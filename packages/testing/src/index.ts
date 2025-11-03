@@ -1,0 +1,2 @@
+export { greeting } from './greeting';
+
