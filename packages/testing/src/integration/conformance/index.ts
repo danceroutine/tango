@@ -1,0 +1,1 @@
+export { runDialectConformanceSuite } from './runDialectConformanceSuite';

@@ -1,0 +1,36 @@
+{
+    "$schema": "https://oxc.rs/schema.json",
+    "categories": {
+        "correctness": "error",
+        "suspicious": "error",
+        "pedantic": "warn"
+    },
+    "jsPlugins": ["oxlint-plugin-eslint"],
+    "ignorePatterns": ["**/next-env.d.ts", "**/.temp/**", "**/docs/.vitepress/cache/**"],
+    "rules": {
+        "max-lines-per-function": "off",
+        "no-unused-vars": ["error", { "varsIgnorePattern": "^_", "argsIgnorePattern": "^_" }],
+        "require-await": "off",
+        "explicit-length-check": "off",
+        "max-lines": "off",
+        "no-extraneous-class": "off",
+        "no-useless-undefined": "off",
+        "no-inline-comments": "off",
+        "no-empty-object-type": "error",
+        "eslint-js/no-restricted-syntax": [
+            "warn",
+            {
+                "selector": "BinaryExpression[operator='instanceof']",
+                "message": "Use static typeguard methods instead of raw instanceof checks."
+            }
+        ],
+        "max-classes-per-file": "off",
+        "no-array-callback-reference": "off",
+        "no-negated-condition": "off",
+        "consistent-function-scoping": "off",
+        "prefer-string-replace-all": "off",
+        // We're not targeting toSorted() yet
+        "no-array-sort": "off",
+        "no-explicit-any": "error"
+    }
+}

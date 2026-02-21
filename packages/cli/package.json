@@ -1,0 +1,54 @@
+{
+    "name": "@danceroutine/tango-cli",
+    "version": "0.1.0",
+    "description": "Unified Tango command line interface for migrations and code generation",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "bin": {
+        "tango": "bin/tango.js"
+    },
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "bin",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsdown",
+        "test": "vitest run --coverage",
+        "test:watch": "vitest",
+        "typecheck": "pnpm run typecheck:prod && pnpm run typecheck:test",
+        "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+        "typecheck:test": "tsc --noEmit -p tsconfig.tests.json"
+    },
+    "keywords": [
+        "tango",
+        "cli",
+        "migrations",
+        "codegen"
+    ],
+    "author": "Pedro Del Moral Lopez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/danceroutine/tango.git",
+        "directory": "packages/cli"
+    },
+    "dependencies": {
+        "@danceroutine/tango-codegen": "workspace:*",
+        "@danceroutine/tango-migrations": "workspace:*",
+        "yargs": "^17.7.2"
+    },
+    "devDependencies": {
+        "@types/node": "^22.9.0",
+        "@types/yargs": "^17.0.33",
+        "tsdown": "^0.4.0",
+        "typescript": "^5.6.3",
+        "vitest": "^4.0.6"
+    }
+}

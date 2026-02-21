@@ -1,33 +1,62 @@
 {
-  "name": "@danceroutine/tango-openapi",
-  "version": "0.1.0",
-  "description": "OpenAPI emitter and documentation helpers for Tango",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@danceroutine/tango-openapi",
+    "version": "0.1.0",
+    "description": "OpenAPI generation for Tango resources",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./domain": {
+            "types": "./dist/domain/index.d.ts",
+            "import": "./dist/domain/index.js"
+        },
+        "./generators": {
+            "types": "./dist/generators/index.d.ts",
+            "import": "./dist/generators/index.js"
+        },
+        "./mappers": {
+            "types": "./dist/mappers/index.d.ts",
+            "import": "./dist/mappers/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsdown",
+        "test": "vitest run --coverage",
+        "test:watch": "vitest",
+        "typecheck": "pnpm run typecheck:prod && pnpm run typecheck:test",
+        "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+        "typecheck:test": "tsc --noEmit -p tsconfig.tests.json"
+    },
+    "keywords": [
+        "tango",
+        "openapi",
+        "swagger",
+        "api-docs"
+    ],
+    "author": "Pedro Del Moral Lopez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/danceroutine/tango.git",
+        "directory": "packages/openapi"
+    },
+    "dependencies": {
+        "@danceroutine/tango-resources": "workspace:*",
+        "zod": "^4.0.0"
+    },
+    "devDependencies": {
+        "@danceroutine/tango-core": "workspace:*",
+        "@danceroutine/tango-testing": "workspace:*",
+        "@types/node": "^22.9.0",
+        "tsdown": "^0.4.0",
+        "typescript": "^5.6.3",
+        "vitest": "^4.0.6"
     }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsdown",
-    "test": "vitest run --coverage",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
-  },
-  "keywords": ["tango", "openapi", "swagger", "api-docs"],
-  "author": "Pedro Del Moral Lopez",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^22.9.0",
-    "tsdown": "^0.4.0",
-    "typescript": "^5.6.3",
-    "vitest": "^4.0.6"
-  }
 }
-

@@ -1,33 +1,70 @@
 {
-  "name": "@danceroutine/tango-core",
-  "version": "0.1.0",
-  "description": "Core types, errors, and result utilities for Tango",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@danceroutine/tango-core",
+    "version": "0.1.0",
+    "description": "Core types, errors, and result utilities for Tango",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./errors": {
+            "types": "./dist/errors/index.d.ts",
+            "import": "./dist/errors/index.js"
+        },
+        "./http": {
+            "types": "./dist/http/index.d.ts",
+            "import": "./dist/http/index.js"
+        },
+        "./result": {
+            "types": "./dist/result/index.d.ts",
+            "import": "./dist/result/index.js"
+        },
+        "./logging": {
+            "types": "./dist/logging/index.d.ts",
+            "import": "./dist/logging/index.js"
+        },
+        "./sql": {
+            "types": "./dist/sql/index.d.ts",
+            "import": "./dist/sql/index.js"
+        },
+        "./runtime": {
+            "types": "./dist/runtime/index.d.ts",
+            "import": "./dist/runtime/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsdown",
+        "test": "vitest run --coverage",
+        "test:watch": "vitest",
+        "typecheck": "pnpm run typecheck:prod && pnpm run typecheck:test",
+        "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+        "typecheck:test": "tsc --noEmit -p tsconfig.tests.json"
+    },
+    "keywords": [
+        "tango",
+        "typescript",
+        "core",
+        "errors",
+        "sql"
+    ],
+    "author": "Pedro Del Moral Lopez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/danceroutine/tango.git",
+        "directory": "packages/core"
+    },
+    "devDependencies": {
+        "@types/node": "^22.9.0",
+        "tsdown": "^0.4.0",
+        "typescript": "^5.6.3",
+        "vitest": "^4.0.6",
+        "zod": "^4.0.0"
     }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsdown",
-    "test": "vitest run --coverage",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
-  },
-  "keywords": ["tango", "typescript", "core", "errors", "result"],
-  "author": "Pedro Del Moral Lopez",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^22.9.0",
-    "tsdown": "^0.4.0",
-    "typescript": "^5.6.3",
-    "vitest": "^4.0.6"
-  }
 }
-

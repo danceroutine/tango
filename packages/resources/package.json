@@ -1,0 +1,81 @@
+{
+    "name": "@danceroutine/tango-resources",
+    "version": "0.1.0",
+    "description": "ModelViewSet, serializers, filters, and pagination for Tango",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./context": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./filters": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./pagination": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./paginators": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./serializer": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./viewset": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./view": {
+            "types": "./dist/view/index.d.ts",
+            "import": "./dist/view/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsdown",
+        "test": "vitest run --coverage",
+        "test:watch": "vitest",
+        "typecheck": "pnpm run typecheck:prod && pnpm run typecheck:test",
+        "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+        "typecheck:test": "tsc --noEmit -p tsconfig.tests.json"
+    },
+    "keywords": [
+        "tango",
+        "resources",
+        "viewset",
+        "crud",
+        "rest"
+    ],
+    "author": "Pedro Del Moral Lopez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/danceroutine/tango.git",
+        "directory": "packages/resources"
+    },
+    "dependencies": {
+        "@danceroutine/tango-core": "workspace:*",
+        "@danceroutine/tango-orm": "workspace:*",
+        "zod": "^4.0.0"
+    },
+    "devDependencies": {
+        "@danceroutine/tango-schema": "workspace:*",
+        "@danceroutine/tango-testing": "workspace:*",
+        "@types/node": "^22.9.0",
+        "tsdown": "^0.4.0",
+        "typescript": "^5.6.3",
+        "vitest": "^4.0.6",
+        "zod": "^4.0.0"
+    }
+}

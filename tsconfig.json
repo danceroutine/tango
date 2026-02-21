@@ -1,39 +1,50 @@
 {
-  "files": [],
-  "references": [
-    {
-      "path": "./packages/core"
-    },
-    {
-      "path": "./packages/schema"
-    },
-    {
-      "path": "./packages/orm"
-    },
-    {
-      "path": "./packages/views"
-    },
-    {
-      "path": "./packages/codegen"
-    },
-    {
-      "path": "./packages/openapi"
-    },
-    {
-      "path": "./packages/migrations"
-    },
-    {
-      "path": "./packages/testing"
-    },
-    {
-      "path": "./packages/adapters/next"
-    },
-    {
-      "path": "./packages/adapters/express"
-    },
-    {
-      "path": "./docs"
-    }
-  ]
+    "files": [],
+    "references": [
+        {
+            "path": "./packages/core"
+        },
+        {
+            "path": "./packages/schema"
+        },
+        {
+            "path": "./packages/config"
+        },
+        {
+            "path": "./packages/orm"
+        },
+        {
+            "path": "./packages/resources"
+        },
+        {
+            "path": "./packages/codegen"
+        },
+        {
+            "path": "./packages/openapi"
+        },
+        {
+            "path": "./packages/migrations"
+        },
+        {
+            "path": "./packages/testing"
+        },
+        {
+            "path": "./packages/cli"
+        },
+        {
+            "path": "./packages/adapters/next"
+        },
+        {
+            "path": "./packages/adapters/express"
+        },
+        {
+            "path": "./docs"
+        },
+        {
+            "path": "./examples/blog-api"
+        },
+        {
+            "path": "./examples/nextjs-blog"
+        }
+    ]
 }
-

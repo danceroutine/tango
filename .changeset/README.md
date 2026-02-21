@@ -12,9 +12,11 @@ pnpm changeset
 
 This will prompt you to select which packages have changed and what type of change it is (major, minor, or patch).
 
+The summary you write is later used to generate Tango's root `CHANGELOG.md` for stable releases.
+
 ## Releasing
 
 Releases are handled automatically via GitHub Actions:
 
-- **Stable releases**: Push to `main` triggers the release workflow which creates a PR to version packages or publishes if the PR is merged
-- **Alpha releases**: Manually trigger the `release-alpha.yml` workflow from the Actions tab, specifying the branch to release from
+- **Stable releases**: Push to `master` triggers the release workflow which creates a version PR with synchronized package versions and an updated root `CHANGELOG.md`
+- **Alpha releases**: Manually trigger the `Release` workflow from the Actions tab, specifying the branch to release from. Alpha publishes do not update the committed root changelog.

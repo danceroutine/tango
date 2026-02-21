@@ -1,0 +1,22 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "composite": true,
+        "outDir": "./dist",
+        "rootDir": ".",
+        "paths": {
+            "@danceroutine/tango-adapters-express": ["../../packages/adapters/express/src/index.ts"],
+            "@danceroutine/tango-adapters-express/*": ["../../packages/adapters/express/src/*"]
+        }
+    },
+    "include": ["src/**/*.ts", "scripts/bootstrap.ts", "migrations/**/*.ts", "tango.config.ts"],
+    "references": [
+        { "path": "../../packages/core" },
+        { "path": "../../packages/schema" },
+        { "path": "../../packages/orm" },
+        { "path": "../../packages/resources" },
+        { "path": "../../packages/adapters/express" },
+        { "path": "../../packages/migrations" },
+        { "path": "../../packages/config" }
+    ]
+}

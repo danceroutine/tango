@@ -1,0 +1,57 @@
+{
+    "name": "@danceroutine/tango-config",
+    "version": "0.1.0",
+    "description": "Configuration loader with environment profiles for Tango",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./schema": {
+            "types": "./dist/schema/index.d.ts",
+            "import": "./dist/schema/index.js"
+        },
+        "./loader": {
+            "types": "./dist/loader/index.d.ts",
+            "import": "./dist/loader/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsdown",
+        "test": "vitest run --coverage",
+        "test:watch": "vitest",
+        "typecheck": "pnpm run typecheck:prod && pnpm run typecheck:test",
+        "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+        "typecheck:test": "tsc --noEmit -p tsconfig.tests.json"
+    },
+    "keywords": [
+        "tango",
+        "config",
+        "environment",
+        "database"
+    ],
+    "author": "Pedro Del Moral Lopez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/danceroutine/tango.git",
+        "directory": "packages/config"
+    },
+    "dependencies": {
+        "dotenv": "^16.4.7",
+        "jiti": "^2.6.1",
+        "zod": "^4.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.9.0",
+        "tsdown": "^0.4.0",
+        "typescript": "^5.6.3",
+        "vitest": "^4.0.6"
+    }
+}

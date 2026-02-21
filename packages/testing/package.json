@@ -1,33 +1,89 @@
 {
-  "name": "@danceroutine/tango-testing",
-  "version": "0.1.0",
-  "description": "Test utilities including testcontainers and factories for Tango",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@danceroutine/tango-testing",
+    "version": "0.1.0",
+    "description": "Testing utilities for Tango",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./integration": {
+            "types": "./dist/integration/index.d.ts",
+            "import": "./dist/integration/index.js"
+        },
+        "./vitest": {
+            "types": "./dist/vitest/index.d.ts",
+            "import": "./dist/vitest/index.js"
+        },
+        "./mocks": {
+            "types": "./dist/mocks/index.d.ts",
+            "import": "./dist/mocks/index.js"
+        },
+        "./factories": {
+            "types": "./dist/factories/index.d.ts",
+            "import": "./dist/factories/index.js"
+        },
+        "./assertions": {
+            "types": "./dist/assertions/index.d.ts",
+            "import": "./dist/assertions/index.js"
+        },
+        "./express": {
+            "types": "./dist/express/index.d.ts",
+            "import": "./dist/express/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsdown",
+        "test": "vitest run --coverage",
+        "test:watch": "vitest",
+        "typecheck": "pnpm run typecheck:prod && pnpm run typecheck:test",
+        "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+        "typecheck:test": "tsc --noEmit -p tsconfig.tests.json"
+    },
+    "keywords": [
+        "tango",
+        "testing",
+        "test",
+        "utilities"
+    ],
+    "author": "Pedro Del Moral Lopez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/danceroutine/tango.git",
+        "directory": "packages/testing"
+    },
+    "dependencies": {
+        "@danceroutine/tango-config": "workspace:*",
+        "@danceroutine/tango-core": "workspace:*",
+        "@danceroutine/tango-migrations": "workspace:*",
+        "@danceroutine/tango-orm": "workspace:*",
+        "@danceroutine/tango-resources": "workspace:*"
+    },
+    "peerDependencies": {
+        "@types/express": "^5.0.0",
+        "vitest": "^4.0.0"
+    },
+    "peerDependenciesMeta": {
+        "@types/express": {
+            "optional": true
+        },
+        "vitest": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.0",
+        "@types/node": "^22.9.0",
+        "tsdown": "^0.4.0",
+        "typescript": "^5.6.3",
+        "vitest": "^4.0.6",
+        "zod": "^4.0.0"
     }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsdown",
-    "test": "vitest run --coverage",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
-  },
-  "keywords": ["tango", "testing", "testcontainers", "factories"],
-  "author": "Pedro Del Moral Lopez",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^22.9.0",
-    "tsdown": "^0.4.0",
-    "typescript": "^5.6.3",
-    "vitest": "^4.0.6"
-  }
 }
-
