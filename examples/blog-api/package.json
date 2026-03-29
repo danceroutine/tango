@@ -1,0 +1,36 @@
+{
+    "name": "@danceroutine/tango-example-express-blog-api",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "predev": "sh -c 'if [ \"$TANGO_SKIP_SETUP_SCHEMA\" = \"true\" ]; then exit 0; fi; pnpm run setup:schema'",
+        "dev": "tsx watch src/index.ts",
+        "prestart": "sh -c 'if [ \"$TANGO_SKIP_SETUP_SCHEMA\" = \"true\" ]; then exit 0; fi; pnpm run setup:schema'",
+        "build": "tsdown",
+        "start": "node dist/index.js",
+        "typecheck": "tsc --noEmit",
+        "setup:schema": "pnpm exec tango migrate --config ./tango.config.ts",
+        "make:migrations": "pnpm exec tango make:migrations --config ./tango.config.ts --models ./src/models/index.ts --name \"${npm_config_name:-manual_change}\"",
+        "prebootstrap": "pnpm run setup:schema",
+        "bootstrap": "tsx src/bootstrap.ts"
+    },
+    "dependencies": {
+        "@danceroutine/tango-cli": "workspace:*",
+        "@danceroutine/tango-core": "workspace:*",
+        "@danceroutine/tango-schema": "workspace:*",
+        "@danceroutine/tango-orm": "workspace:*",
+        "@danceroutine/tango-resources": "workspace:*",
+        "@danceroutine/tango-adapters-express": "workspace:*",
+        "@danceroutine/tango-migrations": "workspace:*",
+        "@danceroutine/tango-openapi": "workspace:*",
+        "@danceroutine/tango-config": "workspace:*",
+        "better-sqlite3": "^11.7.0",
+        "express": "^4.21.2",
+        "zod": "^4.0.0"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.0",
+        "tsx": "^4.19.2"
+    }
+}

@@ -1,10 +1,24 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "baseUrl": ".",
+        "composite": false,
+        "outDir": "./dist",
+        "paths": {
+            "@danceroutine/tango-config": ["../config/src/index.ts"],
+            "@danceroutine/tango-config/*": ["../config/src/*"],
+            "@danceroutine/tango-core": ["../core/src/index.ts"],
+            "@danceroutine/tango-core/*": ["../core/src/*"],
+            "@danceroutine/tango-migrations": ["../migrations/src/index.ts"],
+            "@danceroutine/tango-migrations/*": ["../migrations/src/*"],
+            "@danceroutine/tango-orm": ["../orm/src/index.ts"],
+            "@danceroutine/tango-orm/*": ["../orm/src/*"],
+            "@danceroutine/tango-resources": ["../resources/src/index.ts"],
+            "@danceroutine/tango-resources/*": ["../resources/src/*"],
+            "@danceroutine/tango-schema": ["../schema/src/index.ts"],
+            "@danceroutine/tango-schema/*": ["../schema/src/*"]
+        }
+    },
+    "include": ["src"],
+    "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }
-

@@ -1,33 +1,66 @@
 {
-  "name": "@danceroutine/tango-codegen",
-  "version": "0.1.0",
-  "description": "CLI for generating repositories, types, migrations, and OpenAPI specs for Tango",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@danceroutine/tango-codegen",
+    "version": "0.1.0",
+    "description": "CLI for generating repositories, types, migrations, and OpenAPI specs for Tango",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./domain": {
+            "types": "./dist/domain/index.d.ts",
+            "import": "./dist/domain/index.js"
+        },
+        "./generators": {
+            "types": "./dist/generators/index.d.ts",
+            "import": "./dist/generators/index.js"
+        },
+        "./frameworks": {
+            "types": "./dist/frameworks/index.d.ts",
+            "import": "./dist/frameworks/index.js"
+        },
+        "./commands": {
+            "types": "./dist/commands/index.d.ts",
+            "import": "./dist/commands/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsdown",
+        "test": "vitest run --coverage",
+        "test:watch": "vitest",
+        "typecheck": "pnpm run typecheck:prod && pnpm run typecheck:test",
+        "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+        "typecheck:test": "tsc --noEmit -p tsconfig.tests.json"
+    },
+    "keywords": [
+        "tango",
+        "codegen",
+        "cli",
+        "generator",
+        "migrations"
+    ],
+    "author": "Pedro Del Moral Lopez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/danceroutine/tango.git",
+        "directory": "packages/codegen"
+    },
+    "dependencies": {
+        "@danceroutine/tango-core": "workspace:*",
+        "yargs": "^17.7.2"
+    },
+    "devDependencies": {
+        "@types/yargs": "^17.0.33",
+        "@types/node": "^22.9.0",
+        "tsdown": "^0.4.0",
+        "typescript": "^5.6.3",
+        "vitest": "^4.0.6"
     }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsdown",
-    "test": "vitest run --coverage",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
-  },
-  "keywords": ["tango", "codegen", "cli", "generator", "migrations"],
-  "author": "Pedro Del Moral Lopez",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^22.9.0",
-    "tsdown": "^0.4.0",
-    "typescript": "^5.6.3",
-    "vitest": "^4.0.6"
-  }
 }
-

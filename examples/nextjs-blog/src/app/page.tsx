@@ -1,0 +1,97 @@
+import { TangoQueryParams } from '@danceroutine/tango-core';
+import { OffsetPaginator } from '@danceroutine/tango-resources';
+import { Q, type FilterInput } from '@danceroutine/tango-orm';
+import { PostModel, PostReadSchema, type Post } from '@/lib/models';
+
+function withSearchParam(url: string | undefined, search: string | undefined): string | undefined {
+    if (!url || !search) {
+        return url;
+    }
+
+    const params = new URLSearchParams(url.startsWith('?') ? url.slice(1) : url);
+    params.set('search', search);
+    return `?${params.toString()}`;
+}
+
+/**
+ * Home page rendering paginated published posts from SQLite.
+ */
+export default async function HomePage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+    const params = TangoQueryParams.fromRecord(await searchParams);
+    const search = params.getSearch();
+
+    let qs = PostModel.objects.query().orderBy('-createdAt').filter({ published: true });
+
+    if (search) {
+        const searchFilters: FilterInput<Post>[] = [{ title__icontains: search }, { content__icontains: search }];
+        qs = qs.filter(Q.or(...searchFilters));
+    }
+
+    const paginator = new OffsetPaginator(qs, 20);
+    const { limit, offset } = paginator.parseParams(params);
+    const [{ results: posts }, totalCount] = await Promise.all([paginator.apply(qs).fetch(PostReadSchema), qs.count()]);
+
+    const pagination = paginator.toResponse(posts, { totalCount });
+    const previousHref = withSearchParam(pagination.previous ?? undefined, search);
+    const nextHref = withSearchParam(pagination.next ?? undefined, search);
+
+    return (
+        <main className="container mx-auto px-4 py-8 max-w-4xl">
+            <header className="mb-8">
+                <h1 className="text-4xl font-bold mb-2">Blog Posts</h1>
+                <p className="text-gray-600">SQLite-backed example with search + offset pagination.</p>
+            </header>
+
+            <form method="GET" className="mb-8 flex gap-2">
+                <input
+                    type="text"
+                    name="search"
+                    defaultValue={search}
+                    placeholder="Search title or content"
+                    className="flex-1 border rounded px-3 py-2"
+                />
+                <input type="hidden" name="limit" value={String(limit)} />
+                <button type="submit" className="bg-black text-white rounded px-4 py-2">
+                    Search
+                </button>
+            </form>
+
+            <div className="space-y-6">
+                {posts.length === 0 ? (
+                    <p className="text-gray-500">No published posts yet.</p>
+                ) : (
+                    posts.map((post) => (
+                        <article key={post.id} className="border rounded-lg p-6 shadow-sm">
+                            <h2 className="text-2xl font-semibold mb-2">{post.title}</h2>
+                            {post.excerpt && <p className="text-gray-600 mb-4">{post.excerpt}</p>}
+                            <div className="flex justify-between items-center text-sm text-gray-500">
+                                <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                                <a href={`/posts/${post.slug}`} className="text-blue-600 hover:underline">
+                                    Read more →
+                                </a>
+                            </div>
+                        </article>
+                    ))
+                )}
+            </div>
+
+            <footer className="mt-8 flex items-center justify-between text-sm">
+                {previousHref ? (
+                    <a href={previousHref}>← Previous</a>
+                ) : (
+                    <span className="text-gray-400">← Previous</span>
+                )}
+
+                <span>
+                    Showing {posts.length === 0 ? 0 : offset + 1}-{offset + posts.length} of {totalCount}
+                </span>
+
+                {nextHref ? <a href={nextHref}>Next →</a> : <span className="text-gray-400">Next →</span>}
+            </footer>
+        </main>
+    );
+}

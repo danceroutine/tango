@@ -1,12 +1,27 @@
 {
-  "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
-  "changelog": "@changesets/cli/changelog",
-  "commit": false,
-  "fixed": [],
-  "linked": [],
-  "access": "public",
-  "baseBranch": "master",
-  "updateInternalDependencies": "patch",
-  "ignore": []
+    "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
+    "changelog": false,
+    "commit": false,
+    "fixed": [
+        [
+            "@danceroutine/tango-core",
+            "@danceroutine/tango-schema",
+            "@danceroutine/tango-config",
+            "@danceroutine/tango-orm",
+            "@danceroutine/tango-resources",
+            "@danceroutine/tango-codegen",
+            "@danceroutine/tango-openapi",
+            "@danceroutine/tango-migrations",
+            "@danceroutine/tango-testing",
+            "@danceroutine/tango-cli",
+            "@danceroutine/tango-adapters-core",
+            "@danceroutine/tango-adapters-next",
+            "@danceroutine/tango-adapters-express"
+        ]
+    ],
+    "linked": [],
+    "access": "public",
+    "baseBranch": "master",
+    "updateInternalDependencies": "patch",
+    "ignore": []
 }
-

@@ -1,33 +1,89 @@
 {
-  "name": "@danceroutine/tango-orm",
-  "version": "0.1.0",
-  "description": "QuerySet, repositories, Unit of Work, and database adapters for Tango",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "name": "@danceroutine/tango-orm",
+    "version": "0.1.0",
+    "description": "Model-first querying, runtime-managed database access, and transactions for Tango",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./query": {
+            "types": "./dist/query/index.d.ts",
+            "import": "./dist/query/index.js"
+        },
+        "./connection": {
+            "types": "./dist/connection/index.d.ts",
+            "import": "./dist/connection/index.js"
+        },
+        "./transaction": {
+            "types": "./dist/transaction/index.d.ts",
+            "import": "./dist/transaction/index.js"
+        },
+        "./runtime": {
+            "types": "./dist/runtime/index.d.ts",
+            "import": "./dist/runtime/index.js"
+        },
+        "./manager": {
+            "types": "./dist/manager/index.d.ts",
+            "import": "./dist/manager/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsdown",
+        "test": "vitest run --coverage",
+        "test:integration": "vitest run src/tests/integration",
+        "test:watch": "vitest",
+        "typecheck": "pnpm run typecheck:prod && pnpm run typecheck:test",
+        "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+        "typecheck:test": "tsc --noEmit -p tsconfig.tests.json"
+    },
+    "keywords": [
+        "tango",
+        "orm",
+        "queryset",
+        "database"
+    ],
+    "author": "Pedro Del Moral Lopez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/danceroutine/tango.git",
+        "directory": "packages/orm"
+    },
+    "dependencies": {
+        "@danceroutine/tango-config": "workspace:*",
+        "@danceroutine/tango-core": "workspace:*",
+        "@danceroutine/tango-schema": "workspace:*",
+        "zod": "^4.0.0"
+    },
+    "peerDependencies": {
+        "pg": "^8.13.1",
+        "better-sqlite3": "^11.7.0"
+    },
+    "peerDependenciesMeta": {
+        "pg": {
+            "optional": true
+        },
+        "better-sqlite3": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@danceroutine/tango-migrations": "workspace:*",
+        "@danceroutine/tango-testing": "workspace:*",
+        "@types/better-sqlite3": "^7.6.12",
+        "@types/node": "^22.9.0",
+        "@types/pg": "^8.11.10",
+        "better-sqlite3": "^11.7.0",
+        "pg": "^8.13.1",
+        "tsdown": "^0.4.0",
+        "typescript": "^5.6.3",
+        "vitest": "^4.0.6"
     }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsdown",
-    "test": "vitest run --coverage",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
-  },
-  "keywords": ["tango", "orm", "queryset", "repository", "database"],
-  "author": "Pedro Del Moral Lopez",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^22.9.0",
-    "tsdown": "^0.4.0",
-    "typescript": "^5.6.3",
-    "vitest": "^4.0.6"
-  }
 }
-

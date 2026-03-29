@@ -2,29 +2,45 @@
 layout: home
 
 hero:
-  name: Tango
-  text: TypeScript Web Framework
-  tagline: Inspired by Django and DRF
-  actions:
-    - theme: brand
-      text: Get Started
-      link: /guide/getting-started
-    - theme: alt
-      text: View on GitHub
-      link: https://github.com/pmorales01/tango
+    name: Tango
+    text: Django + DRF workflows for TypeScript
+    tagline: Schema, ORM, migrations, and API-layer primitives designed to work within your favorite framework, inspired by Django and Django REST Framework
+    actions:
+        - theme: brand
+          text: Develop with Tango
+          link: /guide/
+        - theme: alt
+          text: Follow tutorials
+          link: /tutorials/
+        - theme: alt
+          text: Contribute to Tango
+          link: /contributors/
 
 features:
-  - icon: 🚀
-    title: Modern TypeScript
-    details: Built with modern TypeScript, ESM-only, and designed for Node.js 22+
-  - icon: 🎯
-    title: Type-Safe
-    details: Full type safety with strict TypeScript configuration and comprehensive type definitions
-  - icon: 📦
-    title: Modular Architecture
-    details: Clean monorepo structure with independent, composable packages
-  - icon: 🛠️
-    title: Developer Experience
-    details: Fast builds with tsdown, comprehensive testing with Vitest, and modern tooling
+    - title: Type-safe model system
+      details: Tango integrates Zod into your model definitions, combining the best of DRF Serializers with Django models.
+    - title: Django + DRF inspired data layer
+      details: Utilize familiar QuerySets and ModelViewSets to implement your API layer
+    - title: Framework interoperability
+      details: Use Tango with your existing web framework instead of replacing your runtime stack.
+    - title: Production-quality testing support
+      details: Multiple database dialect integration harnesses, plus Vitest helpers for maintainable test suites.
 ---
 
+_Tango is an independent project and is not affiliated with, endorsed by, or sponsored by the Django Software Foundation or the creators of Django REST Framework._
+
+## Get to know Tango
+
+### I want to use Tango in my app
+
+1. [Guide](/guide/)
+2. [Tutorials](/tutorials/)
+3. [Topics](/topics/)
+4. [How-to guides](/how-to/)
+5. [Reference](/reference/)
+
+### I want to contribute to Tango itself
+
+1. [Contributor docs](/contributors/)
+2. [Contributor setup](/contributors/setup)
+3. [Contributing guidelines](/contributing)

@@ -10,7 +10,10 @@ coverage
 .env.local
 .env.*.local
 *.tsbuildinfo
-.changeset/*.md
-!.changeset/README.md
 .vitepress/cache
 .vitepress/dist
+.vscode
+scrapnotes
+.temp
+docs/.vitepress/cache
+packages/**/*.d.ts

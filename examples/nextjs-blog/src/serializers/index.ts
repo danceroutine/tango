@@ -1,0 +1,1 @@
+export { PostSerializer } from './PostSerializer';

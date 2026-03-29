@@ -1,218 +1,120 @@
-- [Tango](#tango)
-  - [Prerequisites](#prerequisites)
-  - [Getting Started](#getting-started)
-    - [1. Clone the Repository](#1-clone-the-repository)
-    - [2. Setup Node Version](#2-setup-node-version)
-    - [3. Install Dependencies](#3-install-dependencies)
-  - [Development](#development)
-    - [Available Scripts](#available-scripts)
-      - [Linting \& Formatting](#linting-formatting)
-      - [Testing](#testing)
-      - [Type Checking](#type-checking)
-      - [Building](#building)
-      - [Documentation](#documentation)
-  - [Monorepo Structure](#monorepo-structure)
-  - [Creating Packages](#creating-packages)
-    - [Package Template Structure](#package-template-structure)
-  - [Releasing](#releasing)
-    - [Creating a Changeset](#creating-a-changeset)
-    - [Stable Releases](#stable-releases)
-    - [Alpha Releases](#alpha-releases)
-  - [Code Quality Standards](#code-quality-standards)
-  - [Contributing](#contributing)
-  - [License](#license)
-  - [Author](#author)
-
 # Tango
 
 Tango is a modern TypeScript web framework that brings the elegance and productivity of Django's design philosophy to the Node.js ecosystem. It encourages rapid development and clean, pragmatic design while leveraging TypeScript's powerful type system for maximum safety and developer experience.
 
 Inspired by [Django](https://github.com/django/django) and Django REST Framework, Tango provides a batteries-included approach to building robust web applications and APIs with TypeScript. Thanks for checking it out.
 
-All documentation is in the "`docs`" directory and online at the VitePress documentation site. If you're just getting started, here's how we recommend you read the docs:
+_Tango is an independent project and is not affiliated with, endorsed by, or sponsored by the Django Software Foundation or the creators of Django REST Framework._
 
-- First, read the [Getting Started guide](docs/guide/getting-started.md) to understand Tango's philosophy
-- Next, follow the [Installation guide](docs/guide/installation.md) for setup instructions
-- Work through tutorials as they become available
-- Check out the [API Reference](docs/api/) for detailed package documentation
+## What Tango Provides
 
-Docs are updated regularly. If you find any problems in the docs, or think they should be clarified in any way, please open an issue or submit a pull request.
+Tango is organized around the same application concerns that shape a Django or Django REST Framework project. Models define structure and metadata, repositories and the ORM handle persistence, migrations keep schema changes explicit and resource classes turn repository behavior into HTTP behavior.
 
-To get more help:
+Tango adds adapters to the mix, to connect those resource classes to host frameworks such as Express and Next.js, and ships with the `tango` CLI to tie the developer workflow together.
 
-- Open an issue on GitHub
-- Check the [documentation site](docs/)
+Tango enhances the frameworks you are already used to with application workflows inspired by Django and is designed to work in tandem with your preferred host framework, without forcing you to migrate away from your chosen tech stack. Express or Next.js continues to own routing and request lifecycle behavior, while Tango provides the application-facing layers for models, persistence, migrations, and API resources.
 
-To contribute to Tango:
+The main packages you will encounter are `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-migrations`, `@danceroutine/tango-resources`, the adapter packages, and `@danceroutine/tango-cli`.
 
-- See the [Contributing](#contributing) section below for information about getting involved
+## Documentation
 
-To run Tango's test suite:
+Tango's documentation is organized to help you solve problems from first principles, and will look familiar to Django developers: tutorials for building something concrete, topic guides for learning the architecture, how-to guides for task-oriented work, and reference pages for public contracts.
 
-- Follow the instructions in the [Development](#development) section
+If you are evaluating Tango, start here:
 
-## Prerequisites
+1. [Getting started](docs/guide/getting-started.md)
+2. [Installation](docs/guide/installation.md)
+3. [Quickstart](docs/quickstart.md)
+4. [Blog API tutorial](docs/tutorials/blog-api.md) or [Next.js tutorial](docs/tutorials/nextjs-blog.md)
+5. the topic guides for the packages you plan to use
 
-Before you begin, ensure you have the following installed:
+The full documentation set lives under [`docs/`](docs/), and is hosted on <https://tangowebframework.dev>.
 
-- **Node.js**: >= 22.0.0 (use `nvm` to manage Node versions)
-- **pnpm**: >= 9.0.0
+## Example Applications
 
-## Getting Started
+Tango provides an example application for each supported host framework, viewable under `examples/`
 
-### 1. Clone the Repository
+Run the Express example with:
+
+```bash
+pnpm --filter @danceroutine/tango-example-express-blog-api bootstrap
+pnpm --filter @danceroutine/tango-example-express-blog-api dev
+```
+
+Run the Next.js example with:
+
+```bash
+pnpm --filter @danceroutine/tango-example-nextjs-blog bootstrap
+pnpm --filter @danceroutine/tango-example-nextjs-blog dev
+```
+
+The examples are the fastest way to see the full Tango stack in one place: models, repositories, migrations, resources, filtering, pagination, and adapters.
+
+## Working in This Repository
+
+If you are contributing to Tango itself, start with the contributor docs:
+
+1. [Contributor overview](docs/contributors/index.md)
+2. [Contributor setup](docs/contributors/setup.md)
+3. [Package catalog](docs/contributors/package-catalog.md)
+4. [Releasing packages](docs/contributors/releasing.md)
+5. [Contributing standards](docs/contributing.md)
+
+### Prerequisites
+
+- Node.js 22 or newer
+- pnpm 9 or newer
+- Docker if you want to run the PostgreSQL integration suite
+
+### Initial Setup
 
 ```bash
 git clone https://github.com/danceroutine/tango.git
 cd tango
-```
-
-### 2. Setup Node Version
-
-This project uses Node.js 22. If you have `nvm` installed:
-
-```bash
 nvm use
-```
-
-This will automatically switch to Node.js 22 based on the `.nvmrc` file.
-
-### 3. Install Dependencies
-
-```bash
 pnpm install
 ```
 
-## Development
-
-### Available Scripts
-
-#### Linting & Formatting
+### Common Commands
 
 ```bash
-pnpm lint          # Run Oxlint, ESLint, and format check
-pnpm lint:ox       # Run Oxlint only
-pnpm lint:eslint   # Run ESLint only
-pnpm format        # Format all files with Prettier
-pnpm format:check  # Check formatting without modifying files
+pnpm typecheck
+pnpm test
+pnpm test:integration
+pnpm test:integration:all
+pnpm build
+pnpm docs:dev
+pnpm docs:build
 ```
 
-#### Testing
+SQLite integration tests run out of the box. For PostgreSQL integration tests, start the local database first:
 
 ```bash
-pnpm test         # Run all tests with coverage (100% required)
-pnpm test:watch   # Run tests in watch mode
+docker compose -f docker-compose.integration.yml up -d
 ```
 
-#### Type Checking
+## Releases
 
-```bash
-pnpm typecheck    # Type check all packages
-```
+Tango uses [Changesets](https://github.com/changesets/changesets) for version management and publishing.
 
-#### Building
-
-```bash
-pnpm build        # Build all packages
-```
-
-#### Documentation
-
-```bash
-pnpm docs:dev     # Start VitePress dev server
-pnpm docs:build   # Build documentation site
-pnpm docs:preview # Preview built documentation
-```
-
-## Monorepo Structure
-
-```
-tango/
-├── packages/          # Framework packages
-│   └── adapters/     # Adapter packages
-├── examples/         # Example applications
-├── docs/            # VitePress documentation site
-└── .changeset/      # Changesets for versioning
-```
-
-## Creating Packages
-
-All packages should:
-
-1. Extend `tsconfig.base.json` for consistent TypeScript configuration
-2. Use `tsdown` for building (ESM-only, no CommonJS)
-3. Maintain 100% test coverage
-4. Follow the monorepo conventions
-
-### Package Template Structure
-
-```
-packages/my-package/
-├── src/
-│   ├── index.ts
-│   └── *.test.ts
-├── package.json
-├── tsconfig.json      # Extends ../../tsconfig.base.json
-├── tsdown.config.ts
-└── vitest.config.ts
-```
-
-## Releasing
-
-This project uses [Changesets](https://github.com/changesets/changesets) for version management and publishing.
-
-### Creating a Changeset
-
-When you make changes that should be released:
+Create a changeset when your work should ship in a release:
 
 ```bash
 pnpm changeset
 ```
 
-Follow the prompts to:
-
-1. Select which packages have changed
-2. Choose the semver bump type (major, minor, patch)
-3. Write a summary of the changes
-
-### Stable Releases
-
-Stable releases are automated via GitHub Actions:
-
-1. Push changes to `main` branch (including changeset files)
-2. GitHub Actions creates a "Version Packages" PR
-3. Review and merge the PR
-4. GitHub Actions automatically publishes to npm
-
-### Alpha Releases
-
-For testing pre-release versions:
-
-1. Go to the GitHub Actions tab
-2. Select "Release Alpha" workflow
-3. Click "Run workflow"
-4. Specify the branch to release from
-5. Packages will be published with `@alpha` tag
-
-## Code Quality Standards
-
-- **Linting**: Oxlint runs first (fast), then ESLint (thorough)
-- **Formatting**: Prettier with automatic formatting on lint
-- **Type Safety**: Strict TypeScript with `verbatimModuleSyntax`
-- **Testing**: 100% code coverage required for all packages
-- **Build**: ESM-only, no CommonJS support
+For the full release workflow, use the [releasing guide](docs/contributors/releasing.md).
 
 ## Contributing
 
-1. Create a feature branch from `main`
-2. Make your changes
-3. Ensure all checks pass (`pnpm lint && pnpm test && pnpm typecheck`)
-4. Create a changeset if needed (`pnpm changeset`)
-5. Submit a pull request
+Issues and pull requests are welcome. Contributor workflow, engineering standards, and release expectations are covered here:
+
+- [Contributor overview](docs/contributors/index.md)
+- [Contributing standards](docs/contributing.md)
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details
+MIT
 
 ## Author
 

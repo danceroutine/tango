@@ -3,7 +3,6 @@ import DefaultTheme from 'vitepress/theme';
 import './custom.css';
 
 export default {
-  extends: DefaultTheme,
-  enhanceApp() {},
+    extends: DefaultTheme,
+    enhanceApp() {},
 } satisfies Theme;
-

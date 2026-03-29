@@ -1,0 +1,20 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "baseUrl": ".",
+        "composite": false,
+        "outDir": "./dist",
+        "paths": {
+            "@danceroutine/tango-config": ["../config/src/index.ts"],
+            "@danceroutine/tango-config/*": ["../config/src/*"],
+            "@danceroutine/tango-codegen": ["../codegen/src/index.ts"],
+            "@danceroutine/tango-codegen/*": ["../codegen/src/*"],
+            "@danceroutine/tango-core": ["../core/src/index.ts"],
+            "@danceroutine/tango-core/*": ["../core/src/*"],
+            "@danceroutine/tango-migrations": ["../migrations/src/index.ts"],
+            "@danceroutine/tango-migrations/*": ["../migrations/src/*"]
+        }
+    },
+    "include": ["src"],
+    "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+}
