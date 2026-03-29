@@ -23,5 +23,9 @@
     "access": "public",
     "baseBranch": "master",
     "updateInternalDependencies": "patch",
-    "ignore": []
+    "ignore": [
+        "@danceroutine/tango-example-express-blog-api",
+        "@danceroutine/tango-example-nextjs-blog",
+        "@danceroutine/tango-docs"
+    ]
 }
