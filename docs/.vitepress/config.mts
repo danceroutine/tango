@@ -1,14 +1,36 @@
 import { defineConfig } from 'vitepress';
 
+function normalizeBase(base: string): string {
+    const trimmed = base.trim();
+    if (!trimmed || trimmed === '/') {
+        return '/';
+    }
+
+    return `/${trimmed.replace(/^\/+|\/+$/g, '')}/`;
+}
+
+function toBasePath(base: string, path: string): string {
+    if (!path.startsWith('/')) {
+        return path;
+    }
+
+    if (base === '/') {
+        return path;
+    }
+
+    return `${base}${path.replace(/^\/+/, '')}`;
+}
+
+const base = normalizeBase(process.env.TANGO_DOCS_BASE ?? '/tango/');
 export default defineConfig({
     title: 'Tango',
     description: 'Batteries-included TypeScript framework inspired by Django and DRF.',
-    base: '/',
+    base,
     cleanUrls: true,
 
     head: [
-        ['link', { rel: 'icon', href: '/favicon.ico' }],
-        ['link', { rel: 'mask-icon', href: '/logo-mark.svg', color: '#8C2F39' }],
+        ['link', { rel: 'icon', href: toBasePath(base, '/favicon.ico') }],
+        ['link', { rel: 'mask-icon', href: toBasePath(base, '/logo-mark.svg'), color: '#8C2F39' }],
         ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
         ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
         [
@@ -150,7 +172,7 @@ export default defineConfig({
             ],
         },
 
-        socialLinks: [{ icon: 'github', link: 'https://github.com/pmorales01/tango' }],
+        socialLinks: [{ icon: 'github', link: 'https://github.com/danceroutine/tango' }],
 
         footer: {
             message: 'Released under the MIT License.',
