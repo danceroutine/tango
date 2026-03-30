@@ -1,6 +1,6 @@
 # Releasing packages
 
-Tango uses a single trusted-publishing workflow for stable and canary releases. Maintainers should follow the release path in this guide and keep the listed files aligned with it.
+Tango uses a single trusted-publishing workflow for stable and alpha releases. Maintainers should follow the release path in this guide and keep the listed files aligned with it.
 
 ## Before you begin
 
@@ -23,7 +23,7 @@ The release workflow lives in `.github/workflows/release.yml` and supports two c
 - stable release flow
 - alpha snapshot flow
 
-Stable runs are triggered by pushes to `master` and can also be triggered manually with `workflow_dispatch`. Alpha runs are triggered manually with `workflow_dispatch` and `release_type=alpha`.
+Stable runs are triggered by pushes to `master` and can also be triggered manually with `workflow_dispatch` for `master`. Alpha runs are triggered manually with `workflow_dispatch` and `release_type=alpha`.
 
 ## Stable release flow
 
@@ -31,9 +31,9 @@ Stable releases are changeset-driven and include root changelog generation.
 
 1. Ensure releasable pull requests include changesets (`pnpm changeset`).
 2. Merge releasable work to `master`.
-3. Let the release workflow run `pnpm changeset:version`, then open or update the version pull request from the generated changes on the `changeset-release/master` branch.
-4. Review the version pull request output, then merge it.
-5. Let the workflow publish through trusted publishing.
+3. Let the release workflow run `pnpm changeset:version`.
+4. If versioning produces a diff, the workflow commits the generated version changes directly to `master` with a bot-authored `[skip ci]` commit so the follow-up push does not start a second release run.
+5. The same workflow run publishes the freshly versioned packages through trusted publishing.
 
 The stable versioning step runs `pnpm changeset:version`, which executes `scripts/release/version-with-root-changelog.ts`. That helper:
 
@@ -58,7 +58,7 @@ Alpha releases intentionally leave `CHANGELOG.md` unchanged.
 
 ## Workspace dependencies
 
-Internal dependencies declared as `workspace:*` are rewritten to concrete published versions during release. Tango's public packages are also versioned together as one fixed release train, so version PRs should show the same version across the published workspace packages.
+Internal dependencies declared as `workspace:*` are rewritten to concrete published versions during release. Tango's public packages are also versioned together as one fixed release train, so generated stable release commits should show the same version across the published workspace packages.
 
 ## Files that must stay in sync
 
