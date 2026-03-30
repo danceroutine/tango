@@ -100,7 +100,7 @@ Before:
 
 After:
 
-`ModelViewSet is the abstract base class for repository-backed CRUD resources.`
+`ModelViewSet is the abstract base class for manager-backed CRUD resources.`
 
 ### Abstract significance marker
 
@@ -110,7 +110,7 @@ Before:
 
 After:
 
-`The repository stays focused on persistence concerns and remains agnostic of routing and other web-layer behavior.`
+`The manager stays focused on persistence concerns and remains agnostic of routing and other web-layer behavior.`
 
 ### Negative-opening contrast
 
@@ -156,11 +156,11 @@ After:
 
 Before:
 
-`Config fields: repository, readSchema, writeSchema, updateSchema, filters, orderingFields, searchFields.`
+`Config fields: manager, readSchema, writeSchema, updateSchema, filters, orderingFields, searchFields.`
 
 After:
 
-`Application code supplies the repository and the schemas that define the resource contract. Optional filtering, ordering, and search settings refine the public API.`
+`Application code supplies the manager and the schemas that define the resource contract. Optional filtering, ordering, and search settings refine the public API.`
 
 ### Contract-name drift
 

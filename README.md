@@ -8,7 +8,7 @@ _Tango is an independent project and is not affiliated with, endorsed by, or spo
 
 ## What Tango Provides
 
-Tango is organized around the same application concerns that shape a Django or Django REST Framework project. Models define structure and metadata, repositories and the ORM handle persistence, migrations keep schema changes explicit and resource classes turn repository behavior into HTTP behavior.
+Tango is organized around the same application concerns that shape a Django or Django REST Framework project. Models define structure and metadata, model managers and the ORM handle persistence, migrations keep schema changes explicit and resource classes turn manager behavior into HTTP behavior.
 
 Tango adds adapters to the mix, to connect those resource classes to host frameworks such as Express and Next.js, and ships with the `tango` CLI to tie the developer workflow together.
 
@@ -48,7 +48,7 @@ pnpm --filter @danceroutine/tango-example-nextjs-blog bootstrap
 pnpm --filter @danceroutine/tango-example-nextjs-blog dev
 ```
 
-The examples are the fastest way to see the full Tango stack in one place: models, repositories, migrations, resources, filtering, pagination, and adapters.
+The examples are the fastest way to see the full Tango stack in one place: models, managers, migrations, resources, filtering, pagination, and adapters.
 
 ## Working in This Repository
 

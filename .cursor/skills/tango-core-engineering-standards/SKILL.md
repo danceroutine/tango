@@ -1,6 +1,6 @@
 ---
 name: tango-core-engineering-standards
-description: Enforce Tango core engineering standards for source-code changes. Use when implementing or reviewing code that touches package structure, exports, typing, branding, or refactors, so changes remain domain-driven, discoverable, strictly typed, and free of compatibility shims.
+description: Enforce Tango core engineering standards for source-code changes. Use when implementing or reviewing code that touches package structure, exports, typing, branding, or refactors, so changes remain domain-driven, discoverable, and strictly typed.
 ---
 
 # Tango Core Engineering Standards
@@ -66,12 +66,12 @@ Execute this workflow for any Tango code change that affects package source file
 
 1. Do: Validate changes with package-level and workspace-level checks.
 2. Check against rules:
-    - Avoid compatibility shims unless explicitly requested.
+    - Add compatibility layers only when an existing public contract or explicit maintainer direction requires them.
     - Keep behavior stable unless behavior change was explicitly requested.
     - Ensure no regressions in typecheck and relevant tests.
     - When shared test fixtures change, validate both producer (`@danceroutine/tango-testing`) and all touched consumer packages.
 3. Address issues:
-    - Update call sites directly instead of adding transitional aliases.
+    - Update call sites directly when the change is internal-only, and add compatibility layers only when the supported contract requires them.
     - Fix regressions and rerun validation until green.
     - Report what changed, why it changed, and which validations passed.
     - For broad test refactors, maintain a per-file checklist and close each item explicitly.

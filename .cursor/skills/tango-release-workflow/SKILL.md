@@ -1,6 +1,6 @@
 ---
 name: tango-release-workflow
-description: Execute Tango release operations for stable and alpha channels using the current GitHub Actions trusted publishing flow. Use when maintainers need to prepare, run, or verify a release and require explicit guidance checkpoints before irreversible steps (workflow dispatch, merge, and publish).
+description: Execute Tango release operations for stable and alpha channels using the current GitHub Actions trusted publishing flow. Use when maintainers need to prepare, run, or verify a release and require explicit guidance checkpoints before irreversible steps (workflow dispatch and publish).
 ---
 
 # Tango Release Workflow
@@ -44,21 +44,17 @@ Execute this workflow when creating a Tango release.
     - Ensure releasable PRs include changesets.
     - If uncertain, run `pnpm changeset status --since=origin/master` when available.
 2. Ask maintainer guidance checkpoint #3:
-    - "Choose stable trigger path: push-to-master flow, or manual workflow_dispatch stable run?"
-3. If manual stable dispatch is chosen, ask guidance checkpoint #4:
-    - "Which branch should be used for manual stable dispatch?"
+    - "Choose stable trigger path: push-to-master flow, or manual workflow_dispatch stable run on master?"
+3. If manual stable dispatch is chosen, confirm that `master` is the target branch before dispatch.
 4. Trigger or wait for the `Release` workflow according to checkpoint #3.
-5. Wait for or inspect version PR created by `changesets/action`.
-6. Verify version PR content:
+5. Verify the generated stable release commit and workflow output:
     - public Tango packages share one synchronized version
     - `CHANGELOG.md` changed via generated stable notes
     - lockfile and version bumps are coherent
-7. Ask maintainer guidance checkpoint #5:
-    - "Version PR looks ready. Do you want to merge it now?"
-8. After merge, verify publish job outcome:
+6. Verify publish job outcome:
     - workflow success
     - npm publish completed via trusted publishing
-9. Ask maintainer guidance checkpoint #6:
+7. Ask maintainer guidance checkpoint #5:
     - "Do you want a post-release validation pass (npm package/version spot checks)?"
 
 ## Alpha Channel Path
@@ -88,7 +84,6 @@ Example prompts:
 
 - "Stable or alpha?"
 - "Run full local preflight now or skip to workflow?"
-- "Merge version PR now?"
 - "Run post-release npm validation?"
 
 ## Validation and Reporting
