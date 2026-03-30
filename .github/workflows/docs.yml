@@ -55,7 +55,7 @@ jobs:
 
             - name: Build docs
               env:
-                  TANGO_DOCS_BASE: /tango/
+                  TANGO_DOCS_BASE: /
               run: pnpm docs:build
 
             - name: Upload Pages artifact

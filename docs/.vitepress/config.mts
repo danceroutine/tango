@@ -21,7 +21,7 @@ function toBasePath(base: string, path: string): string {
     return `${base}${path.replace(/^\/+/, '')}`;
 }
 
-const base = normalizeBase(process.env.TANGO_DOCS_BASE ?? '/tango/');
+const base = normalizeBase(process.env.TANGO_DOCS_BASE ?? '/');
 export default defineConfig({
     title: 'Tango',
     description: 'Batteries-included TypeScript framework inspired by Django and DRF.',
