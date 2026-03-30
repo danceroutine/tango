@@ -31,7 +31,7 @@ Stable releases are changeset-driven and include root changelog generation.
 
 1. Ensure releasable pull requests include changesets (`pnpm changeset`).
 2. Merge releasable work to `master`.
-3. Let the release workflow open or update the version pull request through `changesets/action`.
+3. Let the release workflow run `pnpm changeset:version`, then open or update the version pull request from the generated changes on the `changeset-release/master` branch.
 4. Review the version pull request output, then merge it.
 5. Let the workflow publish through trusted publishing.
 
