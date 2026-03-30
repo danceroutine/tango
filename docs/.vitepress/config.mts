@@ -1,4 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { defineConfig } from 'vitepress';
+
+type PackageManifest = {
+    version?: string;
+};
 
 function normalizeBase(base: string): string {
     const trimmed = base.trim();
@@ -22,6 +28,9 @@ function toBasePath(base: string, path: string): string {
 }
 
 const base = normalizeBase(process.env.TANGO_DOCS_BASE ?? '/');
+const packageManifestPath = resolve(import.meta.dirname, '../../packages/core/package.json');
+const publicVersion = (JSON.parse(readFileSync(packageManifestPath, 'utf8')) as PackageManifest).version ?? '0.0.0';
+
 export default defineConfig({
     title: 'Tango',
     description: 'Batteries-included TypeScript framework inspired by Django and DRF.',
@@ -56,8 +65,8 @@ export default defineConfig({
             { text: 'Reference', link: '/reference/' },
             { text: 'Contributors', link: '/contributors/' },
             {
-                text: 'v0.0.0',
-                items: [{ text: 'Changelog', link: 'https://github.com/danceroutine/tango/releases' }],
+                text: `v${publicVersion}`,
+                items: [{ text: 'Changelog', link: 'https://github.com/danceroutine/tango/blob/master/CHANGELOG.md' }],
             },
         ],
 
