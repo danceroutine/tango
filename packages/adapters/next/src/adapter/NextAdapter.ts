@@ -13,10 +13,13 @@ import {
     type FrameworkAdapter,
     type FrameworkAdapterOptions,
 } from '@danceroutine/tango-adapters-core/adapter';
-import { InternalHttpMethod, InternalActionScope, InternalActionMatchKind } from '@danceroutine/tango-adapters-core';
-
-type HttpMethod = (typeof InternalHttpMethod)[keyof typeof InternalHttpMethod];
-type ActionScope = (typeof InternalActionScope)[keyof typeof InternalActionScope];
+import {
+    InternalHttpMethod,
+    InternalActionScope,
+    InternalActionMatchKind,
+    type ActionScope,
+    type HttpMethod,
+} from '@danceroutine/tango-adapters-core';
 
 type ResolvedViewSetActionDescriptor = {
     name: string;
