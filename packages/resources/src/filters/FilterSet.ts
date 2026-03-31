@@ -294,6 +294,28 @@ export class FilterSet<T extends Record<string, unknown>> {
     }
 
     /**
+     * Return a new filter set with parser-aware scalar/range/in resolvers for matching fields.
+     */
+    withFieldParsers(parsers: Partial<Record<keyof T, FilterValueParser>>): FilterSet<T> {
+        if (Object.keys(parsers).length === 0) {
+            return this;
+        }
+
+        let changed = false;
+        const nextSpec = Object.fromEntries(
+            Object.entries(this.spec).map(([param, resolver]) => {
+                const nextResolver = this.applyFieldParserOverride(resolver, parsers);
+                if (nextResolver !== resolver) {
+                    changed = true;
+                }
+                return [param, nextResolver];
+            })
+        ) as Record<string, FilterResolver<T>>;
+
+        return changed ? new FilterSet(nextSpec, this.allowAllParams) : this;
+    }
+
+    /**
      * Apply all configured resolvers against query params.
      */
     apply(params: TangoQueryParams): FilterInput<T>[] {
@@ -372,6 +394,31 @@ export class FilterSet<T extends Record<string, unknown>> {
 
             default:
                 return undefined;
+        }
+    }
+
+    private applyFieldParserOverride(
+        resolver: FilterResolver<T>,
+        parsers: Partial<Record<keyof T, FilterValueParser>>
+    ): FilterResolver<T> {
+        switch (resolver.type) {
+            case InternalFilterType.SCALAR: {
+                const parser = parsers[resolver.column];
+                return parser ? FilterSet.createLookupResolver(resolver.column, 'exact', parser) : resolver;
+            }
+
+            case InternalFilterType.RANGE: {
+                const parser = parsers[resolver.column];
+                return parser ? FilterSet.createLookupResolver(resolver.column, resolver.op, parser) : resolver;
+            }
+
+            case InternalFilterType.IN: {
+                const parser = parsers[resolver.column];
+                return parser ? FilterSet.createLookupResolver(resolver.column, 'in', parser) : resolver;
+            }
+
+            default:
+                return resolver;
         }
     }
 }

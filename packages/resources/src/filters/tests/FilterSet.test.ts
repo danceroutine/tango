@@ -182,6 +182,58 @@ describe(FilterSet, () => {
         expect(result).toEqual([{ active: true }]);
     });
 
+    it('can enrich scalar, range, and in filters with field parser overrides after definition', () => {
+        const filters = FilterSet.define<UserFilterModel>({
+            fields: {
+                active: true,
+                age: ['gte', 'in'],
+            },
+        }).withFieldParsers({
+            active: (raw) => {
+                const value = (Array.isArray(raw) ? raw[0] : raw)?.toLowerCase();
+                if (value === 'true') return true;
+                if (value === 'false') return false;
+                return undefined;
+            },
+            age: (raw) => {
+                const values = Array.isArray(raw) ? raw : String(raw).split(',');
+                const parsed = values.map(Number);
+                return parsed.length === 1 ? parsed[0] : parsed;
+            },
+        });
+
+        expect(filters.apply(query('active=true'))).toEqual([{ active: true }]);
+        expect(filters.apply(query('age__gte=21'))).toEqual([{ age__gte: 21 }]);
+        expect(filters.apply(query('age__in=1,2,3'))).toEqual([{ age__in: [1, 2, 3] }]);
+    });
+
+    it('leaves non-scalar filter resolvers unchanged when applying field parser overrides', () => {
+        const filters = FilterSet.define<UserFilterModel>({
+            aliases: {
+                q: {
+                    fields: ['name', 'email'],
+                },
+            },
+        }).withFieldParsers({
+            active: (raw) => raw,
+        });
+
+        expect(filters.apply(query('q=pedro'))).toEqual([{ name__icontains: '%pedro%', email__icontains: '%pedro%' }]);
+    });
+
+    it('leaves range and in resolvers unchanged when no matching parser override exists', () => {
+        const filters = FilterSet.define<UserFilterModel>({
+            fields: {
+                age: ['gte', 'in'],
+            },
+        }).withFieldParsers({
+            active: (raw) => raw,
+        });
+
+        expect(filters.apply(query('age__gte=21'))).toEqual([{ age__gte: '21' }]);
+        expect(filters.apply(query('age__in=1,2,3'))).toEqual([{ age__in: ['1', '2', '3'] }]);
+    });
+
     it('supports alias declarations for single-field lookups', () => {
         const filters = FilterSet.define<UserFilterModel>({
             aliases: {

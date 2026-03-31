@@ -5,6 +5,7 @@ import { OffsetPaginator } from '../paginators/OffsetPaginator';
 import { APIView } from './APIView';
 import { RequestContext } from '../context/index';
 import type { FilterSet } from '../filters/index';
+import { inferModelFieldParsers } from '../filters/inferModelFieldParsers';
 import type { GenericAPIViewOpenAPIDescription } from '../resource/index';
 import type { ModelSerializerClass, SerializerOutput, SerializerSchema } from '../serializer/index';
 import type { ResourceModelLike } from '../resource/index';
@@ -129,7 +130,9 @@ export abstract class GenericAPIView<
             let qs = baseQueryset;
 
             if (this.filters) {
-                const filterInputs = this.filters.apply(params);
+                const filterInputs = this.filters
+                    .withFieldParsers(inferModelFieldParsers(this.getSerializer().getModel()))
+                    .apply(params);
                 if (filterInputs.length > 0) {
                     qs = qs.filter(Q.and(...filterInputs));
                 }

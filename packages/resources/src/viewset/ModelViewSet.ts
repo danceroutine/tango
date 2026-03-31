@@ -2,6 +2,7 @@ import type { FilterInput, ManagerLike, QuerySet } from '@danceroutine/tango-orm
 import { HttpErrorFactory, TangoResponse, type JsonValue, NotFoundError } from '@danceroutine/tango-core';
 import type { RequestContext } from '../context/index';
 import type { FilterSet } from '../filters/index';
+import { inferModelFieldParsers } from '../filters/inferModelFieldParsers';
 import { OffsetPaginator } from '../paginators/OffsetPaginator';
 import { Q } from '@danceroutine/tango-orm';
 import type { Paginator } from '../pagination/index';
@@ -186,7 +187,9 @@ export abstract class ModelViewSet<
             let qs = baseQueryset;
 
             if (this.filters) {
-                const filterInputs = this.filters.apply(params);
+                const filterInputs = this.filters
+                    .withFieldParsers(inferModelFieldParsers(this.getSerializer().getModel()))
+                    .apply(params);
                 if (filterInputs.length > 0) {
                     qs = qs.filter(Q.and(...filterInputs));
                 }
