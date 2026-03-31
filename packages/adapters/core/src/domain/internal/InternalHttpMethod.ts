@@ -5,3 +5,5 @@ export const InternalHttpMethod = {
     PATCH: 'PATCH',
     DELETE: 'DELETE',
 } as const;
+
+export type HttpMethod = (typeof InternalHttpMethod)[keyof typeof InternalHttpMethod];
