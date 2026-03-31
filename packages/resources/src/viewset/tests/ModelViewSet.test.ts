@@ -338,6 +338,22 @@ describe(ModelViewSet, () => {
         );
     });
 
+    it('rejects OpenAPI generation when serializer model metadata has no primary key field', () => {
+        currentUserModel = {
+            objects: manager,
+            metadata: {
+                name: 'User',
+                fields: [{ name: 'email', type: 'text' }],
+            },
+        } as ResourceModelLike<UserRecord>;
+
+        const minimal = new UserViewSet({ serializer: UserSerializer });
+
+        expect(() => minimal.describeOpenAPI()).toThrow(
+            'OpenAPI generation requires a primary key field in Tango model metadata.'
+        );
+    });
+
     it('returns 404 when retrieve cannot find a row', async () => {
         vi.mocked(querySetDouble.fetchOne).mockResolvedValue(null);
 
