@@ -74,14 +74,15 @@ export abstract class GenericAPIView<
      * Describe the public HTTP contract that this resource contributes to OpenAPI generation.
      */
     describeOpenAPI(): GenericAPIViewOpenAPIDescription<TModel, TSerializer> {
+        const model = this.requireModelMetadata();
         return {
-            model: this.requireModelMetadata(),
+            model,
             outputSchema: this.getOutputSchema(),
             createSchema: this.getCreateSchema(),
             updateSchema: this.getUpdateSchema(),
             searchFields: this.searchFields,
             orderingFields: this.orderingFields,
-            lookupField: this.getLookupField(),
+            lookupField: this.lookupField ?? this.getLookupFieldFromMetadata(model),
             lookupParam: this.lookupParam,
             allowedMethods: this.getAllowedMethods(),
             usesDefaultOffsetPagination: !this.paginatorFactory,
@@ -256,5 +257,19 @@ export abstract class GenericAPIView<
         return model as ResourceModelLike<TModel> & {
             metadata: NonNullable<ResourceModelLike<TModel>['metadata']>;
         };
+    }
+
+    private getLookupFieldFromMetadata(
+        model: ResourceModelLike<TModel> & {
+            metadata: NonNullable<ResourceModelLike<TModel>['metadata']>;
+        }
+    ): keyof TModel {
+        const primaryKeyField = model.metadata.fields.find((field) => field.primaryKey);
+
+        if (!primaryKeyField) {
+            throw new Error('OpenAPI generation requires a primary key field in Tango model metadata.');
+        }
+
+        return primaryKeyField.name as keyof TModel;
     }
 }

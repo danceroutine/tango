@@ -390,6 +390,21 @@ describe(GenericAPIView, () => {
         expect(description.updateSchema).toBe(UserSerializer.updateSchema);
     });
 
+    it('derives the OpenAPI lookup field from model metadata when no explicit lookup field is configured', () => {
+        currentUserModel = {
+            objects: aManager<UserRecord>({
+                meta: { table: 'users', pk: 'id', columns: { id: 'int', email: 'text', name: 'text' } },
+            }),
+            metadata: {
+                name: 'User',
+                fields: [{ name: 'id', type: 'serial', primaryKey: true }],
+            },
+        };
+
+        const view = new UserDetailView({ serializer: UserSerializer });
+        expect(view.describeOpenAPI().lookupField).toBe('id');
+    });
+
     it('rejects OpenAPI generation when serializer model metadata is missing', () => {
         currentUserModel = {
             objects: aManager<UserRecord>({
@@ -400,6 +415,23 @@ describe(GenericAPIView, () => {
         const view = new UserDetailView({ serializer: UserSerializer });
         expect(() => view.describeOpenAPI()).toThrow(
             'OpenAPI generation requires Tango model metadata on GenericAPIView models.'
+        );
+    });
+
+    it('rejects OpenAPI generation when model metadata does not mark a primary key field', () => {
+        currentUserModel = {
+            objects: aManager<UserRecord>({
+                meta: { table: 'users', pk: 'id', columns: { id: 'int', email: 'text', name: 'text' } },
+            }),
+            metadata: {
+                name: 'User',
+                fields: [{ name: 'id', type: 'serial' }],
+            },
+        };
+
+        const view = new UserDetailView({ serializer: UserSerializer });
+        expect(() => view.describeOpenAPI()).toThrow(
+            'OpenAPI generation requires a primary key field in Tango model metadata.'
         );
     });
 
