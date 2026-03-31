@@ -34,4 +34,11 @@ describe(TemplateBuilder, () => {
         expect(oneLiner).toContain('@danceroutine/tango-adapters-express@');
         expect(oneLiner).toContain('pg@^8.16.3');
     });
+
+    it('formats Nuxt install instructions with the Nuxt adapter package', () => {
+        const oneLiner = TemplateBuilder.getTangoInstallOneLiner('pnpm', 'sqlite', 'nuxt');
+
+        expect(oneLiner).toContain('@danceroutine/tango-adapters-nuxt@');
+        expect(oneLiner).toContain('better-sqlite3@^11.10.0');
+    });
 });

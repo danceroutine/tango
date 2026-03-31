@@ -12,6 +12,7 @@ Use a tutorial when you want to see how several Tango packages fit together in o
 
 - [Blog API tutorial](/tutorials/blog-api)
 - [Next.js blog tutorial](/tutorials/nextjs-blog)
+- [Nuxt blog tutorial](/tutorials/nuxt-blog)
 
 ## Topic guides
 

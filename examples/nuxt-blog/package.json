@@ -1,0 +1,41 @@
+{
+    "name": "@danceroutine/tango-example-nuxt-blog",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "prepare:tango": "pnpm --filter @danceroutine/tango-config build && pnpm --filter @danceroutine/tango-core build && pnpm --filter @danceroutine/tango-schema build && pnpm --filter @danceroutine/tango-orm build && pnpm --filter @danceroutine/tango-resources build && pnpm --filter @danceroutine/tango-migrations build && pnpm --filter @danceroutine/tango-openapi build && pnpm --filter @danceroutine/tango-adapters-core build && pnpm --filter @danceroutine/tango-adapters-nuxt build && pnpm --filter @danceroutine/tango-cli build",
+        "predev": "sh -c 'pnpm run prepare:tango && if [ \"$TANGO_SKIP_SETUP_SCHEMA\" = \"true\" ]; then exit 0; fi; pnpm run setup:schema'",
+        "dev": "NUXT_TELEMETRY_DISABLED=1 nuxt dev",
+        "prebuild": "pnpm run prepare:tango",
+        "prestart": "sh -c 'pnpm run prepare:tango && if [ \"$TANGO_SKIP_SETUP_SCHEMA\" = \"true\" ]; then exit 0; fi; pnpm run setup:schema'",
+        "build": "NUXT_TELEMETRY_DISABLED=1 nuxt build",
+        "start": "NUXT_TELEMETRY_DISABLED=1 nuxt preview",
+        "typecheck": "NUXT_TELEMETRY_DISABLED=1 nuxt typecheck",
+        "setup:schema": "pnpm exec tango migrate --config ./tango.config.ts",
+        "make:migrations": "pnpm exec tango make:migrations --config ./tango.config.ts --models ./lib/models.ts --name \"${npm_config_name:-manual_change}\"",
+        "prebootstrap": "pnpm run prepare:tango && pnpm run setup:schema",
+        "bootstrap": "tsx scripts/bootstrap.ts"
+    },
+    "dependencies": {
+        "@danceroutine/tango-adapters-nuxt": "workspace:*",
+        "@danceroutine/tango-cli": "workspace:*",
+        "@danceroutine/tango-config": "workspace:*",
+        "@danceroutine/tango-core": "workspace:*",
+        "@danceroutine/tango-migrations": "workspace:*",
+        "@danceroutine/tango-openapi": "workspace:*",
+        "@danceroutine/tango-orm": "workspace:*",
+        "@danceroutine/tango-resources": "workspace:*",
+        "@danceroutine/tango-schema": "workspace:*",
+        "better-sqlite3": "^11.7.0",
+        "nuxt": "^4.4.2",
+        "vue": "^3.5.31",
+        "zod": "^4.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.9.0",
+        "tsx": "^4.20.6",
+        "typescript": "^5.6.3",
+        "vue-tsc": "^3.1.2"
+    }
+}

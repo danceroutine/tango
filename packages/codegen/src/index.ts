@@ -15,6 +15,7 @@ export {
     FrameworkScaffoldRegistry,
     ExpressScaffoldStrategy,
     NextScaffoldStrategy,
+    NuxtScaffoldStrategy,
     scaffoldProject,
 } from './frameworks/index';
 export type {

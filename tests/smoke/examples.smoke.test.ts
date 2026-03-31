@@ -11,6 +11,7 @@ function ensureSmokeBuildPrerequisites(): void {
         ['--filter', '@danceroutine/tango-cli', 'build'],
         ['--filter', '@danceroutine/tango-adapters-express', 'build'],
         ['--filter', '@danceroutine/tango-adapters-next', 'build'],
+        ['--filter', '@danceroutine/tango-adapters-nuxt', 'build'],
     ];
 
     for (const args of commands) {
@@ -38,8 +39,10 @@ function ensureSmokeBuildPrerequisites(): void {
 smokeDescribe('example smoke tests', () => {
     let expressHarness: AppProcessHarness | null = null;
     let nextHarness: AppProcessHarness | null = null;
+    let nuxtHarness: AppProcessHarness | null = null;
     const expressSqliteFile = `/tmp/tango-smoke-express-${randomUUID()}.sqlite`;
     const nextSqliteFile = `/tmp/tango-smoke-next-${randomUUID()}.sqlite`;
+    const nuxtSqliteFile = `/tmp/tango-smoke-nuxt-${randomUUID()}.sqlite`;
 
     beforeAll(async () => {
         ensureSmokeBuildPrerequisites();
@@ -47,10 +50,11 @@ smokeDescribe('example smoke tests', () => {
         // Ensure a clean database state for repeatable smoke runs.
         await rm(expressSqliteFile, { force: true });
         await rm(nextSqliteFile, { force: true });
+        await rm(nuxtSqliteFile, { force: true });
 
         expressHarness = await AppProcessHarness.start({
             command: 'pnpm',
-            args: ['--filter', '@danceroutine/tango-example-express-blog-api', 'dev'],
+            args: ['--filter', '@danceroutine/tango-example-express-blog-api', 'start'],
             baseUrl: 'http://127.0.0.1:3210',
             readyPath: '/health',
             env: {
@@ -72,9 +76,24 @@ smokeDescribe('example smoke tests', () => {
             readyTimeoutMs: 90_000,
             readyIntervalMs: 300,
         });
+
+        nuxtHarness = await AppProcessHarness.start({
+            command: 'pnpm',
+            args: ['--filter', '@danceroutine/tango-example-nuxt-blog', 'dev', '--port', '3212', '--host', '127.0.0.1'],
+            baseUrl: 'http://127.0.0.1:3212',
+            readyPath: '/api/health',
+            env: {
+                TANGO_SQLITE_FILENAME: nuxtSqliteFile,
+            },
+            readyTimeoutMs: 120_000,
+            readyIntervalMs: 300,
+        });
     }, 120_000);
 
     afterAll(async () => {
+        if (nuxtHarness) {
+            await nuxtHarness.stop();
+        }
         if (nextHarness) {
             await nextHarness.stop();
         }
@@ -83,6 +102,7 @@ smokeDescribe('example smoke tests', () => {
         }
         await rm(expressSqliteFile, { force: true });
         await rm(nextSqliteFile, { force: true });
+        await rm(nuxtSqliteFile, { force: true });
     });
 
     it('smokes express CRUD routes with one-call viewset registration', async () => {
@@ -206,6 +226,78 @@ smokeDescribe('example smoke tests', () => {
         });
 
         await nextHarness!.assertResponseStatus(invalid, 400, 'next invalid create should return 400');
+        const body = (await invalid.json()) as { error?: string; details?: Record<string, string[]> };
+        expect(typeof body.error).toBe('string');
+        expect(body.details).toBeDefined();
+    });
+
+    it('smokes nuxt SSR pages and Nitro CRUD routes', async () => {
+        const home = await nuxtHarness!.request('/');
+        await nuxtHarness!.assertResponseStatus(home, 200, 'nuxt home page failed');
+        expect(await home.text()).toContain('Tango + Nuxt');
+
+        const openapi = await nuxtHarness!.request('/api/openapi');
+        await nuxtHarness!.assertResponseStatus(openapi, 200, 'nuxt openapi endpoint failed');
+        const nuxtSpec = (await openapi.json()) as { openapi?: string; paths?: Record<string, unknown> };
+        expect(nuxtSpec.openapi).toBe('3.1.0');
+        expect(nuxtSpec.paths).toBeDefined();
+
+        const created = await nuxtHarness!.request('/api/posts', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                title: 'Nuxt Smoke Title',
+                content: 'Nuxt Smoke Content',
+                published: false,
+            }),
+        });
+        await nuxtHarness!.assertResponseStatus(created, 201, 'nuxt create /api/posts failed');
+        const post = (await created.json()) as { id: number; title: string; slug: string };
+        expect(post.title).toBe('Nuxt Smoke Title');
+
+        const retrieved = await nuxtHarness!.request(`/api/posts/${String(post.id)}`);
+        await nuxtHarness!.assertResponseStatus(retrieved, 200, 'nuxt retrieve /api/posts/:id failed');
+
+        const patched = await nuxtHarness!.request(`/api/posts/${String(post.id)}`, {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                title: 'Nuxt Smoke Title Updated',
+            }),
+        });
+        await nuxtHarness!.assertResponseStatus(patched, 200, 'nuxt patch /api/posts/:id failed');
+
+        const published = await nuxtHarness!.request(`/api/posts/${String(post.id)}/publish`, {
+            method: 'POST',
+        });
+        await nuxtHarness!.assertResponseStatus(published, 200, 'nuxt publish /api/posts/:id/publish failed');
+
+        const page = await nuxtHarness!.request(`/posts/${post.slug}`);
+        await nuxtHarness!.assertResponseStatus(page, 200, 'nuxt post page failed');
+        expect(await page.text()).toContain('Nuxt Smoke Title Updated');
+
+        const genericRetrieve = await nuxtHarness!.request(`/api/posts-generic/${String(post.id)}`);
+        await nuxtHarness!.assertResponseStatus(genericRetrieve, 200, 'nuxt generic api view retrieve failed');
+
+        const apiViewStatus = await nuxtHarness!.request('/api/status');
+        await nuxtHarness!.assertResponseStatus(apiViewStatus, 200, 'nuxt api view /api/status failed');
+
+        const deleted = await nuxtHarness!.request(`/api/posts/${String(post.id)}`, {
+            method: 'DELETE',
+        });
+        await nuxtHarness!.assertResponseStatus(deleted, 204, 'nuxt delete /api/posts/:id failed');
+    });
+
+    it('returns 400 for invalid nuxt create payloads', async () => {
+        const invalid = await nuxtHarness!.request('/api/posts', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                title: 'Invalid payload without required content',
+            }),
+        });
+
+        await nuxtHarness!.assertResponseStatus(invalid, 400, 'nuxt invalid create should return 400');
         const body = (await invalid.json()) as { error?: string; details?: Record<string, string[]> };
         expect(typeof body.error).toBe('string');
         expect(body.details).toBeDefined();

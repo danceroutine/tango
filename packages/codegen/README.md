@@ -25,6 +25,7 @@ The scaffold strategies are the primary public workflow. The lower-level generat
 
 ```bash
 tango new my-app --framework express --package-manager pnpm --dialect sqlite
+tango new my-nuxt-app --framework nuxt --package-manager pnpm --dialect sqlite
 ```
 
 Generated applications include:

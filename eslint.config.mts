@@ -10,6 +10,7 @@ export default defineConfig([
         '**/dist/**',
         '**/coverage/**',
         '**/.next/**',
+        '**/.nuxt/**',
         '**/.output/**',
         '**/.temp/**',
         '**/docs/.vitepress/cache/**',

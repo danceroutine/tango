@@ -79,4 +79,28 @@ describe(runInitCommand, () => {
             await rm(dir, { recursive: true, force: true });
         }
     });
+
+    it('logs Nuxt-specific follow-up guidance for server handler wiring', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'tango-codegen-run-init-nuxt-'));
+        const logger = { info: vi.fn() };
+        vi.spyOn(tangoCore, 'getLogger').mockReturnValue(logger as never);
+
+        try {
+            await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'nuxt-app' }, null, 2), 'utf8');
+
+            await runInitCommand({
+                framework: 'nuxt',
+                path: dir,
+                dialect: 'sqlite',
+                skipExisting: true,
+                force: false,
+            });
+
+            expect(logger.info).toHaveBeenCalledWith(
+                expect.stringContaining('register Nitro serverHandlers in nuxt.config.ts')
+            );
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
 });

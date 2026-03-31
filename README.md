@@ -10,9 +10,9 @@ _Tango is an independent project and is not affiliated with, endorsed by, or spo
 
 Tango is organized around the same application concerns that shape a Django or Django REST Framework project. Models define structure and metadata, model managers and the ORM handle persistence, migrations keep schema changes explicit and resource classes turn manager behavior into HTTP behavior.
 
-Tango adds adapters to the mix, to connect those resource classes to host frameworks such as Express and Next.js, and ships with the `tango` CLI to tie the developer workflow together.
+Tango adds adapters to the mix, to connect those resource classes to host frameworks such as Express, Next.js, and Nuxt, and ships with the `tango` CLI to tie the developer workflow together.
 
-Tango enhances the frameworks you are already used to with application workflows inspired by Django and is designed to work in tandem with your preferred host framework, without forcing you to migrate away from your chosen tech stack. Express or Next.js continues to own routing and request lifecycle behavior, while Tango provides the application-facing layers for models, persistence, migrations, and API resources.
+Tango enhances the frameworks you are already used to with application workflows inspired by Django and is designed to work in tandem with your preferred host framework, without forcing you to migrate away from your chosen tech stack. Express, Next.js, or Nuxt continues to own routing and request lifecycle behavior, while Tango provides the application-facing layers for models, persistence, migrations, and API resources.
 
 The main packages you will encounter are `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-migrations`, `@danceroutine/tango-resources`, the adapter packages, and `@danceroutine/tango-cli`.
 
@@ -25,7 +25,7 @@ If you are evaluating Tango, start here:
 1. [Getting started](docs/guide/getting-started.md)
 2. [Installation](docs/guide/installation.md)
 3. [Quickstart](docs/quickstart.md)
-4. [Blog API tutorial](docs/tutorials/blog-api.md) or [Next.js tutorial](docs/tutorials/nextjs-blog.md)
+4. [Blog API tutorial](docs/tutorials/blog-api.md), [Next.js tutorial](docs/tutorials/nextjs-blog.md), or [Nuxt tutorial](docs/tutorials/nuxt-blog.md)
 5. the topic guides for the packages you plan to use
 
 The full documentation set lives under [`docs/`](docs/), and is hosted on <https://tangowebframework.dev>.
@@ -46,6 +46,13 @@ Run the Next.js example with:
 ```bash
 pnpm --filter @danceroutine/tango-example-nextjs-blog bootstrap
 pnpm --filter @danceroutine/tango-example-nextjs-blog dev
+```
+
+Run the Nuxt example with:
+
+```bash
+pnpm --filter @danceroutine/tango-example-nuxt-blog bootstrap
+pnpm --filter @danceroutine/tango-example-nuxt-blog dev
 ```
 
 The examples are the fastest way to see the full Tango stack in one place: models, managers, migrations, resources, filtering, pagination, and adapters.

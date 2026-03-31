@@ -21,6 +21,7 @@ Use the `tango` binary when you want to:
 
 ```bash
 tango new my-app --framework express --package-manager pnpm --dialect sqlite
+tango new my-nuxt-app --framework nuxt --package-manager pnpm --dialect sqlite
 tango make:migrations --config ./tango.config.ts --models ./src/models.ts --name add_posts
 tango migrate --config ./tango.config.ts
 tango plan --config ./tango.config.ts

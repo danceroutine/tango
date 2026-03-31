@@ -45,6 +45,23 @@ Then open:
 
 If you want to inspect the example code after it is running, start with the model definitions, the serializer, the post viewset, and the detail API view.
 
+## Run the Nuxt example
+
+The Nuxt example shows Tango inside explicit Nitro server handlers, while Nuxt continues to own SSR pages and application shell concerns.
+
+```bash
+pnpm --filter @danceroutine/tango-example-nuxt-blog bootstrap
+pnpm --filter @danceroutine/tango-example-nuxt-blog dev
+```
+
+Then open:
+
+- `http://localhost:3002/`
+- `http://localhost:3002/api/posts?limit=20&offset=0`
+- `http://localhost:3002/api/openapi`
+
+If you want to inspect the example code after it is running, start with `nuxt.config.ts`, the `server/tango/` handlers, the post serializer, the post viewset, and the Nuxt SSR pages under `app/pages/`.
+
 ## What to look for
 
 As you browse the examples, keep this sequence in mind:
@@ -53,11 +70,12 @@ As you browse the examples, keep this sequence in mind:
 2. A serializer defines the create, update, and output contract for the HTTP boundary.
 3. A migration keeps the database schema aligned with the model metadata.
 4. A view class or viewset turns model-backed resource behavior into HTTP endpoints.
-5. An adapter connects those view classes to Express or Next.js.
+5. An adapter connects those view classes to Express, Next.js, or Nuxt.
 
 ## Next steps
 
 - [Blog API tutorial](/tutorials/blog-api)
 - [Next.js tutorial](/tutorials/nextjs-blog)
+- [Nuxt tutorial](/tutorials/nuxt-blog)
 - [Models and schema](/topics/models-and-schema)
 - [Serializers](/topics/serializers)

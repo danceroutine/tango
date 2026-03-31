@@ -19,4 +19,5 @@ export { ScaffoldTemplateDescriptor } from './contracts/template/implementation/
 export { FrameworkScaffoldRegistry } from './registry/FrameworkScaffoldRegistry';
 export { ExpressScaffoldStrategy } from './strategies/express/ExpressScaffoldStrategy';
 export { NextScaffoldStrategy } from './strategies/next/NextScaffoldStrategy';
+export { NuxtScaffoldStrategy } from './strategies/nuxt/NuxtScaffoldStrategy';
 export { scaffoldProject, type ScaffoldProjectOptions } from './scaffold/scaffoldProject';

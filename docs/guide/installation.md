@@ -38,6 +38,15 @@ pnpm add @danceroutine/tango-adapters-next next react react-dom
 pnpm add better-sqlite3
 ```
 
+or:
+
+```bash
+pnpm add @danceroutine/tango-adapters-nuxt nuxt vue
+pnpm add better-sqlite3
+```
+
+Nuxt applications that import Tango model source directly into Nitro handlers or SSR pages should call `registerModelObjects()` from `@danceroutine/tango-orm/runtime` in the model module. Nitro can drop side-effect-only runtime imports during bundling, and the explicit registration keeps `Model.objects` available where application code expects it.
+
 For PostgreSQL:
 
 ```bash
@@ -109,11 +118,13 @@ If you are deciding where to start:
 
 - Use the Express blog example if you want to see the entire stack in a conventional JSON API.
 - Use the Next.js example if you want to see Tango inside App Router route handlers.
+- Use the Nuxt example if you want to see Tango inside explicit Nitro server handlers with Nuxt SSR pages.
 
 The example package scripts are already configured:
 
 - `@danceroutine/tango-example-express-blog-api`
 - `@danceroutine/tango-example-nextjs-blog`
+- `@danceroutine/tango-example-nuxt-blog`
 
 ## Related pages
 

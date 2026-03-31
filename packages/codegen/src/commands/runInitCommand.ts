@@ -81,6 +81,11 @@ export async function runInitCommand({
     if (framework === SUPPORTED_FRAMEWORK.EXPRESS) {
         logger.info("Mount Tango: import { registerTango } from './src/tango.js'; await registerTango(app);");
     }
+    if (framework === SUPPORTED_FRAMEWORK.NUXT) {
+        logger.info(
+            'Wire Tango handlers: register Nitro serverHandlers in nuxt.config.ts and export NuxtAdapter-backed handlers from server/tango/.'
+        );
+    }
 }
 export function withInitCommand(parser: Argv): Argv {
     return parser.command(
@@ -92,7 +97,7 @@ export function withInitCommand(parser: Argv): Argv {
                     type: 'string',
                     choices: Object.values(SUPPORTED_FRAMEWORK),
                     demandOption: true,
-                    describe: 'Host framework (express or next).',
+                    describe: 'Host framework (express, next, or nuxt).',
                 })
                 .option('path', {
                     type: 'string',

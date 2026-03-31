@@ -10,6 +10,7 @@ import { TemplateBuilder } from './template/TemplateBuilder';
 export const SUPPORTED_FRAMEWORK = {
     EXPRESS: 'express',
     NEXT: 'next',
+    NUXT: 'nuxt',
 } as const;
 export type SupportedFramework = (typeof SUPPORTED_FRAMEWORK)[keyof typeof SUPPORTED_FRAMEWORK];
 

@@ -91,6 +91,7 @@ export default defineConfig({
                         { text: 'Tutorials overview', link: '/tutorials/' },
                         { text: 'Blog API (Express + SQLite)', link: '/tutorials/blog-api' },
                         { text: 'Next.js blog (App Router + SQLite)', link: '/tutorials/nextjs-blog' },
+                        { text: 'Nuxt blog (Nitro + SQLite)', link: '/tutorials/nuxt-blog' },
                     ],
                 },
             ],

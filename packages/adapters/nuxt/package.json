@@ -1,0 +1,59 @@
+{
+    "name": "@danceroutine/tango-adapters-nuxt",
+    "version": "1.0.0",
+    "description": "Nuxt Nitro adapter for Tango viewsets",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./adapter": {
+            "types": "./dist/adapter/index.d.ts",
+            "import": "./dist/adapter/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsdown",
+        "test": "vitest run --coverage",
+        "test:watch": "vitest",
+        "typecheck": "pnpm run typecheck:prod && pnpm run typecheck:test",
+        "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+        "typecheck:test": "tsc --noEmit -p tsconfig.tests.json"
+    },
+    "keywords": [
+        "tango",
+        "nuxt",
+        "nitro",
+        "adapter"
+    ],
+    "author": "Pedro Del Moral Lopez",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/danceroutine/tango.git",
+        "directory": "packages/adapters/nuxt"
+    },
+    "dependencies": {
+        "@danceroutine/tango-core": "workspace:*",
+        "@danceroutine/tango-resources": "workspace:*",
+        "@danceroutine/tango-adapters-core": "workspace:*",
+        "h3": "^1.15.6"
+    },
+    "peerDependencies": {
+        "nuxt": "^4.4.2"
+    },
+    "devDependencies": {
+        "@types/node": "^22.9.0",
+        "nuxt": "^4.4.2",
+        "tsdown": "^0.4.0",
+        "typescript": "^5.6.3",
+        "vitest": "^4.0.6",
+        "vue": "^3.5.31"
+    }
+}

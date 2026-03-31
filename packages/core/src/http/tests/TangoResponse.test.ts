@@ -363,6 +363,17 @@ describe(TangoResponse, () => {
         }
     });
 
+    it('allows __peekBodyForTestOnly when process is unavailable', () => {
+        vi.stubGlobal('process', undefined);
+
+        try {
+            const response = TangoResponse.text('peek');
+            expect(response.__peekBodyForTestOnly()).toBe('peek');
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
     it('returns JSON bodies through the generic response helper', async () => {
         const response = TangoResponse.json({ value: 'x' });
         const data = await response.json<{ value: string }>();

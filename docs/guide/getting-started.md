@@ -2,7 +2,7 @@
 
 Tango is a set of TypeScript packages for building data-heavy web applications with a workflow inspired by Django and Django REST Framework.
 
-Tango lives inside a host runtime such as Express or Next.js and gives you a consistent way to define models, configure environments, query data, manage migrations, expose API endpoints, and test the result.
+Tango lives inside a host runtime such as Express, Next.js, or Nuxt and gives you a consistent way to define models, configure environments, query data, manage migrations, expose API endpoints, and test the result.
 
 ## Package layers
 
@@ -13,7 +13,7 @@ Most applications start with these packages:
 - `@danceroutine/tango-orm` for `Model.objects`, `QuerySet`, and database adapters
 - `@danceroutine/tango-migrations` for schema diffing, migration generation, and migration execution
 - `@danceroutine/tango-resources` for `APIView`, generic CRUD views, `ModelViewSet`, filtering, and pagination
-- an adapter package such as `@danceroutine/tango-adapters-express` or `@danceroutine/tango-adapters-next`
+- an adapter package such as `@danceroutine/tango-adapters-express`, `@danceroutine/tango-adapters-next`, or `@danceroutine/tango-adapters-nuxt`
 
 You will also see `@danceroutine/tango-openapi` for machine-readable API documents, `@danceroutine/tango-testing` for test helpers, and `@danceroutine/tango-cli` for the unified `tango` command-line workflow.
 
@@ -96,7 +96,7 @@ That exercise forces you to touch the same boundaries you will use in a real pro
 
 ## Common misunderstandings
 
-- Tango enhances host frameworks such as Express and Next.js while those frameworks continue to own routing and request lifecycle behavior.
+- Tango enhances host frameworks such as Express, Next.js, and Nuxt while those frameworks continue to own routing and request lifecycle behavior.
 - `Model.objects` is the default application-facing data access path.
 - A migration is not optional once model metadata changes.
 - `tango.config.ts` is the normal place to define database and migration settings for an application.
