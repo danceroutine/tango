@@ -14,6 +14,7 @@ type UserRecord = {
     id: number;
     email: string;
     name: string;
+    active?: boolean;
 };
 
 const userReadSchema = z.object({
@@ -144,7 +145,10 @@ describe(ModelViewSet, () => {
             objects: manager,
             metadata: {
                 name: 'User',
-                fields: [{ name: 'id', type: 'serial', primaryKey: true }],
+                fields: [
+                    { name: 'id', type: 'serial', primaryKey: true },
+                    { name: 'active', type: 'bool' },
+                ],
             },
         };
 
@@ -216,6 +220,52 @@ describe(ModelViewSet, () => {
         expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalled();
     });
 
+    it('coerces boolean query params from model metadata when applying filters', async () => {
+        const withFilters = new UserViewSet({
+            serializer: UserSerializer,
+            filters: FilterSet.define<UserRecord>({
+                fields: {
+                    active: true,
+                },
+            }),
+        });
+        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.count).mockResolvedValueOnce(0);
+
+        const response = await withFilters.list(
+            aResourcesRequestContext('GET', 'https://example.test/users?active=true')
+        );
+
+        expect(response.status).toBe(200);
+        expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalledWith({
+            kind: 'and',
+            nodes: [{ kind: 'atom', where: { active: true } }],
+        });
+    });
+
+    it('coerces numeric query params from model metadata when applying filters', async () => {
+        const withFilters = new UserViewSet({
+            serializer: UserSerializer,
+            filters: FilterSet.define<UserRecord>({
+                fields: {
+                    id: ['gte'],
+                },
+            }),
+        });
+        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.count).mockResolvedValueOnce(0);
+
+        const response = await withFilters.list(
+            aResourcesRequestContext('GET', 'https://example.test/users?id__gte=10')
+        );
+
+        expect(response.status).toBe(200);
+        expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalledWith({
+            kind: 'and',
+            nodes: [{ kind: 'atom', where: { id__gte: 10 } }],
+        });
+    });
+
     it('skips empty filter results, ignores invalid ordering tokens, and supports constructors without actions', async () => {
         const noActionsConstructor = function NoActions() {
             return undefined;
@@ -277,9 +327,7 @@ describe(ModelViewSet, () => {
             InvalidActionPathViewSet.getActions(
                 InvalidActionPathViewSet as unknown as new (...args: never[]) => AnyTestModelViewSet
             )
-        ).toThrow(
-            "Invalid custom action path for ''."
-        );
+        ).toThrow("Invalid custom action path for ''.");
     });
 
     it('rejects OpenAPI generation when serializer model metadata is missing', () => {

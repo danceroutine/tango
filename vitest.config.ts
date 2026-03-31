@@ -19,7 +19,9 @@ export default defineConfig({
             '@danceroutine/tango-orm/connection': fileURLToPath(
                 new URL('./packages/orm/src/connection/index.ts', import.meta.url)
             ),
-            '@danceroutine/tango-orm/query': fileURLToPath(new URL('./packages/orm/src/query/index.ts', import.meta.url)),
+            '@danceroutine/tango-orm/query': fileURLToPath(
+                new URL('./packages/orm/src/query/index.ts', import.meta.url)
+            ),
             '@danceroutine/tango-orm': fileURLToPath(new URL('./packages/orm/src/index.ts', import.meta.url)),
             '@danceroutine/tango-orm/': fileURLToPath(new URL('./packages/orm/src/', import.meta.url)),
             '@danceroutine/tango-resources/context': fileURLToPath(

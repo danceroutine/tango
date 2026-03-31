@@ -26,9 +26,7 @@ export default defineConfig({
             '@danceroutine/tango-schema/domain': fileURLToPath(
                 new URL('../schema/src/domain/index.ts', import.meta.url)
             ),
-            '@danceroutine/tango-schema/model': fileURLToPath(
-                new URL('../schema/src/model/index.ts', import.meta.url)
-            ),
+            '@danceroutine/tango-schema/model': fileURLToPath(new URL('../schema/src/model/index.ts', import.meta.url)),
             '@danceroutine/tango-schema/': fileURLToPath(new URL('../schema/src/', import.meta.url)),
         },
     },

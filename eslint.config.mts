@@ -6,7 +6,14 @@ import prettier from 'eslint-plugin-prettier/recommended';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-    globalIgnores(['**/dist/**', '**/coverage/**', '**/.next/**', '**/.temp/**', '**/docs/.vitepress/cache/**']),
+    globalIgnores([
+        '**/dist/**',
+        '**/coverage/**',
+        '**/.next/**',
+        '**/.output/**',
+        '**/.temp/**',
+        '**/docs/.vitepress/cache/**',
+    ]),
     {
         extends: [js.configs.recommended, tseslint.configs.recommended, oxlint.configs['flat/recommended'], prettier],
         files: ['**/*.{ts,tsx}'],

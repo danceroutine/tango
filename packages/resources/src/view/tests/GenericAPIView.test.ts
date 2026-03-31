@@ -15,6 +15,7 @@ type UserRecord = {
     id: number;
     email: string;
     name: string;
+    active?: boolean;
 };
 
 const userReadSchema = z.object({
@@ -234,6 +235,10 @@ describe(GenericAPIView, () => {
                 meta: { table: 'users', pk: 'id', columns: { id: 'int', email: 'text', name: 'text' } },
                 query: vi.fn(() => querySetDouble),
             }),
+            metadata: {
+                name: 'User',
+                fields: [{ name: 'active', type: 'bool' }],
+            },
         };
 
         const view = new UserListCreateView({
@@ -251,6 +256,72 @@ describe(GenericAPIView, () => {
         );
         expect(response.status).toBe(200);
         expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalled();
+    });
+
+    it('coerces boolean query params from model metadata during list filters', async () => {
+        const querySetDouble = aQuerySet<UserRecord>();
+        vi.mocked(querySetDouble.fetch).mockResolvedValue({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.count).mockResolvedValue(0);
+
+        currentUserModel = {
+            objects: aManager<UserRecord>({
+                meta: { table: 'users', pk: 'id', columns: { id: 'int', email: 'text', name: 'text' } },
+                query: vi.fn(() => querySetDouble),
+            }),
+            metadata: {
+                name: 'User',
+                fields: [{ name: 'active', type: 'bool' }],
+            },
+        };
+
+        const view = new UserListCreateView({
+            serializer: UserSerializer,
+            filters: FilterSet.define<UserRecord>({
+                fields: {
+                    active: true,
+                },
+            }),
+        });
+
+        const response = await view.dispatch(aResourcesRequestContext('GET', 'https://example.test/users?active=true'));
+        expect(response.status).toBe(200);
+        expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalledWith({
+            kind: 'and',
+            nodes: [{ kind: 'atom', where: { active: true } }],
+        });
+    });
+
+    it('coerces numeric query params from model metadata during list filters', async () => {
+        const querySetDouble = aQuerySet<UserRecord>();
+        vi.mocked(querySetDouble.fetch).mockResolvedValue({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.count).mockResolvedValue(0);
+
+        currentUserModel = {
+            objects: aManager<UserRecord>({
+                meta: { table: 'users', pk: 'id', columns: { id: 'int', email: 'text', name: 'text' } },
+                query: vi.fn(() => querySetDouble),
+            }),
+            metadata: {
+                name: 'User',
+                fields: [{ name: 'id', type: 'serial', primaryKey: true }],
+            },
+        };
+
+        const view = new UserListCreateView({
+            serializer: UserSerializer,
+            filters: FilterSet.define<UserRecord>({
+                fields: {
+                    id: ['gte'],
+                },
+            }),
+        });
+
+        const response = await view.dispatch(aResourcesRequestContext('GET', 'https://example.test/users?id__gte=10'));
+        expect(response.status).toBe(200);
+        expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalledWith({
+            kind: 'and',
+            nodes: [{ kind: 'atom', where: { id__gte: 10 } }],
+        });
     });
 
     it('skips empty filter results and ignores invalid ordering tokens', async () => {
