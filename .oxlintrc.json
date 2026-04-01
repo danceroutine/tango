@@ -6,7 +6,13 @@
         "pedantic": "warn"
     },
     "jsPlugins": ["oxlint-plugin-eslint"],
-    "ignorePatterns": ["**/next-env.d.ts", "**/.temp/**", "**/docs/.vitepress/cache/**"],
+    "ignorePatterns": [
+        "**/next-env.d.ts",
+        "**/.nuxt/**",
+        "**/.output/**",
+        "**/.temp/**",
+        "**/docs/.vitepress/cache/**"
+    ],
     "rules": {
         "max-lines-per-function": "off",
         "no-unused-vars": ["error", { "varsIgnorePattern": "^_", "argsIgnorePattern": "^_" }],

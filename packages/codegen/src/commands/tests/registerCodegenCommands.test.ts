@@ -50,6 +50,27 @@ describe(registerCodegenCommands, () => {
         }
     });
 
+    it('writes a new Nuxt project when new is run with framework and path', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'tango-codegen-nuxt-cmd-'));
+        const targetDir = join(dir, 'demo-nuxt');
+        try {
+            const parser = registerCodegenCommands(
+                yargs(['new', 'demo-nuxt', '--framework', 'nuxt', '--path', targetDir])
+            );
+            await parser.parseAsync();
+
+            const packageJson = await readFile(join(targetDir, 'package.json'), 'utf8');
+            const nuxtConfig = await readFile(join(targetDir, 'nuxt.config.ts'), 'utf8');
+            const routeSource = await readFile(join(targetDir, 'server/tango/todos.ts'), 'utf8');
+            expect(packageJson).toContain('"nuxt"');
+            expect(packageJson).toContain('"@danceroutine/tango-adapters-nuxt"');
+            expect(nuxtConfig).toContain('/api/todos/**:tango');
+            expect(routeSource).toContain('NuxtAdapter');
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
     it('runs package manager install when install flag is set', async () => {
         const dir = await mkdtemp(join(tmpdir(), 'tango-codegen-install-'));
         const targetDir = join(dir, 'demo-install');
@@ -201,6 +222,25 @@ describe(registerCodegenCommands, () => {
             const tangoTs = await readFile(join(dir, 'src/tango.ts'), 'utf8');
             expect(tangoTs).toContain('registerTango');
             await expect(stat(join(dir, 'package.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('writes only Tango layer and omits app shell for Nuxt when init is run', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'tango-codegen-init-nuxt-cmd-'));
+        try {
+            const parser = registerCodegenCommands(yargs(['init', '--framework', 'nuxt', '--path', dir]));
+            await parser.parseAsync();
+
+            const tangoConfig = await readFile(join(dir, 'tango.config.ts'), 'utf8');
+            const todoModel = await readFile(join(dir, 'lib/models/TodoModel.ts'), 'utf8');
+            expect(tangoConfig).toContain("adapter: 'sqlite'");
+            expect(todoModel).toContain('TodoModel');
+
+            await expect(stat(join(dir, 'package.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+            await expect(stat(join(dir, 'nuxt.config.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
+            await expect(stat(join(dir, 'app/app.vue'))).rejects.toMatchObject({ code: 'ENOENT' });
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { scaffoldProject } from '../scaffoldProject';
 import { ExpressScaffoldStrategy } from '../../strategies/express/ExpressScaffoldStrategy';
 import { NextScaffoldStrategy } from '../../strategies/next/NextScaffoldStrategy';
+import { NuxtScaffoldStrategy } from '../../strategies/nuxt/NuxtScaffoldStrategy';
 
 describe(scaffoldProject, () => {
     it('writes a full Express project into target directory', async () => {
@@ -72,6 +73,45 @@ describe(scaffoldProject, () => {
             expect(openapiSource).toContain('describeViewSet');
             expect(serializerSource).toContain('TodoSerializer');
             expect(layoutSource).toContain('RootLayout');
+            expect(tsconfig).toContain('"migrations/**/*.ts"');
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('writes a full Nuxt project into target directory', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'tango-codegen-nuxt-'));
+        try {
+            await scaffoldProject(
+                {
+                    projectName: 'nuxt-app',
+                    targetDir: dir,
+                    framework: 'nuxt',
+                    packageManager: 'pnpm',
+                    dialect: 'sqlite',
+                    includeSeed: true,
+                },
+                new NuxtScaffoldStrategy()
+            );
+
+            const packageJson = await readFile(join(dir, 'package.json'), 'utf8');
+            const nuxtConfig = await readFile(join(dir, 'nuxt.config.ts'), 'utf8');
+            const routeSource = await readFile(join(dir, 'server/tango/todos.ts'), 'utf8');
+            const openapiRoute = await readFile(join(dir, 'server/tango/openapi.ts'), 'utf8');
+            const openapiSource = await readFile(join(dir, 'lib/openapi.ts'), 'utf8');
+            const serializerSource = await readFile(join(dir, 'serializers/TodoSerializer.ts'), 'utf8');
+            const appShell = await readFile(join(dir, 'app/app.vue'), 'utf8');
+            const pageSource = await readFile(join(dir, 'app/pages/index.server.vue'), 'utf8');
+            const tsconfig = await readFile(join(dir, 'tsconfig.json'), 'utf8');
+            expect(packageJson).toContain('"nuxt"');
+            expect(packageJson).toContain('"@danceroutine/tango-openapi"');
+            expect(nuxtConfig).toContain('/api/todos/**:tango');
+            expect(routeSource).toContain('NuxtAdapter');
+            expect(openapiRoute).toContain("from '~~/lib/openapi'");
+            expect(openapiSource).toContain('describeViewSet');
+            expect(serializerSource).toContain('TodoSerializer');
+            expect(appShell).toContain('<NuxtPage />');
+            expect(pageSource).toContain('<script setup lang="ts">');
             expect(tsconfig).toContain('"migrations/**/*.ts"');
         } finally {
             await rm(dir, { recursive: true, force: true });
@@ -193,6 +233,37 @@ describe(scaffoldProject, () => {
 
             await expect(stat(join(dir, 'package.json'))).rejects.toMatchObject({ code: 'ENOENT' });
             await expect(stat(join(dir, 'src/app/layout.tsx'))).rejects.toMatchObject({ code: 'ENOENT' });
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('writes only Tango layer and omits app shell when adding to an existing Nuxt project', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'tango-codegen-init-nuxt-'));
+        try {
+            await scaffoldProject(
+                {
+                    projectName: 'nuxt-app',
+                    targetDir: dir,
+                    framework: 'nuxt',
+                    packageManager: 'pnpm',
+                    dialect: 'sqlite',
+                    includeSeed: true,
+                },
+                new NuxtScaffoldStrategy(),
+                { mode: 'init' }
+            );
+
+            const tangoConfig = await readFile(join(dir, 'tango.config.ts'), 'utf8');
+            const todoModel = await readFile(join(dir, 'lib/models/TodoModel.ts'), 'utf8');
+            const serializerSource = await readFile(join(dir, 'serializers/TodoSerializer.ts'), 'utf8');
+            expect(tangoConfig).toContain("adapter: 'sqlite'");
+            expect(todoModel).toContain('TodoModel');
+            expect(serializerSource).toContain('TodoSerializer');
+
+            await expect(stat(join(dir, 'package.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+            await expect(stat(join(dir, 'nuxt.config.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
+            await expect(stat(join(dir, 'app/app.vue'))).rejects.toMatchObject({ code: 'ENOENT' });
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

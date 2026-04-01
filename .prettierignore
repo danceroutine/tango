@@ -4,6 +4,8 @@ build
 coverage
 .turbo
 .next
+.nuxt
+.output
 .changeset/*.md
 pnpm-lock.yaml
 .vitepress/cache

@@ -1,6 +1,7 @@
 import { FrameworkScaffoldStrategy, type SupportedFramework } from '../contracts/FrameworkScaffoldStrategy';
 import { ExpressScaffoldStrategy } from '../strategies/express/ExpressScaffoldStrategy';
 import { NextScaffoldStrategy } from '../strategies/next/NextScaffoldStrategy';
+import { NuxtScaffoldStrategy } from '../strategies/nuxt/NuxtScaffoldStrategy';
 
 /**
  * Registry for framework scaffolding strategies keyed by framework id.
@@ -15,6 +16,7 @@ export class FrameworkScaffoldRegistry {
         const registry = new FrameworkScaffoldRegistry();
         registry.register(new ExpressScaffoldStrategy());
         registry.register(new NextScaffoldStrategy());
+        registry.register(new NuxtScaffoldStrategy());
         return registry;
     }
 

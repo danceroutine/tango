@@ -31,7 +31,7 @@ export abstract class TemplateBuilder implements BoundTemplate {
     static getTangoInstallOneLiner(
         packageManager: string,
         dialect: 'sqlite' | 'postgres',
-        framework: 'express' | 'next'
+        framework: 'express' | 'next' | 'nuxt'
     ): string {
         const deps = TemplateBuilder.getTangoDependencyEntriesFor(dialect, framework);
         const devDeps = TemplateBuilder.getTangoDevDependencyEntriesFor();
@@ -65,7 +65,7 @@ export abstract class TemplateBuilder implements BoundTemplate {
 
     private static getTangoDependencyEntriesFor(
         dialect: 'sqlite' | 'postgres',
-        framework: 'express' | 'next'
+        framework: 'express' | 'next' | 'nuxt'
     ): Record<string, string> {
         const v = TemplateBuilder.getTangoVersion();
         const core: Record<string, string> = {
@@ -80,7 +80,9 @@ export abstract class TemplateBuilder implements BoundTemplate {
         const adapter: Record<string, string> =
             framework === 'express'
                 ? { '@danceroutine/tango-adapters-express': v }
-                : { '@danceroutine/tango-adapters-next': v };
+                : framework === 'next'
+                  ? { '@danceroutine/tango-adapters-next': v }
+                  : { '@danceroutine/tango-adapters-nuxt': v };
         const dialectDeps: Record<string, string> =
             dialect === 'sqlite' ? { 'better-sqlite3': '^11.10.0' } : { pg: '^8.16.3' };
         return { ...core, ...adapter, ...dialectDeps };

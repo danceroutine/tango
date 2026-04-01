@@ -16,6 +16,7 @@
             "@danceroutine/tango-cli",
             "@danceroutine/tango-adapters-core",
             "@danceroutine/tango-adapters-next",
+            "@danceroutine/tango-adapters-nuxt",
             "@danceroutine/tango-adapters-express"
         ]
     ],
@@ -26,6 +27,7 @@
     "ignore": [
         "@danceroutine/tango-example-express-blog-api",
         "@danceroutine/tango-example-nextjs-blog",
+        "@danceroutine/tango-example-nuxt-blog",
         "@danceroutine/tango-docs"
     ]
 }

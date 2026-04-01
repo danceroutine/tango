@@ -920,12 +920,10 @@ export class TangoResponse implements Response {
      */
 
     public __peekBodyForTestOnly(): BodyInit | JsonValue | null {
+        const nodeEnv = typeof process !== 'undefined' ? (process.env?.NODE_ENV as string | undefined) : undefined;
+
         // Strong guard against accidental shipping in production
-        if (
-            typeof process !== 'undefined' &&
-            process.env &&
-            (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'prod')
-        ) {
+        if (nodeEnv === 'production' || nodeEnv === 'prod') {
             throw new Error('peekBody() is not available in production builds. For test/debug use only.');
         }
         return this.tangoBody.bodySource;
