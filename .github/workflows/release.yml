@@ -123,17 +123,28 @@ jobs:
                     echo "mode=release" >> "$GITHUB_OUTPUT"
                   fi
 
+            - name: Generate release app token (stable)
+              if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release'
+              id: release-app-token
+              uses: actions/create-github-app-token@v2
+              with:
+                  app-id: ${{ vars.RELEASE_APP_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  owner: ${{ github.repository_owner }}
+
             - name: Commit version changes to master (stable)
               if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release'
               shell: bash
+              env:
+                  APP_TOKEN: ${{ steps.release-app-token.outputs.token }}
+                  NPM_CONFIG_PROVENANCE: true
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
                   git add -A
                   git commit -m "chore: version packages [skip ci]"
+                  git remote set-url origin "https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
                   git push origin HEAD:master
-              env:
-                  NPM_CONFIG_PROVENANCE: true
 
             - name: Publish packages (stable)
               if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release'

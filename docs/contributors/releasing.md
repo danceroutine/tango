@@ -32,7 +32,7 @@ Stable releases are changeset-driven and include root changelog generation.
 1. Ensure releasable pull requests include changesets (`pnpm changeset`).
 2. Merge releasable work to `master`.
 3. Let the release workflow run `pnpm changeset:version`.
-4. If versioning produces a diff, the workflow commits the generated version changes directly to `master` with a bot-authored `[skip ci]` commit so the follow-up push does not start a second release run.
+4. If versioning produces a diff, the workflow mints a token from the installed release GitHub App and uses that app identity to commit the generated version changes directly to `master` with a bot-authored `[skip ci]` commit so the follow-up push does not start a second release run.
 5. The same workflow run publishes the freshly versioned packages through trusted publishing.
 
 The stable versioning step runs `pnpm changeset:version`, which executes `scripts/release/version-with-root-changelog.ts`. That helper:
@@ -68,6 +68,7 @@ When the release process changes, update these files together:
 - `.changeset/config.json`
 - `scripts/release/version-with-root-changelog.ts`
 - root `package.json` release scripts (`changeset:version` and `changeset:publish`)
+- repository Actions variables/secrets for the release GitHub App (`RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY`)
 - this page
 
 `CHANGELOG.md` should be treated as generated output from the stable release flow rather than as a manually maintained source file.
