@@ -2,6 +2,10 @@
 
 This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
 
+## 1.1.0 - 2026-04-01
+
+- Add first-class Nuxt support with a dedicated adapter package, Nuxt project scaffolding, an official Nuxt blog example, and Nuxt docs coverage. Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-codegen`, `@danceroutine/tango-cli`, `@danceroutine/tango-adapters-nuxt`.
+
 ## 1.0.2 - 2026-03-31
 
 - Infer typed filter coercion from Tango model metadata so resource query params can be parsed into boolean, numeric, and timestamp values centrally. Affected packages: `@danceroutine/tango-resources`.
