@@ -3,10 +3,10 @@ name: CI
 on:
     push:
         branches:
-            - master
+            - main
     pull_request:
         branches:
-            - master
+            - main
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
@@ -287,7 +287,7 @@ jobs:
 
             - name: Check changesets cover changed packages
               if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changeset') }}
-              run: pnpm changeset status --since=origin/master
+              run: pnpm changeset status --since=origin/main
 
             - name: Changeset check skipped by maintainer
               if: ${{ contains(github.event.pull_request.labels.*.name, 'skip-changeset') }}

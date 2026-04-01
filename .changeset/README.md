@@ -18,5 +18,5 @@ The summary you write is later used to generate Tango's root `CHANGELOG.md` for 
 
 Releases are handled automatically via GitHub Actions:
 
-- **Stable releases**: Push to `master` triggers the release workflow which creates a version PR with synchronized package versions and an updated root `CHANGELOG.md`
+- **Stable releases**: Push to `main` triggers the release workflow, which versions the fixed package train, updates the root `CHANGELOG.md`, and commits the generated release artifacts back to `main`
 - **Alpha releases**: Manually trigger the `Release` workflow from the Actions tab, specifying the branch to release from. Alpha publishes do not update the committed root changelog.

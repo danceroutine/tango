@@ -23,16 +23,16 @@ The release workflow lives in `.github/workflows/release.yml` and supports two c
 - stable release flow
 - alpha snapshot flow
 
-Stable runs are triggered by pushes to `master` and can also be triggered manually with `workflow_dispatch` for `master`. Alpha runs are triggered manually with `workflow_dispatch` and `release_type=alpha`.
+Stable runs are triggered by pushes to `main` and can also be triggered manually with `workflow_dispatch` for `main`. Alpha runs are triggered manually with `workflow_dispatch` and `release_type=alpha`.
 
 ## Stable release flow
 
 Stable releases are changeset-driven and include root changelog generation.
 
 1. Ensure releasable pull requests include changesets (`pnpm changeset`).
-2. Merge releasable work to `master`.
+2. Merge releasable work to `main`.
 3. Let the release workflow run `pnpm changeset:version`.
-4. If versioning produces a diff, the workflow mints a token from the installed release GitHub App and uses that app identity to commit the generated version changes directly to `master` with a bot-authored `[skip ci]` commit so the follow-up push does not start a second release run.
+4. If versioning produces a diff, the workflow mints a token from the installed release GitHub App and uses that app identity to commit the generated version changes directly to `main` with a bot-authored `[skip ci]` commit so the follow-up push does not start a second release run.
 5. The same workflow run publishes the freshly versioned packages through trusted publishing.
 
 The stable versioning step runs `pnpm changeset:version`, which executes `scripts/release/version-with-root-changelog.ts`. That helper:
