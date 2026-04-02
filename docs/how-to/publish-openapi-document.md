@@ -4,9 +4,25 @@
 
 ## Install the package
 
-```bash
+::: code-group
+
+```bash [npm]
+npm install @danceroutine/tango-openapi
+```
+
+```bash [yarn]
+yarn add @danceroutine/tango-openapi
+```
+
+```bash [pnpm]
 pnpm add @danceroutine/tango-openapi
 ```
+
+```bash [bun]
+bun add @danceroutine/tango-openapi
+```
+
+:::
 
 Most applications pair it with `@danceroutine/tango-resources` and a host adapter package.
 

@@ -55,11 +55,10 @@ If you are new to Tango, use this order:
 
 1. [Getting started](/guide/getting-started)
 2. [Installation](/guide/installation)
-3. [Quickstart](/guide/quickstart)
-4. one tutorial
-5. the topic guides for the packages you use
-6. how-to guides when you begin changing behavior
-7. reference when you need exact method names or contracts
+3. one tutorial
+4. the topic guides for the packages you use
+5. how-to guides when you begin changing behavior
+6. reference when you need exact method names or contracts
 
 ## A good reading path for maintainers
 

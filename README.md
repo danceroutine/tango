@@ -37,7 +37,7 @@ If you are evaluating Tango, start here:
 
 1. [Getting started](https://tangowebframework.dev/guide/getting-started)
 2. [Installation](https://tangowebframework.dev/guide/installation)
-3. [Quickstart](https://tangowebframework.dev/guide/quickstart)
+3. [Documentation overview](https://tangowebframework.dev/guide/overview)
 
 You can also see a tutorial for any of the supported frameworks
 

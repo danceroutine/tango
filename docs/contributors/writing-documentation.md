@@ -7,9 +7,9 @@ Tango's documentation is maintained via [VitePress](https://vitepress.dev) markd
 Documentation in Tango is intentionally organized to rhyme with Django's overall documentation structure. This is due to Tango intentionally trying to remain intuitive and familiar to lifelong Django developers.
 
 - **Tutorials** must provide step-by-step guidance for an entirely new developer to create something meaningful and useful, starting from first principles and building to a complete delivery.
-  - Tutorials do not need to teach the underlying concepts for Tango capabilities, only teach the developer how to _use_ them.
+    - Tutorials do not need to teach the underlying concepts for Tango capabilities, only teach the developer how to _use_ them.
 - **Topics** in turn aim to explain the theory or design behind aspects of Tango's capabilities or system design.
-  - The goal of a topic page is to help a developer understand the _why_ behind the decisions in Tango's design.
+    - The goal of a topic page is to help a developer understand the _why_ behind the decisions in Tango's design.
 - **Reference guides** must provide the applied knowledge that complements topic guides. They must explain the _what_ and _how_ of Tango's implementation.
 - Finally, **How-To guides** are the more advanced and focused sibling of tutorials. They provide step-by-step guides for accomplishing specific tasks in Tango, while assuming the developer is already familiar with Tango and can move more quickly through the task.
 
