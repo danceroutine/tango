@@ -1,10 +1,31 @@
 # Releasing packages
 
-Tango uses a single trusted-publishing workflow for stable and alpha releases. Maintainers should follow the release path in this guide and keep the listed files aligned with it.
+Releasing Tango publishes the fixed-version package set through the repository's trusted publishing workflow.
 
-## Before you begin
+We recommend completing the [Contributor setup](/contributors/setup) before you begin. Releases must also be performed by maintainers that have need permission to run the repository's GitHub Actions workflows and access to the `npm` environment that backs trusted publishing.
 
-Run the same quality gates that CI expects:
+A typical release moves through the following stages:
+
+- validating the branch you intend to release
+- confirming whether the release is stable or alpha
+- making sure changesets are present for stable release work
+- letting the release workflow run versioning, tests, and publishing
+- verifying the published result
+- updating the release contract files when the release system itself changes
+
+## Understand the release channels
+
+Tango ships through two release channels.
+
+Stable releases publish the normal package versions that advance the fixed Tango release train. They are driven by changesets, update the root changelog, and must publish from `main`.
+
+Alpha releases publish snapshot builds under the `alpha` dist-tag. They support testing and early feedback, and they leave the root changelog unchanged.
+
+## Validate the branch before you release
+
+The release workflow runs database-backed integration checks before publishing, but maintainers should still validate the branch locally before merging releasable work or dispatching a manual run. That keeps release debugging separate from normal branch validation.
+
+Run the same quality gates expected by the repository:
 
 ```bash
 pnpm typecheck
@@ -14,61 +35,81 @@ pnpm build
 pnpm test:integration:all
 ```
 
-If any of those commands fail, treat the failure as a release blocker rather than as something to revisit after publishing.
+If one of those commands fails, it _will_ block your release, so you must resolve it before you publish.
 
-## Release channels and triggers
+## Prepare a stable release
 
-The release workflow lives in `.github/workflows/release.yml` and supports two channels:
+Stable releases are changeset-driven. Each pull request that changes releasable package behavior should include a changeset so the release workflow knows which version bump to apply and which release notes to generate.
 
-- stable release flow
-- alpha snapshot flow
+Create a changeset during development with:
 
-Stable runs are triggered by pushes to `main` and can also be triggered manually with `workflow_dispatch` for `main`. Alpha runs are triggered manually with `workflow_dispatch` and `release_type=alpha`.
+```bash
+pnpm changeset
+```
 
-## Stable release flow
+Once the releasable pull requests are merged to `main`, the stable release path is ready. In normal operation, a push to `main` triggers the stable workflow automatically. If you need to rerun the stable path manually, dispatch the workflow with `release_type=stable` and `branch=main`.
 
-Stable releases are changeset-driven and include root changelog generation.
+## What the stable workflow does
 
-1. Ensure releasable pull requests include changesets (`pnpm changeset`).
-2. Merge releasable work to `main`.
-3. Let the release workflow run `pnpm changeset:version`.
-4. If versioning produces a diff, the workflow mints a token from the installed release GitHub App and uses that app identity to commit the generated version changes directly to `main` with a bot-authored `[skip ci]` commit so the follow-up push does not start a second release run.
-5. The same workflow run publishes the freshly versioned packages through trusted publishing.
+The stable release workflow versions packages, tests the release candidate, commits generated version changes, and publishes the resulting packages.
 
-The stable versioning step runs `pnpm changeset:version`, which executes `scripts/release/version-with-root-changelog.ts`. That helper:
+The workflow performs these steps:
 
-- runs `changeset version`
-- refreshes the lockfile
-- updates the root `CHANGELOG.md`
+1. checks out `main`
+2. installs dependencies and waits for PostgreSQL
+3. runs the SQLite and PostgreSQL integration suites
+4. runs `pnpm changeset:version`
+5. checks whether versioning produced a diff
+6. commits generated version changes to `main` with a bot-authored `[skip ci]` commit when a release is pending
+7. publishes the packages through trusted publishing
 
-`CHANGELOG.md` is generated as part of this path and should not be manually edited.
+The stable versioning command is `pnpm changeset:version`, which runs `scripts/release/version-with-root-changelog.ts`. That script executes `changeset version`, refreshes the lockfile, and prepends the new entry to the root `CHANGELOG.md`.
 
-## Alpha release flow
+If `pnpm changeset:version` produces no diff, the stable workflow becomes a no-op for publishing. That usually means there were no pending releasable changesets on `main`.
 
-Alpha releases use snapshot versioning and publish with the `alpha` tag.
+## Run an alpha release
 
-The workflow path is:
+Alpha releases are manual. Dispatch the release workflow with `release_type=alpha` and choose the branch you want to publish from.
 
-1. run workflow manually with `release_type=alpha`
-2. version packages as a snapshot (`changeset version --snapshot ...`)
-3. build packages
-4. publish snapshots with `changeset publish --snapshot --tag alpha`
+The alpha path performs these steps:
 
-Alpha releases intentionally leave `CHANGELOG.md` unchanged.
+1. checks out the selected branch
+2. installs dependencies and runs the integration suites
+3. generates a short commit SHA
+4. versions packages with `changeset version --snapshot alpha-<short-sha>`
+5. builds the packages
+6. publishes them with the `alpha` dist-tag
 
-## Workspace dependencies
+Alpha releases preserve the existing root changelog. The workflow publishes the snapshot build directly from the selected branch, and `main` remains unchanged.
 
-Internal dependencies declared as `workspace:*` are rewritten to concrete published versions during release. Tango's public packages are also versioned together as one fixed release train, so generated stable release commits should show the same version across the published workspace packages.
+## Verify the published result
 
-## Files that must stay in sync
+After a release completes, confirm that the published packages match the intended channel and version shape.
 
-When the release process changes, update these files together:
+For stable releases, the published Tango packages should share one version because the workspace is configured as a fixed release group. Internal `workspace:*` dependencies are rewritten to concrete published versions during release, so the generated version commit should show a consistent version across the releasable workspace packages.
+
+For alpha releases, confirm that the published versions carry the snapshot suffix and use the `alpha` dist-tag.
+
+## Updating the release system
+
+Release mechanics change less often than package code, but when that contract changes, update the release documentation and the release-defining files together.
+
+When the release system changes, update these files and settings in the same pull request:
 
 - `.github/workflows/release.yml`
 - `.changeset/config.json`
 - `scripts/release/version-with-root-changelog.ts`
-- root `package.json` release scripts (`changeset:version` and `changeset:publish`)
-- repository Actions variables/secrets for the release GitHub App (`RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY`)
+- root `package.json` scripts for `changeset:version` and `changeset:publish`
+- repository Actions configuration for `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY`
 - this page
 
-`CHANGELOG.md` should be treated as generated output from the stable release flow rather than as a manually maintained source file.
+Those files govern branch eligibility, release channel behavior, version generation, changelog generation, and publish authentication. Keep them aligned in the same pull request whenever the release process changes.
+
+## Where to go next
+
+These contributor pages are often useful alongside release work:
+
+- [Contributor setup](/contributors/setup)
+- [Contributing code](/contributors/contributing-code)
+- [Contributor topics](/contributors/topics/)
+- [Contributor how-to guides](/contributors/how-to/)

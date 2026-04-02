@@ -58,7 +58,7 @@ export default defineConfig({
         },
 
         nav: [
-            { text: 'Guide', link: '/guide/' },
+            { text: 'Guides', link: '/guide/' },
             { text: 'Tutorials', link: '/tutorials/' },
             { text: 'Topics', link: '/topics/' },
             { text: 'How-to', link: '/how-to/' },
@@ -80,7 +80,7 @@ export default defineConfig({
                         { text: 'Installation (users)', link: '/guide/installation' },
                         { text: 'Overview', link: '/guide/overview' },
                         { text: 'Supported and unsupported features', link: '/guide/supported-and-unsupported' },
-                        { text: 'Quickstart', link: '/quickstart' },
+                        { text: 'Quickstart', link: '/guide/quickstart' },
                     ],
                 },
             ],
@@ -89,7 +89,7 @@ export default defineConfig({
                     text: 'Tutorials',
                     items: [
                         { text: 'Tutorials overview', link: '/tutorials/' },
-                        { text: 'Blog API (Express + SQLite)', link: '/tutorials/blog-api' },
+                        { text: 'Blog API (Express + SQLite)', link: '/tutorials/express-blog-api' },
                         { text: 'Next.js blog (App Router + SQLite)', link: '/tutorials/nextjs-blog' },
                         { text: 'Nuxt blog (Nitro + SQLite)', link: '/tutorials/nuxt-blog' },
                     ],
@@ -153,7 +153,8 @@ export default defineConfig({
                         { text: 'Overview', link: '/contributors/' },
                         { text: 'Setup', link: '/contributors/setup' },
                         { text: 'Releasing packages', link: '/contributors/releasing' },
-                        { text: 'Contributing guidelines', link: '/contributing' },
+                        { text: 'Contributing code', link: '/contributors/contributing-code' },
+                        { text: 'Writing documentation', link: '/contributors/writing-documentation' },
                     ],
                 },
                 {

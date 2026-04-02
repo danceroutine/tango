@@ -1,16 +1,17 @@
 # Contributor setup
 
-This page focuses on local environment setup and validation. It helps you get a clean checkout into a known-good state that matches CI expectations before you begin feature work.
-
-For contribution standards and pull request expectations, check out [Contributing](/contributing). For versioning and package publication, reference [Releasing packages](/contributors/releasing).
+Whether you're here to write the next chapter of our documentation, fix a bug, or expand Tango's capabilities, everything starts with a working local build. Let's get you up to speed.
 
 ## Prerequisites
 
+In order to contribute to Tango, you'll need to have [Git](https://git-scm.com/install/) setup on your machine. We also recommend ensuring you have [nvm](https://github.com/nvm-sh/nvm) installed before proceeding.
+
+Tango leverages modern TypeScript tooling for local development. You'll also need to ensure you are using:
+
 - Node.js 22 or newer
 - pnpm 9 or newer
-- Docker for PostgreSQL integration workflows
 
-Tango uses `pnpm` workspace commands throughout the repository. If your local shell resolves a different Node or pnpm version than CI, fix that first because most downstream failures become noisy version mismatches.
+If you're contributing code, you'll also need to install [Docker](https://docs.docker.com/engine/install/) in order to run the database dialect integration tests.
 
 ## Clone and install
 
@@ -22,7 +23,13 @@ pnpm install
 
 ## Validate a clean checkout
 
-Run the same broad gates that CI relies on:
+To ensure your setup was successful, you can run our validation suite.
+
+SQLite integration tests run out of the box. For PostgreSQL integration tests, start the local database first:
+
+```bash
+docker compose -f docker-compose.integration.yml up -d
+```
 
 ```bash
 pnpm typecheck
@@ -36,15 +43,7 @@ Under normal circumstances, all of those checks should pass immediately on fresh
 
 ## After setup
 
-Once local setup is complete, continue with:
+Once local setup is complete, you can choose your adventure:
 
-1. [Contributing](/contributing) for engineering standards and pull request workflow
-2. [Releasing packages](/contributors/releasing) for changesets and publish flow
-
-## Contributor how-to guides
-
-When you are ready to execute a specific maintainer workflow, use the contributor how-to guides as procedural references:
-
-1. [Contributor how-to guides](/contributors/how-to/)
-
-For architecture and maintainer contract context, use [Contributor topics](/contributors/topics/).
+1. [Contributing code](/contributors/contributing-code)
+2. [Writing documentation](/contributors/writing-documentation)

@@ -117,5 +117,5 @@ The package covers the built-in resource surface directly from Tango resources. 
 
 - [OpenAPI API](/reference/openapi-api)
 - [Resources and viewsets](/topics/resources-and-viewsets)
-- [Blog API tutorial](/tutorials/blog-api)
+- [Blog API tutorial](/tutorials/express-blog-api)
 - [Next.js blog tutorial](/tutorials/nextjs-blog)

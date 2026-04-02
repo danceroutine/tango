@@ -10,4 +10,4 @@ Contributor how-to guides are procedural references for specific maintainer work
 
 - [Contributor setup](/contributors/setup)
 - [Contributor topics](/contributors/topics/)
-- [Contributing](/contributing)
+- [Contributing](/contributors/index)

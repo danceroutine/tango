@@ -129,7 +129,7 @@ The example package scripts are already configured:
 ## Related pages
 
 - [Getting started](/guide/getting-started)
-- [Quickstart](/quickstart)
+- [Quickstart](/guide/quickstart)
 - [Configure databases](/how-to/databases)
 - [Run Tango in CI/CD](/how-to/ci-cd-pipelines)
 - [Publish an OpenAPI document](/how-to/publish-openapi-document)

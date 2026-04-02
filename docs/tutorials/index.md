@@ -4,7 +4,7 @@ Tutorials are learning-by-building walkthroughs. Use them when you want to see h
 
 ## Available tutorials
 
-1. [Blog API (Express + SQLite)](/tutorials/blog-api)
+1. [Blog API (Express + SQLite)](/tutorials/express-blog-api)
 2. [Next.js blog (App Router + SQLite)](/tutorials/nextjs-blog)
 3. [Nuxt blog (Nitro + SQLite)](/tutorials/nuxt-blog)
 

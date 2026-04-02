@@ -115,7 +115,7 @@ pnpm --filter @danceroutine/tango-schema test
 
 For the wider contributor workflow, use:
 
-- <https://tangowebframework.dev/contributing>
+- <https://tangowebframework.dev/contributors/contributing-code>
 
 ## License
 

@@ -110,7 +110,7 @@ import { adapter } from '@danceroutine/tango-adapters-express';
 The official documentation walks through Tango from first principles and gives the clearest starting point when you are evaluating the framework or building with it.
 
 - Official documentation: <https://tangowebframework.dev>
-- Blog API tutorial: <https://tangowebframework.dev/tutorials/blog-api>
+- Blog API tutorial: <https://tangowebframework.dev/tutorials/express-blog-api>
 - Resources topic: <https://tangowebframework.dev/topics/resources-and-viewsets>
 - Serializers topic: <https://tangowebframework.dev/topics/serializers>
 
@@ -124,7 +124,7 @@ pnpm --filter @danceroutine/tango-adapters-express test
 
 For the wider contributor workflow, use:
 
-- <https://tangowebframework.dev/contributing>
+- <https://tangowebframework.dev/contributors/contributing-code>
 
 ## License
 

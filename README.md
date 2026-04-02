@@ -1,4 +1,10 @@
+<p align="center">
+  <img src="docs/public/logo.svg" alt="Tango" width="160" />
+</p>
+
 # Tango
+
+[![npm](https://img.shields.io/npm/v/%40danceroutine%2Ftango-cli.svg)](https://www.npmjs.com/package/@danceroutine/tango-cli) [![npm downloads](https://img.shields.io/npm/dw/%40danceroutine%2Ftango-cli.svg)](https://www.npmjs.com/package/@danceroutine/tango-cli) [![CI](https://github.com/danceroutine/tango/actions/workflows/ci.yml/badge.svg)](https://github.com/danceroutine/tango/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/danceroutine/tango)](https://github.com/danceroutine/tango/blob/main/LICENSE)
 
 Tango is a modern TypeScript web framework that brings the elegance and productivity of Django's design philosophy to the Node.js ecosystem. It encourages rapid development and clean, pragmatic design while leveraging TypeScript's powerful type system for maximum safety and developer experience.
 
@@ -8,116 +14,44 @@ _Tango is an independent project and is not affiliated with, endorsed by, or spo
 
 ## What Tango Provides
 
-Tango is organized around the same application concerns that shape a Django or Django REST Framework project. Models define structure and metadata, model managers and the ORM handle persistence, migrations keep schema changes explicit and resource classes turn manager behavior into HTTP behavior.
+Tango is organized around the same application concerns that shape a Django or Django REST Framework project:
 
-Tango adds adapters to the mix, to connect those resource classes to host frameworks such as Express, Next.js, and Nuxt, and ships with the `tango` CLI to tie the developer workflow together.
+- A rich TypeScript-based ORM, based on the Django ORM, manages persistence and database access, with a migrations system that enables carefree schema evolution
+- A structured API toolkit, based on Django REST Framework, provides opt-in auto-magical functionalities for building your Web API in conjunction with your Tango models.
+- A CLI to automate away the day-to-day boilerplate. The `tango` CLI is Tango's equivalent to Django's `manage.py`
+
+Tango adds adapters to the mix, to connect the API and ORM layer to your favorite host framework such as Express, Next.js, and Nuxt.
 
 Tango enhances the frameworks you are already used to with application workflows inspired by Django and is designed to work in tandem with your preferred host framework, without forcing you to migrate away from your chosen tech stack. Express, Next.js, or Nuxt continues to own routing and request lifecycle behavior, while Tango provides the application-facing layers for models, persistence, migrations, and API resources.
 
-The main packages you will encounter are `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-migrations`, `@danceroutine/tango-resources`, the adapter packages, and `@danceroutine/tango-cli`.
-
 ## Documentation
 
-Tango's documentation is organized to help you solve problems from first principles, and will look familiar to Django developers: tutorials for building something concrete, topic guides for learning the architecture, how-to guides for task-oriented work, and reference pages for public contracts.
+Tango's documentation is organized to help you solve problems from first principles, and will look familiar to Django developers:
+
+- [Tutorials](https://tangowebframework.dev/tutorials/) provide step-by-step walkthroughs for building something concrete
+- [How-to guides](https://tangowebframework.dev/how-to/) give you task-oriented guidance that you can compose to achieve larger goals
+- [Topic guides](https://tangowebframework.dev/topics/) provide a jump-off point for the critical concepts and theory important for developing with Tango
+- [Reference pages](https://tangowebframework.dev/reference/) provide technical details on the functioning and implementation of public contracts.
 
 If you are evaluating Tango, start here:
 
-1. [Getting started](docs/guide/getting-started.md)
-2. [Installation](docs/guide/installation.md)
-3. [Quickstart](docs/quickstart.md)
-4. [Blog API tutorial](docs/tutorials/blog-api.md), [Next.js tutorial](docs/tutorials/nextjs-blog.md), or [Nuxt tutorial](docs/tutorials/nuxt-blog.md)
-5. the topic guides for the packages you plan to use
+1. [Getting started](https://tangowebframework.dev/guide/getting-started)
+2. [Installation](https://tangowebframework.dev/guide/installation)
+3. [Quickstart](https://tangowebframework.dev/guide/quickstart)
 
-The full documentation set lives under [`docs/`](docs/), and is hosted on <https://tangowebframework.dev>.
+You can also see a tutorial for any of the supported frameworks
 
-## Example Applications
-
-Tango provides an example application for each supported host framework, viewable under `examples/`
-
-Run the Express example with:
-
-```bash
-pnpm --filter @danceroutine/tango-example-express-blog-api bootstrap
-pnpm --filter @danceroutine/tango-example-express-blog-api dev
-```
-
-Run the Next.js example with:
-
-```bash
-pnpm --filter @danceroutine/tango-example-nextjs-blog bootstrap
-pnpm --filter @danceroutine/tango-example-nextjs-blog dev
-```
-
-Run the Nuxt example with:
-
-```bash
-pnpm --filter @danceroutine/tango-example-nuxt-blog bootstrap
-pnpm --filter @danceroutine/tango-example-nuxt-blog dev
-```
-
-The examples are the fastest way to see the full Tango stack in one place: models, managers, migrations, resources, filtering, pagination, and adapters.
-
-## Working in This Repository
-
-If you are contributing to Tango itself, start with the contributor docs:
-
-1. [Contributor overview](docs/contributors/index.md)
-2. [Contributor setup](docs/contributors/setup.md)
-3. [Package catalog](docs/contributors/package-catalog.md)
-4. [Releasing packages](docs/contributors/releasing.md)
-5. [Contributing standards](docs/contributing.md)
-
-### Prerequisites
-
-- Node.js 22 or newer
-- pnpm 9 or newer
-- Docker if you want to run the PostgreSQL integration suite
-
-### Initial Setup
-
-```bash
-git clone https://github.com/danceroutine/tango.git
-cd tango
-nvm use
-pnpm install
-```
-
-### Common Commands
-
-```bash
-pnpm typecheck
-pnpm test
-pnpm test:integration
-pnpm test:integration:all
-pnpm build
-pnpm docs:dev
-pnpm docs:build
-```
-
-SQLite integration tests run out of the box. For PostgreSQL integration tests, start the local database first:
-
-```bash
-docker compose -f docker-compose.integration.yml up -d
-```
-
-## Releases
-
-Tango uses [Changesets](https://github.com/changesets/changesets) for version management and publishing.
-
-Create a changeset when your work should ship in a release:
-
-```bash
-pnpm changeset
-```
-
-For the full release workflow, use the [releasing guide](docs/contributors/releasing.md).
+1. [Express Blog API tutorial](https://tangowebframework.dev/tutorials/express-blog-api)
+2. [Next.js tutorial](https://tangowebframework.dev/tutorials/nextjs-blog)
+3. [Nuxt tutorial](https://tangowebframework.dev/tutorials/nuxt-blog)
 
 ## Contributing
 
-Issues and pull requests are welcome. Contributor workflow, engineering standards, and release expectations are covered here:
+Issues and pull requests are welcome. If you'd like to contributing to Tango, start with the contributor docs:
 
-- [Contributor overview](docs/contributors/index.md)
-- [Contributing standards](docs/contributing.md)
+1. [Contributor overview](https://tangowebframework.dev/contributors/)
+2. [Contributor setup](https://tangowebframework.dev/contributors/setup)
+3. [Releasing packages](https://tangowebframework.dev/contributors/releasing)
 
 ## License
 
