@@ -2,6 +2,10 @@
 
 This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
 
+## 1.1.1 - 2026-04-02
+
+- Updated package readmes to point to the new contributor documentation Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-schema`, `@danceroutine/tango-config`, `@danceroutine/tango-openapi`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`, `@danceroutine/tango-adapters-core`, `@danceroutine/tango-adapters-next`, `@danceroutine/tango-adapters-express`.
+
 ## 1.1.0 - 2026-04-01
 
 - Add first-class Nuxt support with a dedicated adapter package, Nuxt project scaffolding, an official Nuxt blog example, and Nuxt docs coverage. Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-codegen`, `@danceroutine/tango-cli`, `@danceroutine/tango-adapters-nuxt`.
