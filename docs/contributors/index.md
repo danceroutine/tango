@@ -1,33 +1,42 @@
-# Contributor documentation
+# Contributing to Tango
 
-Thank you for your interest in contributing to Tango. We appreciate the assistance, and want to ensure that you have an easy time working within this project.
+Tango grows through contributors who improve the framework, sharpen its public contracts, and make the documentation easier to learn from. Whether you want to fix a bug, improve an example, refine a package README, or help maintain release workflows, the contributor documentation below is the place to begin.
 
-If you are evaluating or adopting Tango for an application, start with the [Guide](/guide/) instead. The contributor pages assume monorepo context, package ownership, release workflow, and CI expectations.
+The contributor guides currently focus on the workflows that already exist in the repository: code contributions, documentation contributions, maintainer topics, and maintainer how-to guides.
 
-## Contributor structure
+## Getting started
 
-Contributor docs now follow the same split as the user-facing docs:
+Start with [Contributor setup](/contributors/setup). It explains how to get a local checkout building, how to run the repository validation suite, and what tools are expected for day-to-day maintenance work.
 
-- contributor topics for design intent and architecture boundaries
-- contributor how-to guides for procedural maintainer workflows
+If you are new to Tango's internals, these pages are a good next stop after setup:
 
-## Read these pages first
+- [Contributor topics](/contributors/topics/)
+- [Contributor how-to guides](/contributors/how-to/)
 
-1. [Contributor setup](/contributors/setup)
-2. [Contributor topics](/contributors/topics/)
-3. [Contributor how-to guides](/contributors/how-to/)
-4. [Releasing packages](/contributors/releasing)
-5. [Contributing guidelines](/contributing)
+## Work on Tango
 
-## Development North Star
+There are two main ways to contribute directly to the framework.
 
-Tango is developed with the following principles in mind. You should utilize these to guide your decision making when dealing with ambiguity or multiple potential solutions.
+### Contributing code
 
-Principles:
+Code contributions include runtime behavior, public APIs, examples, tooling, tests, and release-related maintenance. The code contribution guide walks through the normal path from choosing a change to opening a pull request, including testing expectations and documentation follow-through.
 
-1. Public contracts should be explicit.
-2. Packages should be structured based on domain, not functionality.
-3. Changes to behavior should travel with tests and documentation.
-    - We enforce a 100% test coverage threshold to help with this. Individual exceptions to coverage are allowed, but will be vetted in PR.
-4. Practicality should be preferred over dogmatism, but try to work within the established patterns for consistency.
-5. Developer delight is king. We want changes to Tango to be focused on making a developer grin when they discover them.
+- [Contributing code](/contributors/contributing-code)
+- [Contributor topics](/contributors/topics/)
+- [Contributor how-to guides](/contributors/how-to/)
+- [Releasing packages](/contributors/releasing)
+
+### Contributing documentation
+
+Documentation work includes the Tango documentation site, package READMEs, contributor guides, and other public technical prose. The documentation guide explains how the docs are organized, how to run VitePress locally, and how documentation changes fit into the normal pull request workflow.
+
+- [Writing documentation](/contributors/writing-documentation)
+- [Contributor setup](/contributors/setup)
+
+## Maintainer reference
+
+Some contributor pages are most useful once you already know the area you are changing and need architectural context or a procedure you can follow step by step.
+
+- [Contributor topics](/contributors/topics/)
+- [Contributor how-to guides](/contributors/how-to/)
+- [Releasing packages](/contributors/releasing)

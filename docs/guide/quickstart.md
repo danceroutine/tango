@@ -74,7 +74,7 @@ As you browse the examples, keep this sequence in mind:
 
 ## Next steps
 
-- [Blog API tutorial](/tutorials/blog-api)
+- [Blog API tutorial](/tutorials/express-blog-api)
 - [Next.js tutorial](/tutorials/nextjs-blog)
 - [Nuxt tutorial](/tutorials/nuxt-blog)
 - [Models and schema](/topics/models-and-schema)

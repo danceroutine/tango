@@ -125,4 +125,4 @@ Those concerns fit better in the resource or query layer, where request handling
 
 - [Schema API reference](/reference/schema-api)
 - [Migrations](/topics/migrations)
-- [Blog API tutorial](/tutorials/blog-api)
+- [Blog API tutorial](/tutorials/express-blog-api)

@@ -81,7 +81,7 @@ pnpm --filter @danceroutine/tango-adapters-next test
 
 For the wider contributor workflow, use:
 
-- <https://tangowebframework.dev/contributing>
+- <https://tangowebframework.dev/contributors/contributing-code>
 
 ## License
 

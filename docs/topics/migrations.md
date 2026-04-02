@@ -110,4 +110,4 @@ You still need to inspect the generated operations, especially if:
 - [Generate and apply migrations](/how-to/generate-and-apply-migrations)
 - [CLI API](/reference/cli-api)
 - [Schema API](/reference/schema-api)
-- [Blog API tutorial](/tutorials/blog-api)
+- [Blog API tutorial](/tutorials/express-blog-api)

@@ -10,7 +10,7 @@ Tutorials are for learning by doing. Read them from top to bottom and avoid skip
 
 Use a tutorial when you want to see how several Tango packages fit together in one application.
 
-- [Blog API tutorial](/tutorials/blog-api)
+- [Blog API tutorial](/tutorials/express-blog-api)
 - [Next.js blog tutorial](/tutorials/nextjs-blog)
 - [Nuxt blog tutorial](/tutorials/nuxt-blog)
 
@@ -55,7 +55,7 @@ If you are new to Tango, use this order:
 
 1. [Getting started](/guide/getting-started)
 2. [Installation](/guide/installation)
-3. [Quickstart](/quickstart)
+3. [Quickstart](/guide/quickstart)
 4. one tutorial
 5. the topic guides for the packages you use
 6. how-to guides when you begin changing behavior

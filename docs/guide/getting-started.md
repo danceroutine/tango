@@ -50,8 +50,8 @@ If you want the background for that structure, compare:
 If you are adopting Tango in an application:
 
 1. [Installation](/guide/installation)
-2. [Quickstart](/quickstart)
-3. [Blog API tutorial](/tutorials/blog-api)
+2. [Quickstart](/guide/quickstart)
+3. [Blog API tutorial](/tutorials/express-blog-api)
 4. [Models and schema](/topics/models-and-schema)
 5. [ORM and repositories](/topics/orm-and-repositories)
 6. [Resources and viewsets](/topics/resources-and-viewsets)
