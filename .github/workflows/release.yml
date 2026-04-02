@@ -55,6 +55,7 @@ jobs:
               with:
                   ref: ${{ github.ref }}
                   fetch-depth: 0
+                  persist-credentials: false
 
             - name: Checkout (workflow_dispatch)
               if: github.event_name == 'workflow_dispatch'
@@ -62,6 +63,7 @@ jobs:
               with:
                   ref: ${{ inputs.branch }}
                   fetch-depth: 0
+                  persist-credentials: false
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
@@ -143,6 +145,7 @@ jobs:
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
                   git add -A
                   git commit -m "chore: version packages [skip ci]"
+                  git config --local --unset-all http.https://github.com/.extraheader || true
                   git remote set-url origin "https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
                   git push origin HEAD:main
 
