@@ -80,7 +80,6 @@ export default defineConfig({
                         { text: 'Installation (users)', link: '/guide/installation' },
                         { text: 'Overview', link: '/guide/overview' },
                         { text: 'Supported and unsupported features', link: '/guide/supported-and-unsupported' },
-                        { text: 'Quickstart', link: '/guide/quickstart' },
                     ],
                 },
             ],

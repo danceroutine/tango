@@ -84,12 +84,12 @@ For most application code:
 - use integration tests for model managers, query behavior, migrations, and dialect differences
 - use smoke or end-to-end tests for adapter wiring and the most important endpoints
 
-The standard project scripts already separate unit and integration execution:
+The standard project scripts already separate unit and integration execution. Run them with your package manager, for example:
 
-- `pnpm test`
-- `pnpm test:integration`
-- `pnpm test:integration:all`
-- `pnpm test:smoke`
+- `npm run test` or `pnpm test` or `yarn test` or `bun run test`
+- `npm run test:integration` or the equivalent `run` command for `test:integration`
+- `npm run test:integration:all` when your project defines that script
+- `npm run test:smoke` when your project defines that script
 
 ## Related pages
 

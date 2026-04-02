@@ -6,9 +6,8 @@ The guide gives you the path from first install to your first working Tango appl
 
 1. [Getting started](/guide/getting-started)
 2. [Installation](/guide/installation)
-3. [Supported and unsupported features](/guide/supported-and-unsupported)
-4. [Quickstart](/guide/quickstart)
-5. [Documentation overview](/guide/overview)
+3. [Documentation overview](/guide/overview)
+4. [Supported and unsupported features](/guide/supported-and-unsupported)
 
 ## Related sections
 

@@ -20,7 +20,7 @@ That separation keeps fast feedback in early jobs while still proving schema com
 
 ## GitHub Actions baseline
 
-This workflow runs static checks, then integration tests on both SQLite and PostgreSQL.
+This workflow runs static checks, then integration tests on both SQLite and PostgreSQL. It assumes pnpm because that matches a common monorepo layout. When your application uses another package manager, replace `pnpm/action-setup`, the `cache` value on `actions/setup-node`, and the install command—for example `npm ci` with `cache: npm`, `yarn install --immutable` with `cache: yarn`, or `bun install --frozen-lockfile` with Bun's caching options.
 
 ```yaml
 name: ci
@@ -87,7 +87,7 @@ jobs:
 
 ## GitLab pipeline baseline
 
-This `.gitlab-ci.yml` uses a similar structure with `verify` and `integration` stages.
+This `.gitlab-ci.yml` uses a similar structure with `verify` and `integration` stages. The sample activates pnpm through Corepack; replace `before_script` with the install path your project uses if you standardize on npm, Yarn, or Bun instead.
 
 ```yaml
 stages:
@@ -157,17 +157,36 @@ Environment overrides supported by `@danceroutine/tango-config` let pipeline job
 
 Integration jobs should run migrations against an empty or disposable test database before tests execute:
 
-```bash
-pnpm exec tango migrate --config ./tango.config.ts --env test
-pnpm test:integration
+::: code-group
+
+```bash [npm]
+npx tango migrate --config ./tango.config.ts --env test
+npm run test:integration
 ```
+
+```bash [yarn]
+yarn exec tango migrate --config ./tango.config.ts --env test
+yarn run test:integration
+```
+
+```bash [pnpm]
+pnpm exec tango migrate --config ./tango.config.ts --env test
+pnpm run test:integration
+```
+
+```bash [bun]
+bunx tango migrate --config ./tango.config.ts --env test
+bun run test:integration
+```
+
+:::
 
 This catches migration-order problems and schema drift in the same pipeline run that validates behavior.
 
 Useful companion checks in CI:
 
-- `pnpm exec tango status --config ./tango.config.ts --env test` after migrate for applied/pending visibility
-- `pnpm exec tango plan --config ./tango.config.ts --env test` when you want SQL output as build logs or artifacts
+- `npx tango status --config ./tango.config.ts --env test` (or `yarn exec tango`, `pnpm exec tango`, `bunx tango`) after migrate for applied/pending visibility
+- the same prefix with `plan` instead of `status` when you want SQL output as build logs or artifacts
 
 ## Migrations in CD
 
@@ -182,10 +201,29 @@ A practical release sequence is:
 
 Typical commands:
 
-```bash
+::: code-group
+
+```bash [npm]
+npx tango migrate --config ./tango.config.ts --env production
+npx tango status --config ./tango.config.ts --env production
+```
+
+```bash [yarn]
+yarn exec tango migrate --config ./tango.config.ts --env production
+yarn exec tango status --config ./tango.config.ts --env production
+```
+
+```bash [pnpm]
 pnpm exec tango migrate --config ./tango.config.ts --env production
 pnpm exec tango status --config ./tango.config.ts --env production
 ```
+
+```bash [bun]
+bunx tango migrate --config ./tango.config.ts --env production
+bunx tango status --config ./tango.config.ts --env production
+```
+
+:::
 
 Running migrations in a single deployment job prevents race conditions when multiple application instances start at the same time.
 

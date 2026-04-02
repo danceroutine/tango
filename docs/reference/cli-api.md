@@ -13,9 +13,25 @@ Install `@danceroutine/tango-cli` in an application when you want to:
 - scaffold a new Tango project
 - embed Tango's command set into a custom binary or test harness
 
-```bash
+::: code-group
+
+```bash [npm]
+npm install -D @danceroutine/tango-cli
+```
+
+```bash [yarn]
+yarn add -D @danceroutine/tango-cli
+```
+
+```bash [pnpm]
 pnpm add -D @danceroutine/tango-cli
 ```
+
+```bash [bun]
+bun add -d @danceroutine/tango-cli
+```
+
+:::
 
 Most application code imports schema, ORM, resources, and adapters directly. The CLI package is usually a development dependency because it supports project setup and maintenance workflows.
 
@@ -28,13 +44,41 @@ The package publishes the `tango` binary. Today, the built-in command modules re
 
 That means these commands are available through one executable:
 
-```bash
+::: code-group
+
+```bash [npm]
+tango migrate --dialect sqlite --dir ./migrations --db ./app.sqlite
+tango make:migrations --dialect sqlite --models ./src/models.ts --dir ./migrations --name add_posts
+tango plan --dialect sqlite --dir ./migrations --db ./app.sqlite
+tango status --dialect sqlite --dir ./migrations --db ./app.sqlite
+tango new my-app --framework express --package-manager npm --dialect sqlite
+```
+
+```bash [yarn]
+tango migrate --dialect sqlite --dir ./migrations --db ./app.sqlite
+tango make:migrations --dialect sqlite --models ./src/models.ts --dir ./migrations --name add_posts
+tango plan --dialect sqlite --dir ./migrations --db ./app.sqlite
+tango status --dialect sqlite --dir ./migrations --db ./app.sqlite
+tango new my-app --framework express --package-manager yarn --dialect sqlite
+```
+
+```bash [pnpm]
 tango migrate --dialect sqlite --dir ./migrations --db ./app.sqlite
 tango make:migrations --dialect sqlite --models ./src/models.ts --dir ./migrations --name add_posts
 tango plan --dialect sqlite --dir ./migrations --db ./app.sqlite
 tango status --dialect sqlite --dir ./migrations --db ./app.sqlite
 tango new my-app --framework express --package-manager pnpm --dialect sqlite
 ```
+
+```bash [bun]
+tango migrate --dialect sqlite --dir ./migrations --db ./app.sqlite
+tango make:migrations --dialect sqlite --models ./src/models.ts --dir ./migrations --name add_posts
+tango plan --dialect sqlite --dir ./migrations --db ./app.sqlite
+tango status --dialect sqlite --dir ./migrations --db ./app.sqlite
+tango new my-app --framework express --package-manager bun --dialect sqlite
+```
+
+:::
 
 The `new` command is also exposed under `codegen new`. The top-level command exists so that application bootstrapping feels like the first thing the CLI knows how to do.
 

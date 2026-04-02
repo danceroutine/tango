@@ -90,7 +90,7 @@ In day-to-day application work, this is the command surface you use:
 - `tango plan`
 - `tango status`
 
-The example applications call the CLI through package scripts or `pnpm exec` rather than assuming a global install.
+The Tango repository's example applications call the CLI through package scripts wired for that monorepo. In your own project, invoke the local binary with `npx tango`, `yarn exec tango`, `pnpm exec tango`, or `bunx tango` after you install `@danceroutine/tango-cli`, rather than assuming a global install.
 
 ## Practical advice
 

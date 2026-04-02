@@ -8,7 +8,7 @@ hero:
     actions:
         - theme: brand
           text: Develop with Tango
-          link: /guide/quickstart
+          link: /guide/getting-started
         - theme: alt
           text: Follow tutorials
           link: /tutorials/

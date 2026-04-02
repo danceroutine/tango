@@ -17,12 +17,37 @@ In the examples, those modules are:
 
 With `tango.config.ts` at the project root:
 
-```bash
+::: code-group
+
+```bash [npm]
+npx tango make:migrations \
+  --config ./tango.config.ts \
+  --models ./src/models/index.ts \
+  --name add_summary
+```
+
+```bash [yarn]
+yarn exec tango make:migrations \
+  --config ./tango.config.ts \
+  --models ./src/models/index.ts \
+  --name add_summary
+```
+
+```bash [pnpm]
 pnpm exec tango make:migrations \
   --config ./tango.config.ts \
   --models ./src/models/index.ts \
   --name add_summary
 ```
+
+```bash [bun]
+bunx tango make:migrations \
+  --config ./tango.config.ts \
+  --models ./src/models/index.ts \
+  --name add_summary
+```
+
+:::
 
 If your config file lives at `./tango.config.ts`, the CLI will auto-load it even when you omit `--config`.
 
@@ -43,9 +68,25 @@ Check for:
 
 ## 4. Apply the migration
 
-```bash
+::: code-group
+
+```bash [npm]
+npx tango migrate --config ./tango.config.ts
+```
+
+```bash [yarn]
+yarn exec tango migrate --config ./tango.config.ts
+```
+
+```bash [pnpm]
 pnpm exec tango migrate --config ./tango.config.ts
 ```
+
+```bash [bun]
+bunx tango migrate --config ./tango.config.ts
+```
+
+:::
 
 The examples wrap this in `setup:schema` scripts so the command is easier to reuse.
 
@@ -53,15 +94,47 @@ The examples wrap this in `setup:schema` scripts so the command is easier to reu
 
 To see what would run without applying it:
 
-```bash
+::: code-group
+
+```bash [npm]
+npx tango plan --config ./tango.config.ts
+```
+
+```bash [yarn]
+yarn exec tango plan --config ./tango.config.ts
+```
+
+```bash [pnpm]
 pnpm exec tango plan --config ./tango.config.ts
 ```
 
+```bash [bun]
+bunx tango plan --config ./tango.config.ts
+```
+
+:::
+
 To see which migrations are applied:
 
-```bash
+::: code-group
+
+```bash [npm]
+npx tango status --config ./tango.config.ts
+```
+
+```bash [yarn]
+yarn exec tango status --config ./tango.config.ts
+```
+
+```bash [pnpm]
 pnpm exec tango status --config ./tango.config.ts
 ```
+
+```bash [bun]
+bunx tango status --config ./tango.config.ts
+```
+
+:::
 
 ## 6. Re-run the generation step after applying
 
