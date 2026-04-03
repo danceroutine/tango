@@ -124,9 +124,9 @@ The root export is enough for normal application use. The `domain`, `generators`
 ## Documentation
 
 - Official documentation: <https://tangowebframework.dev>
-- Publish an OpenAPI document: <https://tangowebframework.dev/how-to/publish-openapi-document>
+- Auto-document your API: <https://tangowebframework.dev/how-to/auto-document-your-api>
 - OpenAPI API reference: <https://tangowebframework.dev/reference/openapi-api>
-- Resources topic: <https://tangowebframework.dev/topics/resources-and-viewsets>
+- API layer topic: <https://tangowebframework.dev/topics/api-layer>
 
 ## Development
 

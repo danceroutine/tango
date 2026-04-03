@@ -95,7 +95,7 @@ pnpm --filter @danceroutine/tango-orm test:integration
 ## Bugs and support
 
 - Documentation: <https://tangowebframework.dev>
-- ORM topic: <https://tangowebframework.dev/topics/orm-and-repositories>
+- ORM topic: <https://tangowebframework.dev/topics/orm-and-querysets>
 - Query reference: <https://tangowebframework.dev/reference/orm-query-api>
 - Issue tracker: <https://github.com/danceroutine/tango/issues>
 

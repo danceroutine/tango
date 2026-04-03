@@ -81,6 +81,6 @@ They create `DBClient` implementations that model managers and migration tooling
 
 ## Related pages
 
-- [ORM and QuerySets](/topics/orm-and-repositories)
-- [Filtering](/how-to/filtering)
+- [ORM and QuerySets](/topics/orm-and-querysets)
+- [Build your API with viewsets](/how-to/build-your-api-with-viewsets)
 - [Pagination](/how-to/pagination)

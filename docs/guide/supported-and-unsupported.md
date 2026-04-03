@@ -22,9 +22,11 @@ That model metadata is not isolated to one package. The same contract feeds migr
 
 ### ORM and data access
 
-The ORM layer already includes model managers through `Model.objects`, immutable `QuerySet` composition, boolean query composition through `Q`, and transaction coordination through `UnitOfWork`.
+The ORM layer already includes model managers through `Model.objects`, immutable `QuerySet` composition, boolean query composition through `Q`, column projection through `select(...)`, and relation-aware query planning through `selectRelated(...)` and `prefetchRelated(...)`.
 
-The ORM surface is designed for application code that wants a Django-shaped querying model without giving up TypeScript-native contracts. Collection filtering, ordering, slicing, existence checks, aggregates such as `count()`, and repository-backed persistence are all part of the current story.
+The ORM surface is designed for application code that wants a Django-shaped querying model without giving up TypeScript-native contracts. Collection filtering, ordering, slicing, existence checks, row shaping through `fetch(...)`, and manager-backed persistence are all part of the current story.
+
+Three ORM features are still outside the supported boundary today. `selectRelated(...)` can plan relation joins, but it does not yet hydrate nested related model objects into the returned row shape. `select(...)` narrows the SQL projection, but it does not yet narrow the TypeScript result type automatically. The ORM also does not yet provide a supported transaction workflow for application code.
 
 ### Database dialects
 
@@ -86,17 +88,26 @@ A forms framework, a server-rendered template engine, and a page-oriented compon
 
 Tango resources can receive authenticated user state through `RequestContext`, and the core package includes standard error types such as `AuthenticationError` and `PermissionDenied`. Authentication backends, permission classes, throttling, renderer negotiation, and the larger policy surface associated with Django REST Framework are not part of the current Tango resource layer.
 
-We anticipate adding this functionality as a high priority feature expansion in the future.
-
 ### Additional built-in SQL dialects
 
 MySQL, MariaDB, SQL Server, and other SQL backends are not built-in Tango dialects today. Supporting a new dialect requires runtime, migration, testing, config, and CI work before that backend can be treated as part of the supported surface.
 
-We likewise anticipate investing in the supported dialects in the coming days.
+MariaDB is the SQL dialect currently called out on the roadmap, but it is not part of the supported database surface yet.
+
+## Which current gaps are already on the roadmap?
+
+Several unsupported areas already have explicit follow-up work planned.
+
+At the ORM level, the roadmap includes relation hydration from `selectRelated(...)`, TypeScript narrowing from `select(...)`, and a supported transaction API for multi-step write workflows.
+
+At the platform level, the roadmap also includes MariaDB support, GraphQL support, custom Tango environments beyond `development`, `test`, and `production`, non-linear migration dependency chains for larger teams, agentic development support for AI-assisted workflows, and longer-term exploration of NoSQL support.
+
+The roadmap page is the right place to follow those items as they evolve. This page should be read as the current support boundary, not as a promise that every planned item will arrive on a fixed schedule.
 
 ## Related pages
 
 - [Overview](/guide/overview)
 - [Installation](/guide/installation)
+- [Roadmap](/roadmap)
 - [Architecture](/topics/architecture)
-- [Resources and viewsets](/topics/resources-and-viewsets)
+- [API layer](/topics/api-layer)

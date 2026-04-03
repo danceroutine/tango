@@ -156,5 +156,5 @@ The `@danceroutine/tango-config/loader` and `@danceroutine/tango-config/schema` 
 ## Related pages
 
 - [Configure databases](/how-to/databases)
-- [Generate and apply migrations](/how-to/generate-and-apply-migrations)
+- [Migrate schema changes](/how-to/work-with-models#migrate-schema-changes)
 - [CLI API](/reference/cli-api)

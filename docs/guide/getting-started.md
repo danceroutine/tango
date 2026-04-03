@@ -193,4 +193,4 @@ If you want to work on Tango itself, continue with the [Contributor documentatio
 - [Supported and unsupported features](/guide/supported-and-unsupported)
 - [Configure databases](/how-to/databases)
 - [Run Tango in CI/CD](/how-to/ci-cd-pipelines)
-- [Publish an OpenAPI document](/how-to/publish-openapi-document)
+- [Auto-document your API](/how-to/auto-document-your-api)

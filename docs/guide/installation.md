@@ -254,6 +254,6 @@ Once the packages are installed, continue with the pages that help you assemble 
 - [Overview](/guide/overview)
 - [Configure databases](/how-to/databases)
 - [Run Tango in CI/CD](/how-to/ci-cd-pipelines)
-- [Publish an OpenAPI document](/how-to/publish-openapi-document)
+- [Auto-document your API](/how-to/auto-document-your-api)
 - [Config API](/reference/config-api)
 - [CLI API](/reference/cli-api)

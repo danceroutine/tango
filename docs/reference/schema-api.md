@@ -114,5 +114,5 @@ These helpers support constraint and index construction. They are lower-level to
 ## Related pages
 
 - [Models and schema](/topics/models-and-schema)
-- [Model lifecycle hooks](/topics/model-lifecycle-hooks)
+- [Work with models](/how-to/work-with-models)
 - [Migrations](/topics/migrations)
