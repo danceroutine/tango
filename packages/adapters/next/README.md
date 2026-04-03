@@ -69,7 +69,7 @@ import { adapter } from '@danceroutine/tango-adapters-next';
 
 - Official documentation: <https://tangowebframework.dev>
 - Next.js blog tutorial: <https://tangowebframework.dev/tutorials/nextjs-blog>
-- Resources topic: <https://tangowebframework.dev/topics/resources-and-viewsets>
+- API layer topic: <https://tangowebframework.dev/topics/api-layer>
 
 ## Development
 

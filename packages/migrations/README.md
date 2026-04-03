@@ -89,7 +89,7 @@ The package also exposes subpaths such as `builder`, `runner`, `generator`, `dif
 
 - Official documentation: <https://tangowebframework.dev>
 - Migrations topic: <https://tangowebframework.dev/topics/migrations>
-- Generate and apply migrations: <https://tangowebframework.dev/how-to/generate-and-apply-migrations>
+- Work with models: <https://tangowebframework.dev/how-to/work-with-models>
 
 ## Development
 

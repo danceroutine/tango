@@ -1,39 +1,59 @@
 # Migrations
 
-Tango migrations keep the database schema aligned with your model metadata.
+Migrations are the checked-in history of your database schema.
 
-In a typical application, `tango.config.ts` sits next to the migration workflow. It describes the database target and migration directory once, and the `tango` CLI reuses that config when it runs migration commands.
+When you change a Tango model, a migration records how the database should move from one schema state to the next so that tables, columns, relations, and indexes stay aligned with the model contract in your code.
 
-The migration package supports three related jobs:
+Migrations are part of normal application development. If models are one source of truth for your data shape, migrations are the history of how that truth changed over time.
 
-- describing schema changes with a class-based migration API
-- generating migration files from model metadata and database introspection
-- applying migrations in a controlled order with a journal table
+The basics:
 
-## The migration API surface
+- `tango make:migrations` creates new migration files from model changes
+- `tango migrate` applies pending migration files to a database
+- Tango stores applied migration state in `_tango_migrations`
+- migration files belong in version control alongside the model changes they represent
 
-`@danceroutine/tango-migrations` gives application code these main pieces:
+## How Tango thinks about migrations
 
-- `Migration`
-- `op`, `OpBuilder`, and `CollectingBuilder`
-- `MigrationRunner`
-- `MigrationGenerator`
-- `diffSchema`
-- SQL compilers and introspectors for PostgreSQL and SQLite
+A Tango migration is one step in an ordered migration chain.
 
-The `tango` executable now lives in `@danceroutine/tango-cli`, which composes the migration commands from this package into the shared Tango CLI.
+Each migration file says, in effect, "starting from the schema state that existed before this file, here is the next schema change." The runner then applies those files in order and records which ones have already been applied.
 
-## Migration classes
+That gives a Tango application two important things:
 
-Every migration subclasses `Migration` and defines:
+- a repeatable way to bring a fresh database up to the current schema
+- a checked-in history of how the schema reached its current shape
 
-- `id`
-- `up(m)`
-- `down(m)`
+Without migrations, the models and the real database would drift apart. Application code would describe one schema while the database still contained an earlier one.
 
-The example from the package README is accurate for the current code:
+## The main commands
+
+Most day-to-day migration work revolves around four commands:
+
+- `tango make:migrations`
+- `tango migrate`
+- `tango plan`
+- `tango status`
+
+`make:migrations` is the command that looks at your current model metadata, compares it to the current database schema, and writes a new migration file when the stored schema needs to change.
+
+`migrate` applies the pending files in order.
+
+`plan` is useful when you want to inspect the SQL that Tango is preparing to run.
+
+`status` is useful when you want to see which migrations the target database believes have already been applied.
+
+The how-to pages cover when to run these commands. The important idea in this topic guide is that they all work from the same migration history.
+
+## Migration files
+
+Migration files are normal TypeScript modules that describe schema changes through a migration class.
+
+A basic migration looks like this:
 
 ```ts
+import { Migration, op } from '@danceroutine/tango-migrations';
+
 export default class CreatePosts extends Migration {
     id = '20260302_create_posts';
 
@@ -52,62 +72,37 @@ export default class CreatePosts extends Migration {
 }
 ```
 
-## How generated migrations work
+The important parts are the migration id and the `up(...)` and `down(...)` methods. `up(...)` describes the schema change that should be applied. `down(...)` describes how to reverse it.
 
-`diffSchema()` compares model metadata with an introspected database schema. It can generate operations for:
+Most application code will generate these files rather than writing them from scratch. Even then, it helps to understand that a migration file is just a declarative description of one schema step.
 
-- create table
-- drop table
-- add column
-- drop column
-- create index
-- drop index
+## Migrations workflow
 
-The generator then writes those operations into a migration file.
+The workflow begins when a model change alters the database schema.
 
-`MigrationGenerator.generate()` throws if there are no operations to write, which prevents empty migration files from being created.
+At that point, run `tango make:migrations`. Tango compares the model metadata in your application with the schema it introspects from the target database, then writes a migration file that describes the next step in the schema history. Migration generation is tied to a real database because Tango needs to measure the gap between the database you have now and the model contract you want to ship.
 
-## How migrations are applied
+Once the file has been generated, read it carefully before you apply it. Generation is the first step in review. For straightforward additions, the generated operations may already be the rollout you want. For renames, dropped columns, constraint changes, and any change against a database that already contains data, you need to review whether the generated step is safe for the records that already exist.
 
-`MigrationRunner` reads files from a directory, sorts them, skips already applied migrations, and records applied migrations in `_tango_migrations`.
+When the migration looks correct, run `tango migrate` against a real database. Tango loads the migration files from the configured directory, applies the ones that have not yet been recorded, and writes the applied ids into `_tango_migrations`. That journal table is what allows the same migration directory to be used in development, CI, staging, and production while each database keeps its own record of how far through the chain it has progressed.
 
-`MigrationRunner` also:
+The model change and the migration file should then be committed together. Other developers, CI jobs, and deployment environments need both at the same time. If one lands without the other, the application code and the database stop describing the same system.
 
-- stores a checksum for each applied migration
-- wraps non-online PostgreSQL migrations in a transaction
-- supports `apply()`, `plan()`, and `status()`
+Version control discipline matters even more when two branches both add migrations. Tango currently uses a linear migration history, so the merged branch has to be reviewed again as one ordered chain. After rebasing or merging, confirm that the migration sequence still describes the merged schema accurately. If it does not, regenerate or adjust the migration before it reaches shared environments.
 
-## How the CLI integrates with migrations
+## Backend differences matter
 
-`@danceroutine/tango-migrations` exports `registerMigrationsCommands()`, and `@danceroutine/tango-cli` mounts that command tree into the shared `tango` binary.
+Migrations describe one schema history, but databases do not all behave the same way while that history is being applied.
 
-When `./tango.config.ts` exists, the CLI can infer the dialect, database target, and migration directory from that file. Explicit flags still win when you need a one-off override.
+Tango currently ships with built-in migration support for SQLite and PostgreSQL. Both can support ordinary application workflows, but they do not have identical operational characteristics.
 
-In day-to-day application work, this is the command surface you use:
+SQLite is convenient for local development and lightweight testing, but schema changes often involve more table rewriting under the hood. PostgreSQL is usually the stronger reference backend for production-oriented migration behavior.
 
-- `tango migrate`
-- `tango make:migrations`
-- `tango plan`
-- `tango status`
-
-The Tango repository's example applications call the CLI through package scripts wired for that monorepo. In your own project, invoke the local binary with `npx tango`, `yarn exec tango`, `pnpm exec tango`, or `bunx tango` after you install `@danceroutine/tango-cli`, rather than assuming a global install.
-
-## Practical advice
-
-Treat migration generation as the start of review, not the end of it.
-
-You still need to inspect the generated operations, especially if:
-
-- a model or field was renamed
-- an index disappeared
-- a relation changed
-- the migration wants to drop a table or column you expected to keep
+Those differences matter when you review rollout risk, CI coverage, and deployment strategy. The migration chain may be the same, but the database backend still affects how safely and quickly that chain can be applied.
 
 ## Related pages
 
-- [Config API](/reference/config-api)
+- [Work with models](/how-to/work-with-models)
 - [Run Tango in CI/CD](/how-to/ci-cd-pipelines)
-- [Generate and apply migrations](/how-to/generate-and-apply-migrations)
 - [CLI API](/reference/cli-api)
 - [Schema API](/reference/schema-api)
-- [Blog API tutorial](/tutorials/express-blog-api)

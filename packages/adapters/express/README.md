@@ -111,8 +111,7 @@ The official documentation walks through Tango from first principles and gives t
 
 - Official documentation: <https://tangowebframework.dev>
 - Blog API tutorial: <https://tangowebframework.dev/tutorials/express-blog-api>
-- Resources topic: <https://tangowebframework.dev/topics/resources-and-viewsets>
-- Serializers topic: <https://tangowebframework.dev/topics/serializers>
+- API layer topic: <https://tangowebframework.dev/topics/api-layer>
 
 ## Development
 

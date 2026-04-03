@@ -1,12 +1,77 @@
 # How to configure databases
 
-`tango.config.ts` is the normal place to describe database configuration in a Tango application.
+Tango reads database settings from `tango.config.ts`. Before models, queries, and migrations can do useful work, you need a database that is running and a Tango environment that points at it.
 
-That file keeps development, test, and production settings together, and it gives the runtime code and the `tango` CLI the same source of truth.
+Tango currently supports SQLite and PostgreSQL as built-in relational databases.
 
-## Start with `tango.config.ts`
+## Choose SQLite or PostgreSQL
 
-Generated Tango applications define their database settings with `@danceroutine/tango-config`:
+The first decision is which database should back the application.
+
+SQLite is a good fit when you want the quickest local setup, when you are building a small application, or when you want tests to run against an isolated database file or an in-memory database. PostgreSQL is a better fit when the application will deploy in production on PostgreSQL, when you want migration testing to reflect production more closely, or when the application will benefit from a server-based database from the beginning.
+
+If you expect to deploy on PostgreSQL, it is wise to use PostgreSQL in at least one non-production environment as well. That gives you earlier feedback on migration behavior, connection settings, and database-specific constraints.
+
+## Get the database running
+
+Before Tango can connect, the database itself needs to exist and accept connections.
+
+### SQLite
+
+SQLite does not need a separate server process. In practice, getting SQLite running usually means deciding where the database file should live.
+
+In many Tango applications, development uses a persistent file and tests use an in-memory database:
+
+```ts
+development: {
+    name: 'development',
+    db: {
+        adapter: 'sqlite',
+        filename: './.data/app.sqlite',
+        maxConnections: 1,
+    },
+    migrations: { dir: './migrations', online: false },
+},
+test: {
+    name: 'test',
+    db: {
+        adapter: 'sqlite',
+        filename: ':memory:',
+        maxConnections: 1,
+    },
+    migrations: { dir: './migrations', online: false },
+},
+```
+
+`./.data/app.sqlite` gives local development one persistent database file. `:memory:` creates a temporary database for the lifetime of the process, which is often convenient for tests.
+
+Once you have decided on the filename, there is usually nothing else to install before you run `tango migrate`.
+
+### PostgreSQL
+
+PostgreSQL needs a running server, a database, and credentials that Tango can use.
+
+Before you configure Tango, make sure you have:
+
+- a PostgreSQL server running locally, in Docker, or in your target environment
+- a database created for the application
+- a database user that can connect to that database
+- enough database permissions for `tango migrate` to create and alter tables
+
+For local development, a simple setup often starts with `psql`:
+
+```sql
+CREATE USER tango_app WITH PASSWORD 'change-me';
+CREATE DATABASE tango_app OWNER tango_app;
+```
+
+Once the server is running and those credentials work, Tango can connect through either a single connection URL or discrete fields such as `host`, `port`, `database`, `user`, and `password`.
+
+## Put the connection into `tango.config.ts`
+
+After the database is running, declare how each Tango environment should reach it.
+
+Generated Tango projects already use one `tango.config.ts` file for `development`, `test`, and `production`:
 
 ```ts
 import { defineConfig } from '@danceroutine/tango-config';
@@ -45,7 +110,31 @@ export default defineConfig({
 });
 ```
 
-At runtime, application code resolves the active environment with `loadConfig()` and then reads `loaded.current.db`.
+This arrangement keeps the application's database policy in one place. Development can stay on SQLite, tests can stay isolated, and production can point at PostgreSQL while the runtime and the CLI continue to read the same configuration file.
+
+If your PostgreSQL environment exposes separate fields instead of a URL, the production environment can use this shape instead:
+
+```ts
+production: {
+    name: 'production',
+    db: {
+        adapter: 'postgres',
+        host: process.env.TANGO_DB_HOST,
+        port: 5432,
+        database: process.env.TANGO_DB_NAME,
+        user: process.env.TANGO_DB_USER,
+        password: process.env.TANGO_DB_PASSWORD,
+        maxConnections: 20,
+    },
+    migrations: { dir: './migrations', online: true },
+},
+```
+
+## Let the runtime and CLI share the same settings
+
+Application code and Tango's CLI both read from the same project config.
+
+At runtime, application startup usually loads the config and reads `loaded.current.db`:
 
 ```ts
 import { loadConfig } from '@danceroutine/tango-config';
@@ -55,93 +144,23 @@ const loadedConfig = loadConfig(() => tangoConfig);
 const db = loadedConfig.current.db;
 ```
 
-## SQLite configuration
+The CLI follows the same environment selection. When `./tango.config.ts` exists at the project root, commands such as `tango migrate` and `tango make:migrations` can infer the selected database adapter, the database target, and the migrations directory from the current environment.
 
-SQLite is the simplest choice for local development, examples, and fast integration loops. In Tango, that usually means:
+That shared configuration is one of the reasons it is worth keeping database settings in `tango.config.ts` instead of scattering them between application bootstrap code and shell scripts.
 
-- `adapter: 'sqlite'`
-- a project-local file such as `./.data/app.sqlite` for development
-- `:memory:` for test runs that should stay isolated and fast
-- `maxConnections: 1`, because SQLite usually runs as a single-process local database
+## Override environment-specific details
 
-The generated application scaffolds follow that pattern directly in `tango.config.ts`.
+`loadConfig()` loads `.env` automatically and then merges Tango-specific environment overrides into the selected environment.
 
-## PostgreSQL configuration
+That lets `tango.config.ts` describe the normal shape of the application while CI and deployment supply the values that change from one environment to another. The most common pattern is to keep PostgreSQL in the config and inject the real connection string through `TANGO_DATABASE_URL` or `DATABASE_URL`.
 
-PostgreSQL is the stronger choice when you want production parity, realistic connection behavior, and migration validation against the backend you expect to deploy.
+When your environment does not provide one URL, Tango can override the connection one field at a time through `TANGO_DB_HOST`, `TANGO_DB_PORT`, `TANGO_DB_NAME`, `TANGO_DB_USER`, and `TANGO_DB_PASSWORD`. SQLite projects can redirect the database file with `TANGO_SQLITE_FILENAME`. Migration behavior can also be adjusted per environment with `TANGO_MIGRATIONS_DIR` and `TANGO_MIGRATIONS_ONLINE`.
 
-You can describe PostgreSQL in two common ways:
-
-- with a single `url`
-- with discrete fields such as `host`, `port`, `database`, `user`, and `password`
-
-The loader supports both shapes. Application code can then pass the resolved values into `PostgresAdapter.connect()`.
-
-```ts
-db: {
-    adapter: 'postgres',
-    url: process.env.TANGO_DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/app',
-    maxConnections: 10,
-}
-```
-
-## A practical environment strategy
-
-Most teams should keep the strategy simple:
-
-- use SQLite for local iteration when startup speed matters
-- use PostgreSQL in CI for backend-parity integration checks
-- use the same PostgreSQL family in production that you test in CI
-
-That setup gives developers a fast inner loop while still forcing the project to prove its behavior against the production-style backend before merge.
-
-## Environment overrides
-
-`loadConfig()` loads `.env` automatically and then merges a fixed set of Tango-specific overrides into the selected environment.
-
-The most common overrides are:
-
-- `TANGO_DATABASE_URL` or `DATABASE_URL` for PostgreSQL URLs
-- `TANGO_SQLITE_FILENAME` for SQLite files
-- `TANGO_DB_HOST`, `TANGO_DB_PORT`, `TANGO_DB_NAME`, `TANGO_DB_USER`, and `TANGO_DB_PASSWORD` for discrete PostgreSQL settings
-- `TANGO_MIGRATIONS_DIR` and `TANGO_MIGRATIONS_ONLINE` for migration behavior
-
-That lets you keep the broad shape of the environment in `tango.config.ts` while still injecting deployment-specific values from the process environment.
-
-## How the CLI uses config
-
-The migrations CLI auto-loads `./tango.config.ts` when the file exists. That allows commands such as `tango migrate` and `tango make:migrations` to infer:
-
-- the dialect from `current.db.adapter`
-- the database target from `current.db`
-- the migrations directory from `current.migrations.dir`
-
-Use `--config` when the file lives somewhere else. Use `--env` when you want the command to resolve `development`, `test`, or `production` from the same file. Use explicit flags such as `--db`, `--dialect`, or `--dir` when you need a one-off override.
-
-## Multi-database applications
-
-Tango does not impose a database routing policy, so multi-database work should stay explicit in application code.
-
-The safest pattern is to centralize:
-
-- connection names
-- adapter selection
-- manager-to-connection mapping
-- migration execution per database
-
-That centralization keeps database policy visible and avoids burying connection assumptions deep inside repositories.
-
-## Operational advice
-
-Whichever backend you choose, make these behaviors explicit:
-
-- application startup should fail fast on invalid or missing database configuration
-- migration application should happen through a deliberate command or deployment step
-- integration tests should cover the backends you claim to support
+For example, a project might keep SQLite in `development`, point `production` at PostgreSQL, and let CI override the `test` environment with `TANGO_DATABASE_URL` so integration tests run against a disposable PostgreSQL database.
 
 ## Related pages
 
 - [Config API](/reference/config-api)
 - [Run Tango in CI/CD](/how-to/ci-cd-pipelines)
-- [Generate and apply migrations](/how-to/generate-and-apply-migrations)
+- [Migrate schema changes](/how-to/work-with-models#migrate-schema-changes)
 - [Testing](/topics/testing)

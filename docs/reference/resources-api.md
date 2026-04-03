@@ -125,11 +125,8 @@ Use it when offset pagination is not stable enough for the data you are traversi
 
 ## Related pages
 
-- [Resources and viewsets](/topics/resources-and-viewsets)
-- [Serializers](/topics/serializers)
-- [Model lifecycle hooks](/topics/model-lifecycle-hooks)
-- [Build a model-backed serializer](/how-to/build-a-model-serializer)
-- [Move persistence rules into model hooks](/how-to/move-persistence-rules-into-model-hooks)
-- [Define custom viewset actions](/how-to/custom-viewset-actions)
-- [Filtering](/how-to/filtering)
+- [API layer](/topics/api-layer)
+- [Work with serializers](/how-to/working-with-serializers)
+- [Move shared write rules into model hooks](/how-to/work-with-models#moving-shared-record-lifecycle-logic-into-model-hooks)
+- [Build your API with viewsets](/how-to/build-your-api-with-viewsets)
 - [Pagination](/how-to/pagination)

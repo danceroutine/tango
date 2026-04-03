@@ -1,79 +1,66 @@
 # Architecture
 
-Tango is designed as a layered toolkit that sits inside a host runtime rather than replacing it. That decision shapes every package in the repository and explains why the examples can move between Express and Next.js without rewriting their application-facing Tango layers.
+Tango organizes application work into a small set of layers that build on one another. That structure gives application code one place for stored-record definitions, another for database access, another for schema evolution, and another for HTTP-facing API behavior.
 
-## The central architectural decision
+The result is a framework that can keep its own application-facing contracts consistent while still fitting into host frameworks such as Express, Next.js, and Nuxt.
 
-Tango keeps host-framework concerns separate from framework-domain concerns so the same primitives can be reused across multiple runtimes.
+## The main architectural idea
 
-Express or Next.js still owns routing, middleware order, rendering, and request lifecycle behavior. Tango owns model metadata, query composition, migrations, resource classes, and the adapter contracts that connect those abstractions to the host.
+Tango concentrates on the parts of application development that sit closest to data contracts and API contracts.
+
+The host framework still owns routing, middleware order, rendering, static assets, and the larger request lifecycle. Tango owns model metadata, ORM queries, migrations, API resources, and the adapters that connect those abstractions to the host runtime.
+
+That division is what gives the framework its shape. Tango gives application code a consistent model, query, migration, and resource architecture that can be used inside more than one host framework.
 
 ## The layers
 
-### Schema layer
+### Models and schema
 
-`@danceroutine/tango-schema` defines model identity, field metadata, relation metadata, indexes, and registry behavior. The schema layer uses Zod as the canonical validation surface, which keeps runtime validation and TypeScript types close to the application code that consumes them.
+The model layer describes stored records.
 
-### Data layer
+This is where Tango learns what data exists, how records are identified, how they relate to one another, and which persistence rules belong to the record itself. Models begin from Zod schemas and then add the metadata needed for database behavior, relation resolution, and higher-level framework features.
 
-`@danceroutine/tango-orm` provides the transparent runtime, `Model.objects`, `QuerySet`, `Q`, adapters, repositories, and `UnitOfWork`. Most application code lives on the model-first path, while repositories remain available for lower-level persistence boundaries.
+### ORM and queries
 
-### Migration layer
+The ORM layer turns those models into a database access surface.
 
-`@danceroutine/tango-migrations` introspects an existing database, compares it to model metadata, generates migration operations, compiles those operations to dialect-specific SQL, and applies them through `MigrationRunner`.
+This is where `Model.objects`, `QuerySet`, and query composition live. Application code uses this layer to create records, retrieve records, refine database queries, and shape result sets. The ORM reads the model contract directly, so application code does not need a second persistence definition alongside the model.
 
-### Resource layer
+### Migrations
 
-`@danceroutine/tango-resources` translates model-backed data access into HTTP behavior through `APIView`, generic CRUD views, `ModelViewSet`, filtering, pagination, and an adapter-neutral `RequestContext`.
+The migration layer turns model changes into schema history.
 
-### Adapter layer
+When a model changes in a way that affects tables, columns, relations, or indexes, the migration layer records how the database should move from one schema state to the next. This keeps the live database aligned with the model contract that application code is using.
 
-The adapter packages connect Tango's resource classes to concrete host runtimes. Their job is translation rather than policy: convert framework requests into `RequestContext`, invoke the Tango resource layer, and write the resulting response back to the host framework.
+### API resources
+
+The API layer turns models and queries into HTTP behavior.
+
+This is where serializers, `APIView`, generic views, viewsets, filtering, and pagination live. The API layer decides which operations belong to a resource, which request payloads are accepted, which response shapes are returned, and which list-query features are part of the public contract.
+
+### Adapters
+
+The adapter layer connects Tango's API resources to the surrounding host framework.
+
+An adapter receives the host framework's request object, builds Tango's request context, calls the resource class, and translates the resulting Tango response back into the host framework's response type. This keeps the HTTP contract defined in Tango while still letting the host framework run the actual server lifecycle.
 
 ## Request flow
 
-When a request reaches a Tango endpoint, the sequence is straightforward:
+When an HTTP request reaches a Tango-backed endpoint, the path through the layers is usually straightforward.
 
-1. the host framework receives the request
-2. the adapter translates it into Tango's request model
-3. the view class or viewset applies validation, filtering, ordering, and pagination rules
-4. the model manager and `QuerySet` layer perform the read or write operations
-5. the adapter serializes the response back to the host framework
-
-Each layer handles one kind of responsibility, so the path from request to query remains readable and testable.
+The host framework receives the request first. The adapter turns that request into Tango's request context and passes it to the resource class. The resource validates input, applies public filtering or pagination rules when needed, and calls into the ORM for reads or writes. The ORM works from the model contract and the current database state. The adapter then translates the resulting Tango response back into the host framework's response type.
 
 ## Schema evolution flow
 
-Schema changes move through a similarly explicit sequence:
+Model changes also move through the architecture in a predictable order.
 
-1. a model definition changes
-2. Tango introspects the database
-3. `diffSchema()` computes the required migration operations
-4. a migration file is generated or updated
-5. the migration runner applies the operations and records them in the journal table
+An application changes a model first. If that change affects stored schema, Tango compares the declared model contract with the current database schema and produces a migration that records the next schema step. The migration is reviewed, committed with the model change, and then applied so the database and the model contract stay aligned.
 
-That pipeline stays inspectable from end to end, which makes it practical to review migration intent before it runs and verify convergence after it completes.
-
-## Why this architecture holds up over time
-
-The boundaries remain useful because they match the way developers already reason about their applications: model definition, data access, schema evolution, HTTP behavior, and runtime integration.
-
-That division also improves long-term maintenance. A change to `FilterSet` should mainly affect the resource layer and its adapters. A change to model metadata should primarily affect schema, migrations, and the data layer. When the boundaries stay disciplined, the blast radius of a change remains understandable.
-
-## Common architectural mistakes
-
-The most common mistakes collapse those boundaries:
-
-- passing Express or Next.js request objects into persistence code
-- putting query-string parsing inside data-access methods
-- encoding migration policy in runtime startup code
-- letting adapters add business logic instead of translation logic
-
-Each of those choices makes the code harder to test because it ties one layer to assumptions that belong somewhere else.
+Migrations belong in the architecture because they are the layer that keeps model changes meaningful once real databases and deployed environments enter the picture.
 
 ## Related pages
 
 - [Models and schema](/topics/models-and-schema)
-- [ORM and repositories](/topics/orm-and-repositories)
-- [Resources and viewsets](/topics/resources-and-viewsets)
+- [ORM and QuerySets](/topics/orm-and-querysets)
+- [API layer](/topics/api-layer)
 - [Migrations](/topics/migrations)

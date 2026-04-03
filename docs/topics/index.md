@@ -6,11 +6,10 @@ Topic guides explain subsystem behavior, architecture boundaries, and decision p
 
 1. [Architecture](/topics/architecture)
 2. [Models and schema](/topics/models-and-schema)
-3. [ORM and repositories](/topics/orm-and-repositories)
-4. [Resources and viewsets](/topics/resources-and-viewsets)
-5. [Serializers](/topics/serializers)
-6. [Migrations](/topics/migrations)
-7. [Testing](/topics/testing)
+3. [ORM and QuerySets](/topics/orm-and-querysets)
+4. [API layer](/topics/api-layer)
+5. [Migrations](/topics/migrations)
+6. [Testing](/topics/testing)
 
 ## Related sections
 

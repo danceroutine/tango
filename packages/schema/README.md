@@ -102,7 +102,6 @@ The root import is the normal entrypoint for application code. The `domain` and 
 
 - Official documentation: <https://tangowebframework.dev>
 - Models and schema topic: <https://tangowebframework.dev/topics/models-and-schema>
-- Model lifecycle hooks topic: <https://tangowebframework.dev/topics/model-lifecycle-hooks>
 - Schema API reference: <https://tangowebframework.dev/reference/schema-api>
 
 ## Development

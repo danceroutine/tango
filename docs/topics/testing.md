@@ -1,98 +1,117 @@
 # Testing
 
-Tango's testing package exists because framework code and data-layer code usually need more than plain unit mocks.
+Testing a Tango application usually means testing more than one layer of behavior.
 
-You often need one or more of these:
+Some code can be proved with a fast unit test. Some behavior depends on a real database because query compilation, schema changes, or dialect differences are part of the contract. Some failures only appear once the application process, the adapter, and the route wiring are all running together.
 
-- manager and query doubles for fast unit tests
-- fixture generation for model-like data
-- a repeatable SQLite or PostgreSQL database harness for integration tests
-- helper functions that keep migration and schema assertions readable
+Tango's testing support follows those different levels of confidence, so choosing the test boundary comes before choosing the helper that matches it.
 
-## Main testing tools
+## Start by choosing the test boundary
 
-The package provides these top-level tools:
+If the behavior is pure application logic, a fast unit test is usually enough.
 
-- `aDBClient`
-- `aManager`
-- `aQueryExecutor`
-- `aQuerySet`
-- `ModelDataFactory`
-- everything from `integration`
-- the Vitest helpers from `vitest`
+If the behavior depends on `Model.objects`, query composition, migrations, or backend-specific schema behavior, a real database-backed integration test is usually the right tool.
 
-## Mocks
+If the behavior depends on the adapter, request translation, route registration, or full application startup, a smoke test or higher-level integration test is usually the better fit.
 
-The mocks package is useful when you want to test code that depends on Tango's manager and query contracts without starting a real database.
+That boundary choice matters because Tango spans several layers of a web application. The closer the behavior sits to the database or the host framework, the less valuable a fully mocked test becomes.
 
-- `aDBClient`
-- `aManager`
-- `aQueryExecutor`
-- `aQuerySet`
+## Fast unit tests
 
-Use them for unit tests around service code, resource classes, and error handling paths.
+Tango's mock helpers exist for tests that want the shape of Tango's contracts without paying the cost of a real database.
 
-## Factories
+That is the right level when application code depends on a model manager or query interface, but the test is really about the application's own branching, error handling, or result handling. In that situation, helpers such as `aManager`, `aQuerySet`, `aDBClient`, and `aQueryExecutor` let the test stay close to Tango's public contracts without pretending to prove real SQL behavior.
 
-`ModelDataFactory` helps build repeatable test data with defaults and sequence-based overrides.
+This level is a good fit for:
 
-It supports:
+- service objects that call a manager
+- resource code with error-handling branches
+- logic that reacts to query results but does not need the real database to produce those results
 
-- `build()`
-- `buildList()`
-- `resetSequence()`
-- `getSequence()`
+Fast unit tests keep the feedback loop short. They are most valuable when they stay honest about the boundary they are testing.
 
-Subclass it when you want custom sequence behavior for one model shape.
+## Factories and repeatable data
 
-## Integration harnesses
+As a test suite grows, the next source of friction is often the data setup rather than the query layer.
 
-`TestHarness` is the main facade for dialect-aware integration test setup.
+`ModelDataFactory` exists so that one model-shaped fixture can be created repeatedly with sensible defaults and predictable variation. That keeps test setup readable and reduces fixture duplication across a suite.
 
-It supports:
+Factories are especially useful when:
 
-- `TestHarness.sqlite()`
-- `TestHarness.postgres()`
-- `TestHarness.forDialect(...)`
-- strategy registration for new dialects
+- several tests need the same model shape
+- you want sequence-based defaults
+- the tests care about the content of the data, but not about how the rows reached the database
 
-This is the right tool when you want to run the same contract tests against multiple databases.
+They fit naturally alongside both unit tests and integration tests.
 
-When a test needs a real database-backed `QuerySet` for an arbitrary table, `createQuerySetFixture(...)` builds that query surface from a harness plus `TableMeta`.
+## Integration tests with a real database
+
+Once the behavior under test depends on real persistence behavior, move to a database-backed integration test.
+
+At that point, Tango's `TestHarness` becomes the useful tool. It creates a dialect-specific test harness around a real database workflow so the test can apply migrations, seed data, run queries, and inspect schema state against an actual backend.
+
+That is the right tool when you need to prove behavior such as:
+
+- model manager reads and writes
+- queryset compilation and execution
+- migration application
+- schema introspection
+- dialect-sensitive behavior
+
+At this level, the database is part of the contract. The test is proving that the application and the database behave correctly together.
+
+## Testing across dialects
+
+Tango's integration support is dialect-aware because SQLite and PostgreSQL are not identical environments.
+
+`TestHarness` can provision SQLite and PostgreSQL harnesses today. That makes it possible to run the same class of integration test against more than one backend family when the application needs that confidence.
+
+This matters most when:
+
+- the application supports more than one database backend
+- a migration needs confidence against the same backend family used in production
+- a query or schema behavior may vary by dialect
+
+For many projects, SQLite is still useful for fast local integration coverage. PostgreSQL is often the stronger reference backend for production-oriented confidence.
 
 ## Vitest integration
 
-`@danceroutine/tango-testing/vitest` extends `vi` with Tango-specific helpers and adds the `toMatchSchema` matcher.
+Tango extends the test runner you are already using with helpers that understand Tango's runtime, ORM, and migration contracts.
 
-The helper surface includes:
+In a Vitest-based project, importing `@danceroutine/tango-testing/vitest` registers Tango-specific helpers and assertions so that tests can share harness setup and make clearer assertions about schema and migration behavior.
 
-- `vi.tango.useHarness(...)`
-- `vi.tango.getTestHarness()`
-- `vi.tango.getRegistry()`
-- `vi.tango.assertMigrationPlan(...)`
-- `vi.tango.applyAndVerifyMigrations(...)`
-- `vi.tango.introspectSchema(...)`
-- `vi.tango.seedTable(...)`
-- `vi.tango.createQuerySetFixture(...)`
-- `vi.tango.expectQueryResult(...)`
+That helper surface is useful when a suite wants one place to keep the active harness, create query fixtures, seed tables, inspect schema state, or assert migration plans without rebuilding the same glue code in every file.
 
-## A sensible test pyramid for Tango apps
+The result is that Vitest can work more naturally with Tango's runtime, migrations, and ORM contracts.
 
-For most application code:
+## Smoke tests and full application behavior
 
-- use unit tests for pure functions, custom serializers, and manager consumers
-- use integration tests for model managers, query behavior, migrations, and dialect differences
-- use smoke or end-to-end tests for adapter wiring and the most important endpoints
+Some failures only show up once the application process is running for real.
 
-The standard project scripts already separate unit and integration execution. Run them with your package manager, for example:
+Adapter registration, framework bootstrapping, environment loading, and full HTTP routing are all examples of behavior that may pass unit and integration tests while still failing in a live process. For that layer, `AppProcessHarness` gives Tango applications a way to start a real child process and probe the running application from the outside.
 
-- `npm run test` or `pnpm test` or `yarn test` or `bun run test`
-- `npm run test:integration` or the equivalent `run` command for `test:integration`
-- `npm run test:integration:all` when your project defines that script
-- `npm run test:smoke` when your project defines that script
+These tests are slower, so they usually focus on a smaller number of high-value paths:
+
+- application startup
+- migration bootstrapping
+- one or two representative endpoints
+- route and adapter wiring
+
+They give confidence that the layers you tested separately can still work together in one running application.
+
+## A sensible testing shape for Tango applications
+
+For most Tango applications, the testing story settles into a familiar pattern:
+
+- unit tests for pure logic and isolated consumers of Tango interfaces
+- integration tests for ORM behavior, migrations, and dialect-backed persistence
+- smoke tests for the application process and adapter wiring
+
+That pattern works well because it matches Tango's architecture. The framework has distinct layers, and the test suite can reflect those layers instead of forcing every kind of confidence into one style of test.
 
 ## Related pages
 
-- [Testing package README](https://github.com/danceroutine/tango/blob/main/packages/testing/README.md)
 - [Run Tango in CI/CD](/how-to/ci-cd-pipelines)
-- [New dialect onboarding](/contributors/how-to/new-dialect-onboarding)
+- [Configure databases](/how-to/databases)
+- [ORM and QuerySets](/topics/orm-and-querysets)
+- [Migrations](/topics/migrations)

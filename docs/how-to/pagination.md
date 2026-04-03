@@ -1,92 +1,165 @@
 # How to add pagination
 
-Tango ships with two paginators:
+Once a list endpoint can return more than a handful of records, clients need a predictable way to move through that result set in smaller pieces. Pagination gives the endpoint that traversal contract.
 
-- `OffsetPaginator`
-- `CursorPaginator`
+In Tango, pagination usually enters the application in one of two ways. Some applications rely on Tango's built-in list behavior. Others paginate a queryset directly in custom application code. The same two paginator classes are available in both cases: `OffsetPaginator` and `CursorPaginator`.
 
-Most applications should start with `OffsetPaginator` because it is already wired into `ModelViewSet` and `GenericAPIView`.
+Most applications should start with offset pagination. Tango already applies it by default to the built-in list behavior, and it is usually the easiest contract for clients to understand while an API is still taking shape.
 
-## Offset pagination
+## Start with offset pagination
 
-`OffsetPaginator` is the default paginator used by the built-in list behavior.
+Offset pagination answers a simple question: how many records should this response include, and how far into the full result set should it begin?
 
-It reads:
+Tango's offset paginator accepts these query parameters:
 
 - `limit`
 - `offset`
 - `page`
 
-Then it returns a response envelope shaped like:
+`limit` controls the page size. `offset` controls how many matching records to skip before the page begins. `page` is a convenience form for page-number traversal. When a request supplies `page`, Tango translates it into an offset internally by using the current page size.
+
+The response keeps the familiar list payload under `results` and adds pagination metadata around it. A response might look like this:
 
 ```json
 {
     "count": 100,
     "next": "?limit=20&offset=20",
-    "previous": null,
     "results": []
 }
 ```
 
-### With `ModelViewSet` or `GenericAPIView`
+When the client is no longer on the first slice of results, Tango also adds a `previous` link. The `count` field tells the client how many matching records exist across the full list, not just on the current page.
 
-You do not need to instantiate the paginator yourself when you use the built-in list behavior. Those classes already create an `OffsetPaginator`, parse the request, apply it to the `QuerySet`, and serialize the response.
+### Use the default behavior before configuring anything extra
 
-What you do need, regardless of whether the paginator is created manually or by a built-in view, is stable ordering.
+If your list endpoint already uses Tango's built-in list behavior, offset pagination is usually present without any additional work. `ModelViewSet` and `GenericAPIView` both create an `OffsetPaginator`, read the query parameters, apply the page boundary to the queryset, and serialize the paginated response.
 
-Declare `orderingFields` in the resource config and give the underlying manager or query code a deterministic default order.
+That means many applications can postpone pagination decisions at first. You can define the list resource, make sure the endpoint returns the right records, and only revisit pagination when you need a different traversal style or tighter control over the response contract.
 
-## Cursor pagination
+### Give the list a stable order
 
-`CursorPaginator` is intended for cases where forward traversal has to remain stable as data changes.
+Pagination is only trustworthy when the list order is deterministic. If the database is free to return rows in an arbitrary order, clients may see duplicates, gaps, or unexpectedly shuffled records as they move from one page to the next.
 
-It reads:
+For that reason, treat ordering as part of the pagination contract. On built-in resources, `orderingFields` is the allowlist that decides which sort keys clients may request. If the endpoint should always use one application-defined order, make sure the queryset that reaches the paginator already has that order applied.
+
+This matters even more when filtering is involved. Before you worry about page size, make sure the endpoint answers two simpler questions reliably:
+
+1. which records belong in the list
+2. in what order should those records appear
+
+Once those answers are stable, page traversal becomes much easier to reason about and test.
+
+## Choose cursor pagination when forward traversal must stay stable
+
+Offset pagination is a good default for many list endpoints. Lists that change frequently while clients are paging through them often benefit from a different traversal contract. New rows inserted at the front of the list may push later rows onto different pages.
+
+Cursor pagination is designed for that situation. Instead of saying "skip the first 40 rows," the client follows an opaque cursor token that marks where the next slice should begin.
+
+Tango's cursor paginator accepts these query parameters:
 
 - `limit`
 - `cursor`
 - `ordering`
 
-The cursor token is opaque to the client. Internally it is a base64-encoded JSON payload with:
+The response keeps the same `results` array, but the traversal metadata changes. A cursor-paginated response might look like this:
 
-- version
-- field
-- direction
-- value
+```json
+{
+    "next": "?limit=20&cursor=eyJ2IjoxLCJmaWVsZCI6ImNyZWF0ZWRBdCIsImRpciI6ImFzYyIsInZhbHVlIjoiMjAyNi0wNC0wMVQxMjozMDowMC4wMDBaIn0%3D&ordering=createdAt",
+    "results": []
+}
+```
 
-Cursor pagination is useful when you need stable forward navigation over changing data, but it requires more care:
+Treat the cursor token as an opaque value. Application documentation should tell clients to follow the `next` and `previous` links that Tango returns. Cursor responses center on traversal links and omit total counts or numeric page positions.
 
-- pick a cursor field with stable ordering semantics
-- avoid exposing arbitrary ordering when the cursor depends on one field
-- document that clients should follow `next` and `previous` links instead of constructing cursors by hand
+### Pick one stable cursor field
 
-## A simple manual example
+Cursor traversal depends on one field whose ordering can define the path through the list. In practice, that field is often `id`, `createdAt`, or another value that moves in one clear direction and does not need arbitrary reordering.
 
-If you want to use a paginator outside the built-in views:
+This is the point where offset and cursor pagination diverge most clearly:
+
+- offset pagination works well when page numbers and total counts are useful to the client
+- cursor pagination works well when the client mainly needs reliable forward or backward traversal through a changing list
+
+Choose cursor pagination when stability matters more than random access. A client that needs "page 7" is usually better served by offset pagination. A client that needs "keep following the newest records as the list changes" is usually a better fit for cursor pagination.
+
+### Switch a built-in list endpoint to `CursorPaginator`
+
+On a viewset or generic view, provide a `paginatorFactory` in the resource configuration. This hook tells the resource which paginator to build for the list queryset.
+
+```ts
+import { CursorPaginator, ModelViewSet } from '@danceroutine/tango-resources';
+import type { Post } from '@/models';
+import { PostSerializer } from '@/serializers/PostSerializer';
+
+export class PostViewSet extends ModelViewSet<Post, typeof PostSerializer> {
+    constructor() {
+        super({
+            serializer: PostSerializer,
+            orderingFields: ['createdAt'],
+            paginatorFactory: (queryset) => new CursorPaginator(queryset, 25, 'createdAt'),
+        });
+    }
+}
+```
+
+In this example, blog posts are traversed by `createdAt`. Clients may request `ordering=createdAt` or `ordering=-createdAt`, and the paginator uses that same field to build the cursor boundary for the next request.
+
+Keep the ordering contract narrow when you do this. Cursor pagination only remains clear when the public ordering choices line up with the field the cursor is actually using.
+
+## Paginate a queryset directly when you are outside built-in list behavior
+
+Some application code still needs pagination even though it is not running through the standard list endpoint of a viewset or generic view. A server-rendered page, a custom report endpoint, or a one-off internal tool may still need the same traversal contract.
+
+In that case, instantiate the paginator directly, let it read the request query parameters, apply it to the queryset, and then return its response envelope.
 
 ```ts
 import { TangoQueryParams } from '@danceroutine/tango-core';
 import { OffsetPaginator } from '@danceroutine/tango-resources';
+import { PostModel } from '@/models';
 
-const paginator = new OffsetPaginator(PostModel.objects.query());
+const baseQueryset = PostModel.objects.query().orderBy('-createdAt');
+const paginator = new OffsetPaginator(baseQueryset, 20);
 const params = TangoQueryParams.fromRequest(request);
 
 paginator.parse(params);
 
-const qs = paginator.apply(PostModel.objects.query().orderBy('-createdAt'));
-const [page, totalCount] = await Promise.all([qs.fetch(PostReadSchema), PostModel.objects.query().count()]);
+const pagedQueryset = paginator.apply(baseQueryset);
+const [page, totalCount] = await Promise.all([pagedQueryset.fetch(), baseQueryset.count()]);
 
 return paginator.toResponse(page.results, { totalCount });
 ```
 
-## Common mistakes
+The pattern stays the same:
 
-Avoid these:
+1. begin with the queryset in its final filtered and ordered form
+2. let the paginator read the request parameters
+3. apply the paginator to that queryset
+4. fetch the page results
+5. build the response from the paginator
 
-- paginating without ordering
-- exposing ordering on fields that are not safe or indexed
-- mixing page-based and cursor-based conventions in one endpoint without documenting it clearly
+That order keeps the pagination behavior consistent with the built-in resource layer.
+
+## Verify the full pagination contract
+
+A pagination test should do more than prove that the endpoint returns twenty rows. It should also prove that clients can move through the list predictably.
+
+For offset pagination, verify that:
+
+- the endpoint returns a deterministic order
+- `next` and `previous` links advance through the list correctly
+- filtered lists still return the expected count and links
+- `page` and `offset` traversal produce the slices you expect
+
+For cursor pagination, verify that:
+
+- the cursor field matches the public ordering contract
+- clients can follow `next` and `previous` links without constructing cursors themselves
+- inserts or updates elsewhere in the list do not make traversal jump unpredictably
+
+Those tests do more to protect the API contract than a single assertion about how many records appear in one response.
 
 ## Related pages
 
+- [Build your API with viewsets](/how-to/build-your-api-with-viewsets)
 - [Resources API reference](/reference/resources-api)
-- [Filtering](/how-to/filtering)

@@ -111,6 +111,6 @@ The package follows Tango resource metadata and covers the standard CRUD surface
 
 ## Related pages
 
-- [Publish an OpenAPI document](/how-to/publish-openapi-document)
+- [Auto-document your API](/how-to/auto-document-your-api)
 - [Resources API](/reference/resources-api)
 - [Models and schema](/topics/models-and-schema)

@@ -22,8 +22,8 @@ Use a topic guide when you already know the task you want to solve but you need 
 
 - [Architecture](/topics/architecture)
 - [Models and schema](/topics/models-and-schema)
-- [ORM and repositories](/topics/orm-and-repositories)
-- [Resources and viewsets](/topics/resources-and-viewsets)
+- [ORM and QuerySets](/topics/orm-and-querysets)
+- [API layer](/topics/api-layer)
 - [Migrations](/topics/migrations)
 - [Testing](/topics/testing)
 
@@ -33,9 +33,9 @@ How-to guides are task oriented. They assume you already know the broad concepts
 
 - [Configure databases](/how-to/databases)
 - [Run Tango in CI/CD](/how-to/ci-cd-pipelines)
-- [Publish an OpenAPI document](/how-to/publish-openapi-document)
-- [Generate and apply migrations](/how-to/generate-and-apply-migrations)
-- [Add filtering](/how-to/filtering)
+- [Auto-document your API](/how-to/auto-document-your-api)
+- [Work with models](/how-to/work-with-models)
+- [Build your API with viewsets](/how-to/build-your-api-with-viewsets)
 - [Add pagination](/how-to/pagination)
 
 ## Reference

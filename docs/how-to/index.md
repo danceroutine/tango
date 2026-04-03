@@ -6,13 +6,11 @@ How-to guides are focused procedures for one concrete outcome. Use them when you
 
 1. [Configure databases](/how-to/databases)
 2. [Run Tango in CI/CD](/how-to/ci-cd-pipelines)
-3. [Publish an OpenAPI document](/how-to/publish-openapi-document)
-4. [Generate and apply migrations](/how-to/generate-and-apply-migrations)
-5. [Add filtering](/how-to/filtering)
-6. [Add pagination](/how-to/pagination)
-7. [Build a model-backed serializer](/how-to/build-a-model-serializer)
-8. [Define custom viewset actions](/how-to/custom-viewset-actions)
-9. [Design filtering and pagination together](/how-to/filtering-and-pagination)
+3. [Auto-document your API](/how-to/auto-document-your-api)
+4. [Work with models](/how-to/work-with-models)
+5. [Work with serializers](/how-to/working-with-serializers)
+6. [Build your API with viewsets](/how-to/build-your-api-with-viewsets)
+7. [Add pagination](/how-to/pagination)
 
 ## Related sections
 

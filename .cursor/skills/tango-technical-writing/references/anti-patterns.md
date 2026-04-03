@@ -40,6 +40,45 @@ Contributor docs may include repository locations when that detail directly help
 - replace file-location language with role language
 - explain what the abstraction does, when to use it, and how it fits into the workflow
 
+## Scope Drift and Sequencing Failures
+
+Avoid these patterns:
+
+- answering a question the reader is not asking yet
+- introducing adjacent abstractions before the page has explained its named subject
+- letting a page about one abstraction drift into a different abstraction
+- non-sequitur comparison paragraphs that interrupt the main task
+- unexplained example nouns such as `Post` when the reader has not yet been told what the example domain is
+- strong opening prose followed by abrupt, under-explained command or code sections
+
+### Rewrite Direction
+
+- derive section order from the reader's likely questions
+- keep one page about one task, concept, or contract
+- ground example domains immediately
+- explain why the next code block or command matters before presenting it
+- move adjacent abstractions to their own page unless the current task depends on them
+
+## Reader-Experience Breaks
+
+Avoid these patterns:
+
+- using a term that only makes sense if the reader already knows the surrounding conversation
+- introducing a framework term of art before the underlying concept has been socialized
+- requiring the reader to scan ahead to infer what a noun or phrase means
+- giving an instruction before explaining why the reader should care about it
+- using vague internal shorthand such as `this section of the model` when the concrete construct has not been named
+- using abstract phrases such as `lifecycle rule` or `write paths` without grounding them in the current example
+
+### Rewrite Direction
+
+- read the draft linearly as the target audience
+- ask what the reader is likely wondering after each paragraph
+- introduce the concept first, then the local framework name for that concept
+- replace vague shorthand with the concrete construct the reader can see in code
+- add the missing rationale before the instruction when the page currently jumps straight to the action
+- rewrite any sentence that depends on scan-ahead for comprehension
+
 ## Contract-Name Drift
 
 Avoid these patterns:
@@ -63,7 +102,8 @@ Avoid these patterns:
 
 ### Rewrite Direction
 
-- state the intended behavior and then state the relevant constraints
+- verify whether the statement is truly unconditional before rewriting it
+- state the intended behavior and then state the relevant constraints when they matter
 - tie guarantees to supported backends, capabilities, and documented operational expectations
 
 ## Field Dumps and Type Dumps
@@ -101,6 +141,46 @@ Before:
 After:
 
 `ModelViewSet is the abstract base class for manager-backed CRUD resources.`
+
+### Scope drift
+
+Before:
+
+`Serializer hooks are still useful...`
+
+After:
+
+`A common sign that a rule belongs on the model is that it begins in one write path and later needs to be enforced everywhere the record is created or updated.`
+
+### Ungrounded example
+
+Before:
+
+`Suppose posts should receive a slug and timestamps...`
+
+After:
+
+`Suppose your application includes a blog post model. Each blog post should receive a slug and timestamps...`
+
+### Reader-experience break
+
+Before:
+
+`Keep this section of the model responsible for recording those values.`
+
+After:
+
+`Keep this logic in the model hooks so the model records those values whenever the record is created or updated.`
+
+### Premature term of art
+
+Before:
+
+`ModelViewSet is the usual starting point when one API resource needs both a collection route and a detail route.`
+
+After:
+
+`When one API resource needs both a collection route and a detail route, it is usually easier to keep that HTTP behavior in one class. In Tango, ModelViewSet is the class for that job.`
 
 ### Abstract significance marker
 
@@ -181,3 +261,9 @@ Before:
 After:
 
 `Most application code remains portable across supported dialects, while migration policy, CI coverage, and capability-sensitive behavior should still be validated per backend.`
+
+### Valid absolute statement
+
+Valid:
+
+`Model hooks run inside Model.objects.`

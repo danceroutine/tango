@@ -159,9 +159,7 @@ pnpm --filter @danceroutine/tango-resources test
 ## Bugs and support
 
 - Documentation: <https://tangowebframework.dev>
-- Serializers topic: <https://tangowebframework.dev/topics/serializers>
-- Model lifecycle hooks topic: <https://tangowebframework.dev/topics/model-lifecycle-hooks>
-- Resources topic: <https://tangowebframework.dev/topics/resources-and-viewsets>
+- API layer topic: <https://tangowebframework.dev/topics/api-layer>
 - API reference: <https://tangowebframework.dev/reference/resources-api>
 - Issue tracker: <https://github.com/danceroutine/tango/issues>
 

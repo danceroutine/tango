@@ -72,7 +72,7 @@ The main adapter entry points are:
 
 - Official documentation: <https://tangowebframework.dev>
 - Nuxt blog tutorial: <https://tangowebframework.dev/tutorials/nuxt-blog>
-- Resources topic: <https://tangowebframework.dev/topics/resources-and-viewsets>
+- API layer topic: <https://tangowebframework.dev/topics/api-layer>
 
 ## Development
 
