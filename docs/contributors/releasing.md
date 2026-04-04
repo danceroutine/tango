@@ -2,7 +2,7 @@
 
 Releasing Tango publishes the fixed-version package set through the repository's trusted publishing workflow.
 
-We recommend completing the [Contributor setup](/contributors/setup) before you begin. Releases must also be performed by maintainers that have need permission to run the repository's GitHub Actions workflows and access to the `npm` environment that backs trusted publishing.
+We recommend completing the [Contributor setup](/contributors/setup) before you begin. Releases must also be performed by maintainers that have the necessary permission to run the repository's GitHub Actions workflows and access to the `npm` environment that backs trusted publishing.
 
 A typical release moves through the following stages:
 
@@ -66,6 +66,19 @@ The workflow performs these steps:
 The stable versioning command is `pnpm changeset:version`, which runs `scripts/release/version-with-root-changelog.ts`. That script executes `changeset version`, refreshes the lockfile, and prepends the new entry to the root `CHANGELOG.md`.
 
 If `pnpm changeset:version` produces no diff, the stable workflow becomes a no-op for publishing. That usually means there were no pending releasable changesets on `main`.
+
+Before publishing, the workflow compares the committed release versions against the npm registry. If the registry is already at the same version, the publish step becomes a no-op. If the registry is ahead of the committed version, the workflow fails hard because the repository is no longer the source of truth for the release state.
+
+## Recover a failed stable publish
+
+Stable releases commit the generated version changes before publishing. That keeps `main` as the source of truth for the release train, but it also means a publish outage can leave the repository ahead of npm.
+
+When that happens, do not create a second changeset just to force another publish. Instead, dispatch the workflow with:
+
+- `release_type=stable-recovery`
+- `branch=main`
+
+The recovery path skips changeset versioning, inspects the committed package versions on `main`, compares them to npm, and publishes the versions that are still missing from the registry. If npm already matches the committed versions, the recovery path becomes a no-op. If npm is somehow ahead of the repository, the recovery path fails so you can investigate the mismatch explicitly.
 
 ## Run an alpha release
 

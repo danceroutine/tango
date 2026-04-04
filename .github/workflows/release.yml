@@ -14,6 +14,7 @@ on:
                 options:
                     - alpha
                     - stable
+                    - stable-recovery
             branch:
                 description: 'Branch to release from (workflow_dispatch only)'
                 required: false
@@ -121,9 +122,9 @@ jobs:
                   pnpm test:integration:postgres
 
             - name: Validate stable branch selection
-              if: github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable' && inputs.branch != 'main'
+              if: github.event_name == 'workflow_dispatch' && (inputs.release_type == 'stable' || inputs.release_type == 'stable-recovery') && inputs.branch != 'main'
               run: |
-                  echo "Stable releases must run from main." >&2
+                  echo "Stable releases and stable recovery must run from main." >&2
                   exit 1
 
             - name: Version packages (stable)
@@ -141,8 +142,13 @@ jobs:
                     echo "mode=release" >> "$GITHUB_OUTPUT"
                   fi
 
+            - name: Resolve publish state
+              if: ((github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release') || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable-recovery')
+              id: publish-state
+              run: pnpm exec tsx scripts/release/resolve-publish-state.ts
+
             - name: Generate release app token (stable)
-              if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release'
+              if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release' && steps.publish-state.outputs.mode == 'publish'
               id: release-app-token
               uses: actions/create-github-app-token@v2
               with:
@@ -151,7 +157,7 @@ jobs:
                   owner: ${{ github.repository_owner }}
 
             - name: Commit version changes to main (stable)
-              if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release'
+              if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release' && steps.publish-state.outputs.mode == 'publish'
               shell: bash
               env:
                   APP_TOKEN: ${{ steps.release-app-token.outputs.token }}
@@ -166,7 +172,7 @@ jobs:
                   git push origin HEAD:main
 
             - name: Publish packages (stable)
-              if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release'
+              if: (((github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release') || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable-recovery')) && steps.publish-state.outputs.mode == 'publish'
               run: pnpm changeset:publish
               env:
                   NPM_CONFIG_PROVENANCE: true
