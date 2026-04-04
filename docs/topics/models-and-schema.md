@@ -125,7 +125,6 @@ Tango adds those missing capabilities on top of Zod. Field helpers such as `t.pr
 
 This structure also makes it practical to keep model and serializer work dry. A team can define shared Zod fragments for a blog post once, derive `PostCreateSchema` and `PostUpdateSchema` from those fragments for serializer use, and derive the stored record schema for `Model(...)` from the same family of Zod definitions. The model still carries database-specific metadata that serializers do not need, and serializers still remain free to shape request and response contracts differently, but the underlying field vocabulary can be shared instead of rewritten by hand in each layer.
 
-
 ## Related pages
 
 - [Work with models](/how-to/work-with-models)

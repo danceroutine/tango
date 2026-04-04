@@ -77,11 +77,7 @@ Most queryset work comes down to refining that base query.
 For example:
 
 ```ts
-const recentPosts = PostModel.objects
-    .query()
-    .filter({ published: true })
-    .orderBy('-createdAt')
-    .limit(20);
+const recentPosts = PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').limit(20);
 ```
 
 You can read that queryset from top to bottom as one sentence about the data the application wants: start from posts, keep the published ones, order them by newest first, and return the first twenty.
@@ -107,11 +103,7 @@ Creating and refining a queryset does not execute a database query by itself.
 Tango waits until application code asks for results. In everyday use, that means the database is queried when code calls methods such as `fetch()`, `fetchOne()`, `count()`, or `exists()`.
 
 ```ts
-const queryset = PostModel.objects
-    .query()
-    .filter({ published: true })
-    .orderBy('-createdAt')
-    .limit(10);
+const queryset = PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').limit(10);
 
 const posts = await queryset.fetch();
 ```
@@ -125,20 +117,13 @@ Different retrieval methods communicate different expectations about the result.
 If you want a flexible query that may return many rows, start with `query()` and finish with `fetch()`:
 
 ```ts
-const publishedPosts = await PostModel.objects
-    .query()
-    .filter({ published: true })
-    .fetch();
+const publishedPosts = await PostModel.objects.query().filter({ published: true }).fetch();
 ```
 
 If you expect at most one row from a refined queryset, use `fetchOne()`:
 
 ```ts
-const latestPost = await PostModel.objects
-    .query()
-    .filter({ published: true })
-    .orderBy('-createdAt')
-    .fetchOne();
+const latestPost = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetchOne();
 ```
 
 If you already know the identifier of the row you want, `findById(...)` or `getOrThrow(...)` often expresses that intent more directly:
@@ -161,12 +146,7 @@ import { Q } from '@danceroutine/tango-orm';
 
 const searchResults = await PostModel.objects
     .query()
-    .filter(
-        Q.or(
-            { title__icontains: 'tango' },
-            { content__icontains: 'tango' }
-        )
-    )
+    .filter(Q.or({ title__icontains: 'tango' }, { content__icontains: 'tango' }))
     .fetch();
 ```
 
@@ -179,11 +159,7 @@ Sometimes application code wants the full model row. Sometimes it only needs a f
 `select(...)` narrows the selected columns:
 
 ```ts
-const postHeaders = await PostModel.objects
-    .query()
-    .select(['id', 'title', 'slug'])
-    .orderBy('-createdAt')
-    .fetch();
+const postHeaders = await PostModel.objects.query().select(['id', 'title', 'slug']).orderBy('-createdAt').fetch();
 ```
 
 At execution time, that changes the SQL projection, so the database returns only the selected columns. In other words, `postHeaders` contains rows with `id`, `title`, and `slug`, not complete post records with every model field still present.

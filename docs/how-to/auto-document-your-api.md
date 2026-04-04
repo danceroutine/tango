@@ -166,7 +166,6 @@ The default generation is strongest when the API surface is already described by
 - use per-method metadata on `describeAPIView()` for custom endpoints
 - use `actions` overrides on `describeViewSet()` when a custom action needs richer request or response documentation than the default route entry
 
-
 ## Related pages
 
 - [OpenAPI API](/reference/openapi-api)
