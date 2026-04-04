@@ -2,6 +2,10 @@
 
 This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
 
+## 1.1.2 - 2026-04-04
+
+- Update package documentation to reflect docsite url changes Affected packages: `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-resources`, `@danceroutine/tango-openapi`, `@danceroutine/tango-migrations`, `@danceroutine/tango-adapters-next`, `@danceroutine/tango-adapters-nuxt`, `@danceroutine/tango-adapters-express`.
+
 ## 1.1.1 - 2026-04-02
 
 - Updated package readmes to point to the new contributor documentation Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-schema`, `@danceroutine/tango-config`, `@danceroutine/tango-openapi`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`, `@danceroutine/tango-adapters-core`, `@danceroutine/tango-adapters-next`, `@danceroutine/tango-adapters-express`.
