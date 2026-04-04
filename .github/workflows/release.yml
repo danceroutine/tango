@@ -21,7 +21,9 @@ on:
                 default: main
                 type: string
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.ref_name }}
+    cancel-in-progress: false
 
 permissions:
     contents: write
@@ -69,30 +71,17 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version-file: '.nvmrc'
+                  node-version: '24.11.1'
                   registry-url: 'https://registry.npmjs.org'
 
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
 
-            - name: Setup npm 11 for trusted publishing
-              shell: bash
+            - name: Log release toolchain
               run: |
-                  NPM_VERSION=11.11.0
-                  NPM_ROOT="$RUNNER_TEMP/npm-cli"
-                  NPM_BIN="$NPM_ROOT/bin"
-                  curl -fsSL "https://registry.npmjs.org/npm/-/npm-${NPM_VERSION}.tgz" -o "$RUNNER_TEMP/npm.tgz"
-                  rm -rf "$NPM_ROOT"
-                  mkdir -p "$NPM_ROOT" "$NPM_BIN"
-                  tar -xzf "$RUNNER_TEMP/npm.tgz" -C "$NPM_ROOT"
-                  cat > "$NPM_BIN/npm" <<EOF
-                  #!/usr/bin/env bash
-                  exec node "$NPM_ROOT/package/bin/npm-cli.js" "\$@"
-                  EOF
-                  chmod +x "$NPM_BIN/npm"
-                  echo "$NPM_BIN" >> "$GITHUB_PATH"
-                  export PATH="$NPM_BIN:$PATH"
+                  node --version
                   npm --version
+                  pnpm --version
 
             - name: Get pnpm store directory
               id: pnpm-cache
@@ -126,6 +115,10 @@ jobs:
               run: |
                   echo "Stable releases and stable recovery must run from main." >&2
                   exit 1
+
+            - name: Validate committed stable release state
+              if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')
+              run: pnpm exec tsx scripts/release/resolve-publish-state.ts --mode=stable-input
 
             - name: Version packages (stable)
               if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')

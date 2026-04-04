@@ -297,7 +297,7 @@ verify:
 
 integration:postgres:
     stage: integration
-    needs: ["verify"]
+    needs: ['verify']
     services:
         - name: postgres:16
           alias: postgres
@@ -314,7 +314,7 @@ integration:postgres:
 
 deploy:
     stage: deploy
-    needs: ["integration:postgres"]
+    needs: ['integration:postgres']
     rules:
         - if: '$CI_COMMIT_BRANCH == "main"'
     variables:

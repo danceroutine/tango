@@ -12,21 +12,37 @@ type PackageEntry = {
     private?: boolean;
 };
 
-type PublishMode = 'noop' | 'publish';
+type ResolutionMode = 'publish' | 'stable-input';
+type WorkflowMode = 'noop' | 'publish' | 'ready';
 
-type PackagePublishState =
-    | {
-          packageName: string;
-          repoVersion: string;
-          registryVersion: string | null;
-          relation: 'equal' | 'repo-ahead';
-      }
-    | {
-          packageName: string;
-          repoVersion: string;
-          registryVersion: string;
-          relation: 'registry-ahead';
-      };
+type PackageRelation = 'already-published' | 'publish-missing' | 'registry-ahead' | 'unpublished-package';
+
+type PackagePublishState = {
+    packageName: string;
+    repoVersion: string;
+    highestPublishedStableVersion: string | null;
+    relation: PackageRelation;
+};
+
+type RegistryPackageMetadata = {
+    highestPublishedStableVersion: string | null;
+    publishedVersions: Set<string>;
+};
+
+type ResolveStateOptions = {
+    readRegistryMetadata?: (packageName: string) => Promise<RegistryPackageMetadata>;
+};
+
+type ResolvePublishStateResult = {
+    mode: Extract<WorkflowMode, 'noop' | 'publish'>;
+    publishablePackages: string[];
+    packageStates: PackagePublishState[];
+};
+
+type ResolveStableInputStateResult = {
+    mode: Extract<WorkflowMode, 'ready'>;
+    packageStates: PackagePublishState[];
+};
 
 type ParsedVersion = {
     major: number;
@@ -38,11 +54,51 @@ type ParsedVersion = {
 const CHANGESET_CONFIG_PATH = '.changeset/config.json';
 const PACKAGES_DIRECTORY = 'packages';
 
-export async function resolvePublishState(rootDir: string): Promise<{
-    mode: PublishMode;
-    publishablePackages: string[];
-    packageStates: PackagePublishState[];
-}> {
+export async function resolvePublishState(
+    rootDir: string,
+    options: ResolveStateOptions = {}
+): Promise<ResolvePublishStateResult> {
+    const packageStates = await collectPackageStates(rootDir, options);
+    assertNoRegistryAheadPackages(packageStates);
+
+    const publishablePackages = packageStates
+        .filter((state) => state.relation === 'publish-missing' || state.relation === 'unpublished-package')
+        .map((state) => state.packageName);
+
+    return {
+        mode: publishablePackages.length > 0 ? 'publish' : 'noop',
+        publishablePackages,
+        packageStates,
+    };
+}
+
+export async function resolveStableInputState(
+    rootDir: string,
+    options: ResolveStateOptions = {}
+): Promise<ResolveStableInputStateResult> {
+    const packageStates = await collectPackageStates(rootDir, options);
+    assertNoRegistryAheadPackages(packageStates);
+
+    const repoAheadPackages = packageStates.filter((state) => state.relation === 'publish-missing');
+
+    if (repoAheadPackages.length > 0) {
+        const details = formatPackageStateDetails(repoAheadPackages);
+        throw new Error(
+            [
+                'The committed stable release state is ahead of npm for one or more existing packages.',
+                'Run stable-recovery before attempting a new stable version bump.',
+                details,
+            ].join('\n')
+        );
+    }
+
+    return {
+        mode: 'ready',
+        packageStates,
+    };
+}
+
+async function collectPackageStates(rootDir: string, options: ResolveStateOptions): Promise<PackagePublishState[]> {
     const releaseConfig = await loadReleaseConfig(rootDir);
     const fixedPackages = releaseConfig.fixed?.[0];
 
@@ -54,6 +110,7 @@ export async function resolvePublishState(rootDir: string): Promise<{
     const releasablePackages = fixedPackages.filter((packageName) => !ignoredPackages.has(packageName));
     const packageEntries = await loadPackageEntries(join(rootDir, PACKAGES_DIRECTORY));
     const packageStates: PackagePublishState[] = [];
+    const readRegistryMetadata = options.readRegistryMetadata ?? fetchRegistryMetadata;
 
     for (const packageName of releasablePackages) {
         const packageEntry = packageEntries.get(packageName);
@@ -62,71 +119,72 @@ export async function resolvePublishState(rootDir: string): Promise<{
             throw new Error(`Could not find package.json for release package "${packageName}".`);
         }
 
-        const registryVersion = await fetchRegistryVersion(packageName);
+        const registryMetadata = await readRegistryMetadata(packageName);
+        packageStates.push(classifyPackageState(packageEntry, registryMetadata));
+    }
 
-        if (!registryVersion) {
-            packageStates.push({
-                packageName,
-                repoVersion: packageEntry.version,
-                registryVersion: null,
-                relation: 'repo-ahead',
-            });
-            continue;
-        }
+    return packageStates;
+}
 
-        const comparison = compareVersions(packageEntry.version, registryVersion);
-
-        if (comparison === 0) {
-            packageStates.push({
-                packageName,
-                repoVersion: packageEntry.version,
-                registryVersion,
-                relation: 'equal',
-            });
-            continue;
-        }
-
-        if (comparison > 0) {
-            packageStates.push({
-                packageName,
-                repoVersion: packageEntry.version,
-                registryVersion,
-                relation: 'repo-ahead',
-            });
-            continue;
-        }
-
-        packageStates.push({
-            packageName,
+function classifyPackageState(
+    packageEntry: PackageEntry,
+    registryMetadata: RegistryPackageMetadata
+): PackagePublishState {
+    if (!registryMetadata.highestPublishedStableVersion) {
+        return {
+            packageName: packageEntry.name,
             repoVersion: packageEntry.version,
-            registryVersion,
+            highestPublishedStableVersion: null,
+            relation: 'unpublished-package',
+        };
+    }
+
+    const comparison = compareVersions(packageEntry.version, registryMetadata.highestPublishedStableVersion);
+
+    if (comparison < 0) {
+        return {
+            packageName: packageEntry.name,
+            repoVersion: packageEntry.version,
+            highestPublishedStableVersion: registryMetadata.highestPublishedStableVersion,
             relation: 'registry-ahead',
-        });
+        };
     }
 
-    const registryAheadPackages = packageStates.filter((state) => state.relation === 'registry-ahead');
-
-    if (registryAheadPackages.length > 0) {
-        const details = registryAheadPackages
-            .map(
-                (state) =>
-                    `- ${state.packageName}: repo=${state.repoVersion}, registry=${state.registryVersion ?? 'unpublished'}`
-            )
-            .join('\n');
-        throw new Error(
-            `Registry versions are ahead of the committed release state for one or more packages.\n${details}`
-        );
+    if (registryMetadata.publishedVersions.has(packageEntry.version)) {
+        return {
+            packageName: packageEntry.name,
+            repoVersion: packageEntry.version,
+            highestPublishedStableVersion: registryMetadata.highestPublishedStableVersion,
+            relation: 'already-published',
+        };
     }
-
-    const publishablePackages = packageStates
-        .filter((state) => state.relation === 'repo-ahead')
-        .map((state) => state.packageName);
 
     return {
-        mode: publishablePackages.length > 0 ? 'publish' : 'noop',
-        publishablePackages,
-        packageStates,
+        packageName: packageEntry.name,
+        repoVersion: packageEntry.version,
+        highestPublishedStableVersion: registryMetadata.highestPublishedStableVersion,
+        relation: 'publish-missing',
     };
+}
+
+function assertNoRegistryAheadPackages(packageStates: PackagePublishState[]): void {
+    const registryAheadPackages = packageStates.filter((state) => state.relation === 'registry-ahead');
+
+    if (registryAheadPackages.length === 0) {
+        return;
+    }
+
+    const details = formatPackageStateDetails(registryAheadPackages);
+    throw new Error(`Registry versions are ahead of the committed release state for one or more packages.\n${details}`);
+}
+
+function formatPackageStateDetails(packageStates: PackagePublishState[]): string {
+    return packageStates
+        .map(
+            (state) =>
+                `- ${state.packageName}: repo=${state.repoVersion}, registry=${state.highestPublishedStableVersion ?? 'unpublished'}`
+        )
+        .join('\n');
 }
 
 async function loadReleaseConfig(rootDir: string): Promise<ReleaseConfig> {
@@ -176,12 +234,15 @@ async function findPackageJsonPaths(directory: string): Promise<string[]> {
     return packageJsonPaths.sort();
 }
 
-async function fetchRegistryVersion(packageName: string): Promise<string | null> {
+async function fetchRegistryMetadata(packageName: string): Promise<RegistryPackageMetadata> {
     const encodedName = encodeURIComponent(packageName);
     const response = await fetch(`https://registry.npmjs.org/${encodedName}`);
 
     if (response.status === 404) {
-        return null;
+        return {
+            highestPublishedStableVersion: null,
+            publishedVersions: new Set(),
+        };
     }
 
     if (!response.ok) {
@@ -191,12 +252,30 @@ async function fetchRegistryVersion(packageName: string): Promise<string | null>
     }
 
     const body = (await response.json()) as {
-        'dist-tags'?: {
-            latest?: string;
-        };
+        versions?: Record<string, unknown>;
     };
+    const publishedVersions = new Set(Object.keys(body.versions ?? {}));
 
-    return body['dist-tags']?.latest ?? null;
+    return {
+        highestPublishedStableVersion: findHighestPublishedStableVersion(publishedVersions),
+        publishedVersions,
+    };
+}
+
+function findHighestPublishedStableVersion(publishedVersions: Set<string>): string | null {
+    let highestVersion: string | null = null;
+
+    for (const version of publishedVersions) {
+        if (parseVersion(version).prerelease.length > 0) {
+            continue;
+        }
+
+        if (!highestVersion || compareVersions(version, highestVersion) > 0) {
+            highestVersion = version;
+        }
+    }
+
+    return highestVersion;
 }
 
 function compareVersions(left: string, right: string): number {
@@ -303,31 +382,94 @@ function comparePrereleasePart(left: string, right: string): number {
     return left.localeCompare(right);
 }
 
-async function writeGithubOutput(mode: PublishMode, publishablePackages: string[]): Promise<void> {
+async function writeGithubOutput(
+    mode: WorkflowMode,
+    packageStates: PackagePublishState[],
+    publishablePackages: string[]
+): Promise<void> {
     const githubOutput = process.env.GITHUB_OUTPUT;
 
     if (!githubOutput) {
         return;
     }
 
-    const lines = [`mode=${mode}`, `packages=${publishablePackages.join(',')}`];
+    const counts = {
+        alreadyPublished: packageStates.filter((state) => state.relation === 'already-published').length,
+        publishMissing: packageStates.filter((state) => state.relation === 'publish-missing').length,
+        unpublishedPackages: packageStates.filter((state) => state.relation === 'unpublished-package').length,
+        registryAhead: packageStates.filter((state) => state.relation === 'registry-ahead').length,
+    };
+    const lines = [
+        `mode=${mode}`,
+        `packages=${publishablePackages.join(',')}`,
+        `already_published=${counts.alreadyPublished}`,
+        `publish_missing=${counts.publishMissing}`,
+        `unpublished_packages=${counts.unpublishedPackages}`,
+        `registry_ahead=${counts.registryAhead}`,
+    ];
 
     await appendFile(githubOutput, `${lines.join('\n')}\n`);
 }
 
+function parseExecutionMode(argv: string[]): ResolutionMode {
+    const modeArgument = argv.find((argument) => argument.startsWith('--mode='));
+    const mode = modeArgument?.slice('--mode='.length) ?? 'publish';
+
+    if (mode !== 'publish' && mode !== 'stable-input') {
+        throw new Error(`Unsupported resolver mode "${mode}".`);
+    }
+
+    return mode;
+}
+
 async function main(): Promise<void> {
     const rootDir = process.cwd();
-    const publishState = await resolvePublishState(rootDir);
+    const mode = parseExecutionMode(process.argv.slice(2));
 
-    for (const state of publishState.packageStates) {
-        const registryVersion = state.registryVersion ?? 'unpublished';
+    if (mode === 'stable-input') {
+        const resolution = await resolveStableInputState(rootDir);
+
+        for (const state of resolution.packageStates) {
+            const registryVersion = state.highestPublishedStableVersion ?? 'unpublished';
+            console.log(
+                `${state.packageName}: repo=${state.repoVersion}, registry=${registryVersion}, relation=${state.relation}`
+            );
+        }
+
+        console.log(
+            [
+                `resolution-mode=${mode}`,
+                `workflow-mode=${resolution.mode}`,
+                `already-published=${resolution.packageStates.filter((state) => state.relation === 'already-published').length}`,
+                `publish-missing=${resolution.packageStates.filter((state) => state.relation === 'publish-missing').length}`,
+                `unpublished-packages=${resolution.packageStates.filter((state) => state.relation === 'unpublished-package').length}`,
+                `registry-ahead=${resolution.packageStates.filter((state) => state.relation === 'registry-ahead').length}`,
+            ].join('\n')
+        );
+        await writeGithubOutput(resolution.mode, resolution.packageStates, []);
+        return;
+    }
+
+    const resolution = await resolvePublishState(rootDir);
+
+    for (const state of resolution.packageStates) {
+        const registryVersion = state.highestPublishedStableVersion ?? 'unpublished';
         console.log(
             `${state.packageName}: repo=${state.repoVersion}, registry=${registryVersion}, relation=${state.relation}`
         );
     }
 
-    console.log(`publish-mode=${publishState.mode}`);
-    await writeGithubOutput(publishState.mode, publishState.publishablePackages);
+    console.log(
+        [
+            `resolution-mode=${mode}`,
+            `workflow-mode=${resolution.mode}`,
+            `already-published=${resolution.packageStates.filter((state) => state.relation === 'already-published').length}`,
+            `publish-missing=${resolution.packageStates.filter((state) => state.relation === 'publish-missing').length}`,
+            `unpublished-packages=${resolution.packageStates.filter((state) => state.relation === 'unpublished-package').length}`,
+            `registry-ahead=${resolution.packageStates.filter((state) => state.relation === 'registry-ahead').length}`,
+        ].join('\n')
+    );
+    await writeGithubOutput(resolution.mode, resolution.packageStates, resolution.publishablePackages);
 }
 
 const isDirectExecution = process.argv[1] ? import.meta.url === new URL(`file://${process.argv[1]}`).href : false;
