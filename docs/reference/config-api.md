@@ -1,30 +1,22 @@
 # Config API
 
-`@danceroutine/tango-config` gives a Tango application one typed place to describe runtime environments and one loader that resolves the active environment at startup.
+`@danceroutine/tango-config` defines the typed contract for `tango.config.*` and the loaders that turn that file into the active runtime configuration for a process.
 
-Most Tango applications put that declaration in `tango.config.ts`. The same file can then serve three parts of the stack:
+Most application config files only need one entrypoint: `defineConfig(...)`.
 
-- application startup code that needs database and migration settings
-- the `tango` CLI, which can infer migration defaults from the file
-- deployment environments that override selected values through environment variables
+The package also exports two loader helpers. `loadConfig(...)` is for code that already has the config module in hand. `loadConfigFromProjectRoot(...)` is for tooling or startup code that should discover `tango.config.*` from a project root.
 
-## The configuration contract
+## `defineConfig(...)`
 
-A Tango config declares three named environments: `development`, `test`, and `production`. The `current` field selects which one should be used for the current process.
+`defineConfig(...)` validates a Tango config object and returns the parsed result.
 
-Each environment contains:
-
-- `name`, which must match the environment key
-- `db`, which describes the database adapter and connection settings
-- `migrations`, which describes where migration files live and whether migrations run online
-
-Generated Tango applications use that shape directly:
+Use it in `tango.config.ts` so invalid configuration fails when the module is loaded, before the rest of the application starts.
 
 ```ts
 import { defineConfig } from '@danceroutine/tango-config';
 
 export default defineConfig({
-    current: (process.env.NODE_ENV || 'development') as 'development' | 'test' | 'production',
+    current: 'development',
     environments: {
         development: {
             name: 'development',
@@ -33,7 +25,11 @@ export default defineConfig({
                 filename: './.data/app.sqlite',
                 maxConnections: 1,
             },
-            migrations: { dir: './migrations', online: false },
+            migrations: {
+                dir: './migrations',
+                online: false,
+                autoApply: true,
+            },
         },
         test: {
             name: 'test',
@@ -42,7 +38,11 @@ export default defineConfig({
                 filename: ':memory:',
                 maxConnections: 1,
             },
-            migrations: { dir: './migrations', online: false },
+            migrations: {
+                dir: './migrations',
+                online: false,
+                autoApply: true,
+            },
         },
         production: {
             name: 'production',
@@ -51,69 +51,113 @@ export default defineConfig({
                 url: process.env.TANGO_DATABASE_URL,
                 maxConnections: 20,
             },
-            migrations: { dir: './migrations', online: true },
+            migrations: {
+                dir: './migrations',
+                online: true,
+                autoApply: true,
+            },
         },
     },
 });
 ```
 
-## `defineConfig()`
+## `loadConfig(...)`
 
-`defineConfig()` validates the config object when the module is loaded and returns the parsed result. It is the right helper for the config file itself because it keeps the declaration close to the runtime schema.
+`loadConfig(fromFile)` validates a config module, resolves the selected environment, loads `.env`, and applies the supported Tango environment-variable overrides.
 
-Use it when you want invalid configuration to fail immediately, before the rest of the application starts.
+It returns a `LoadedConfig` object with three fields:
 
-## `loadConfig()`
+- `cfg`: the fully validated `TangoConfig`
+- `env`: the selected environment name
+- `current`: the resolved `EnvConfig` for that environment after overrides are merged
 
-`loadConfig()` resolves a validated config into the environment your process should actually use. It returns:
-
-- `cfg`, the full validated config object
-- `env`, the selected environment name
-- `current`, the resolved environment settings for that process
-
-`loadConfig()` also loads `.env` through `dotenv` and then merges supported Tango overrides into the selected environment. Application runtime code usually reads `loaded.current.db` and `loaded.current.migrations` rather than reaching back into the full config object.
+Application runtime code usually reads `loaded.current.db` and `loaded.current.migrations`, because those are the settings that matter to the current process.
 
 ```ts
-import { loadConfig } from '@danceroutine/tango-config';
 import tangoConfig from '../tango.config';
+import { loadConfig } from '@danceroutine/tango-config';
 
-const loadedConfig = loadConfig(() => tangoConfig);
+const loaded = loadConfig(() => tangoConfig);
 
-const db = loadedConfig.current.db;
+const dbConfig = loaded.current.db;
+const migrationsConfig = loaded.current.migrations;
 ```
 
-## Database settings
+`loadConfig(...)` is the right helper when your code already has the config module in hand and wants the resolved settings for the current process.
 
-The `db` section chooses the adapter and the connection target.
+## `loadConfigFromProjectRoot(...)`
 
-For SQLite, application code usually relies on:
+`loadConfigFromProjectRoot(...)` finds a Tango config file under a project root, loads it, validates it, and returns the same `LoadedConfig` shape as `loadConfig(...)`.
 
-- `adapter: 'sqlite'`
-- `filename`
-- `maxConnections`
+Use it in tools, scripts, or startup paths that should discover the config automatically instead of importing it directly.
 
-For PostgreSQL, application code usually relies on:
+```ts
+import { loadConfigFromProjectRoot } from '@danceroutine/tango-config';
 
-- `adapter: 'postgres'`
-- either `url` or the discrete connection fields
-- `maxConnections`
+const loaded = loadConfigFromProjectRoot({
+    projectRoot: process.cwd(),
+});
+```
 
-The loader does not choose a connection strategy for you. It resolves config. Your ORM setup still decides how to map those settings into a concrete adapter connection.
+The loader searches these filenames in order when `configPath` is not provided:
 
-## Migration settings
+- `tango.config.ts`
+- `tango.config.mts`
+- `tango.config.cts`
+- `tango.config.js`
+- `tango.config.mjs`
+- `tango.config.cjs`
 
-The `migrations` section keeps the migration directory and online/offline mode next to the database configuration that uses them.
+If `configPath` is provided, Tango resolves it relative to `projectRoot` instead of searching that default filename list.
 
-- `dir` defaults to `migrations`
-- `online` defaults to `false`
+## `TangoConfig`
 
-The migrations CLI reads those values when it auto-loads `tango.config.ts`, which keeps the runtime and migration workflow aligned around the same config source.
+`TangoConfig` is the root configuration shape.
 
-## Environment overrides
+Application code supplies two things:
 
-`loadConfig()` merges a fixed set of overrides into the selected environment after the config file has been parsed.
+- `current`, which selects the environment the current process should use
+- `environments`, which contains the declared settings for `development`, `test`, and `production`
 
-Supported database overrides:
+Each entry in `environments` is an `EnvConfig`, so the root contract is really one environment selector plus three named environment declarations.
+
+## `EnvConfig`
+
+`EnvConfig` describes one named runtime environment.
+
+Each environment declaration pairs three concerns in one object: `name`, which must match the environment key, `db`, which describes the database connection for that environment, and `migrations`, which describes the migration settings for that same environment.
+
+Tango currently fixes the environment names at `development`, `test`, and `production`, so the purpose of `EnvConfig` is to keep the database and migration settings for one of those three environments together.
+
+## `DbConfig`
+
+`DbConfig` tells Tango which database adapter to use and how to connect to it.
+
+Every `DbConfig` declares an `adapter` and a `maxConnections` value. The remaining fields depend on how that adapter is configured.
+
+SQLite configurations usually provide `filename` and a low `maxConnections`, because the connection target is one local database file.
+
+PostgreSQL configurations usually provide either a single `url` or the discrete connection fields `host`, `port`, `database`, `user`, and `password`, then choose a `maxConnections` value appropriate to the runtime environment.
+
+`maxConnections` defaults to `10` when omitted.
+
+## `MigrationsConfig`
+
+`MigrationsConfig` keeps migration execution settings next to the database configuration that uses them.
+
+Its three fields are `dir`, which points to the migration directory, `online`, which selects online migration mode, and `autoApply`, which controls whether `tango migrate` is allowed to apply pending steps.
+
+If they are omitted, Tango uses `dir: 'migrations'`, `online: false`, and `autoApply: true`.
+
+In many applications, `dir` is the only value that changes regularly. `online` and `autoApply` become more important when a deployment environment needs tighter control over how migrations are applied.
+
+## Environment variable overrides
+
+`loadConfig(...)` and `loadConfigFromProjectRoot(...)` merge a fixed set of environment-variable overrides into the selected environment after the config file has been parsed.
+
+This is the layer that usually changes between local development, CI, preview deployments, and production. The config file establishes the base contract. Environment variables patch the selected environment for the current process.
+
+For database selection and connection targets, the supported overrides are:
 
 - `TANGO_DB_ADAPTER`
 - `TANGO_DATABASE_URL`
@@ -125,33 +169,36 @@ Supported database overrides:
 - `TANGO_DB_PASSWORD`
 - `TANGO_SQLITE_FILENAME`
 
-Supported migration overrides:
+For migration behavior, the supported overrides are:
 
 - `TANGO_MIGRATIONS_DIR`
 - `TANGO_MIGRATIONS_ONLINE`
 
-`TANGO_DATABASE_URL` takes precedence over `DATABASE_URL` when both are present.
+When both are present, `TANGO_DATABASE_URL` takes precedence over `DATABASE_URL`.
+
+The common pattern is to keep the stable shape of the environment in `tango.config.*`, then let deployment-specific values such as database host, URL, credentials, or migration mode come from environment variables.
 
 ## CLI integration
 
-Migration commands auto-load `./tango.config.ts` when it exists. That allows commands such as `tango migrate`, `tango plan`, `tango status`, and `tango make:migrations` to infer:
+The migration commands in `@danceroutine/tango-cli` resolve their settings from Tango config directly.
 
-- the dialect from `current.db.adapter`
-- the database target from `current.db`
-- the migration directory from `current.migrations.dir`
+The CLI follows the same general flow as application startup.
 
-`--config` selects a different config file. `--env` selects a different environment from that file. Explicit CLI flags such as `--dialect`, `--db`, and `--dir` override the values inferred from config.
+First, it loads `tango.config.*` from the project root, or from the file selected with `--config`.
 
-## Subpath exports
+Second, it resolves the active environment from that file. By default it uses `current`. `--env` selects a different environment from the same config file.
 
-The root package export is enough for most applications:
+Third, it reads the migration settings from that resolved environment. The dialect comes from `current.db.adapter`, the database target comes from `current.db`, and the migration directory comes from `current.migrations.dir`.
 
-- `defineConfig()`
-- `loadConfig()`
-- `LoadedConfig`
-- the core config types and schemas
+Finally, explicit command-line flags override the values inferred from config.
 
-The `@danceroutine/tango-config/loader` and `@danceroutine/tango-config/schema` subpaths are useful when you want a narrower import boundary in application code or tooling.
+This config-aware behavior applies to `tango make:migrations`, `tango migrate`, `tango plan`, and `tango status`.
+
+## Schemas and subpaths
+
+The root package export is enough for most applications. It includes the loader helpers, the config types, and the Zod schemas that back validation: `AdapterNameSchema`, `DbConfigSchema`, `MigrationsConfigSchema`, `EnvConfigSchema`, and `TangoConfigSchema`.
+
+The narrower subpaths, `@danceroutine/tango-config/loader` and `@danceroutine/tango-config/schema`, are mainly useful when tooling or shared libraries want a smaller import boundary than the root package export.
 
 ## Related pages
 

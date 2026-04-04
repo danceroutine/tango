@@ -6,6 +6,10 @@ It will change as the framework evolves. For the current supported surface, see 
 
 ## What is on the roadmap?
 
+### Improved developer experience with t.foreignKey
+
+`t.foreignKey` today needs additional support from the `relations` lookup. This violates DRY for no added benefit.
+
 ### Relation hydration from `selectRelated(...)`
 
 `selectRelated(...)` already gives the ORM enough relation metadata to plan SQL joins through declared `belongsTo` relationships.

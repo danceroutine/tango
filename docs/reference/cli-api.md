@@ -8,77 +8,102 @@ For most applications, this package is how you run Tango's project setup and mig
 
 Install the CLI as a development dependency in an application:
 
-```bash
+::: code-group
+
+```bash [pnpm]
 pnpm add -D @danceroutine/tango-cli
 ```
+
+```bash [npm]
+npm install -D @danceroutine/tango-cli
+```
+
+```bash [yarn]
+yarn add -D @danceroutine/tango-cli
+```
+
+```bash [bun]
+bun add -d @danceroutine/tango-cli
+```
+
+:::
 
 The rest of the documentation assumes the `tango` executable is available in your project.
 
 ## Built-in commands
 
-Today, the CLI ships with two command groups.
+The CLI has two public workflows.
 
-The first group covers project scaffolding:
+Project creation goes through one command:
 
 - `tango new`
 
-The second group covers migrations:
+Schema maintenance for an existing Tango application goes through four commands:
 
 - `tango make:migrations`
 - `tango migrate`
 - `tango plan`
 - `tango status`
 
-That gives one executable a consistent surface for the two workflows most applications reach for first: creating a project and maintaining its database schema.
+That keeps the public command surface centered on the two jobs most applications reach for first: creating a project and maintaining its database schema.
 
 ## Common command-line usage
 
-These are the most common commands:
+Most application code only touches one scaffold command and a small migration loop.
+
+Use `tango new` when you are creating a project:
 
 ```bash
 tango new my-app --framework express --package-manager pnpm --dialect sqlite
+```
+
+Use the migration commands when the application already exists and the model layer has changed:
+
+```bash
 tango make:migrations --config ./tango.config.ts --models ./src/models.ts --name add_posts
 tango migrate --config ./tango.config.ts
 tango plan --config ./tango.config.ts
 tango status --config ./tango.config.ts
 ```
 
-`tango new` creates a new application scaffold. `tango make:migrations` generates the next migration step from model metadata and the current database schema. `tango migrate` applies pending migrations. `tango plan` shows the SQL Tango would run. `tango status` shows which migration ids the target database has already recorded.
+`tango make:migrations` generates the next migration step from model metadata and the current database schema. `tango migrate` applies pending migrations. `tango plan` shows the SQL Tango would run. `tango status` shows which migration ids the target database has already recorded.
 
 ## Config-aware migration commands
 
-The migration commands can auto-load `./tango.config.ts` from the current working directory when that file exists.
+The migration commands can resolve their settings from `tango.config.*` instead of requiring every flag to be passed manually.
 
-When a config file is available, the CLI can infer:
+The CLI resolves those settings in layers.
+
+First, the CLI looks for `tango.config.*` in the current working directory. If you need to override the default config lookup, `--config` allows you to point it at a different file.
+
+Second, it selects the active environment from that file. By default it uses `current` but you can override the environment by using the `--env` flag to select a different environment from the same config file.
+
+Third, it infers the migration settings from that resolved environment:
 
 - the dialect from `current.db.adapter`
 - the database target from `current.db`
 - the migrations directory from `current.migrations.dir`
 
-That inference applies to:
+Finally, explicit command-line flags such as `--db`, `--dialect`, or `--dir` override the values inferred from config.
+
+This config-aware behavior applies to:
 
 - `tango migrate`
 - `tango make:migrations`
 - `tango plan`
 - `tango status`
 
-Use `--config` when the config file is not at the project root. Use `--env` when you want the command to resolve a different environment from the same config file. Use explicit flags such as `--db`, `--dialect`, or `--dir` when you need a one-off override without changing the config file itself.
-
 ## Programmatic API
 
-The root export is small:
+Most applications do not need the programmatic API. It exists for tooling authors and applications that want one binary to expose both Tango commands and application-specific commands.
 
-- `runCli(options?)`
-- `createDefaultCommandModules()`
-- `TangoCliCommandModule`
+That extension API is built around three exports:
 
-`runCli()` is the programmatic entrypoint used by the `tango` binary itself. If you call it with no custom options, it runs the normal Tango CLI command set.
+- `runCli(options?)`, which starts the CLI
+- `createDefaultCommandModules()`, which returns Tango's built-in command modules
+- `TangoCliCommandModule`, which is the interface for one additional command module
 
-`createDefaultCommandModules()` returns the standard module list that Tango registers by default.
-
-`TangoCliCommandModule` is the interface for adding another command subtree to the shared parser.
-
-Use this API when you want one binary that includes Tango's built-in commands and your own application-specific commands:
+Use that surface when you want to keep Tango's built-in commands and add your own command subtree alongside them:
 
 ```ts
 import type { Argv } from 'yargs';
@@ -104,7 +129,7 @@ await runCli({
 });
 ```
 
-In that setup, Tango still supplies its normal command groups, while your application adds its own commands alongside them.
+In the above toy setup, Tango still supplies `new` and the migration commands, while the application adds `seed-demo-data` through the same parser.
 
 ## Related pages
 

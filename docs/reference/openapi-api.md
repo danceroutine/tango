@@ -1,10 +1,12 @@
 # OpenAPI API
 
-`@danceroutine/tango-openapi` generates OpenAPI 3.1 documents from Tango resource instances. The package builds a JSON-serializable document object and leaves publication to the host framework.
+`@danceroutine/tango-openapi` generates OpenAPI 3.1 documents from Tango resources and schema inputs.
 
-## `generateOpenAPISpec()`
+Application code usually works with this package in one flow. First, describe each resource that should appear in the document. Then pass those descriptions into `generateOpenAPISpec(...)` to build the final OpenAPI object.
 
-`generateOpenAPISpec()` is the main entrypoint. Application code supplies document metadata such as `title`, `version`, `description`, and `servers`, then passes a `resources` array built from descriptor helpers.
+## `generateOpenAPISpec(...)`
+
+`generateOpenAPISpec(...)` builds the final OpenAPI document. It gathers the resource descriptions, combines them with the document-level metadata, and returns a plain object that can be sent from a route handler, written to a file, or passed to downstream OpenAPI tooling.
 
 ```ts
 import { describeViewSet, generateOpenAPISpec } from '@danceroutine/tango-openapi';
@@ -22,26 +24,41 @@ const spec = generateOpenAPISpec({
 });
 ```
 
-The generator normalizes descriptor paths to OpenAPI syntax, registers component schemas, and emits operations based on the resource type.
+`OpenAPIGeneratorConfig` requires `title` and `version`. `description` and `servers` let application code fill in the usual document metadata. `resources` is where the described Tango resources go.
 
-## `describeViewSet()`
+The return type is `OpenAPISpec`. Once the spec is built, it is ready for normal OpenAPI tooling and downstream consumers.
 
-`describeViewSet({ basePath, resource, ... })` documents a `ModelViewSet`.
+## `describeViewSet(...)`
 
-The generator uses the resource's OpenAPI description to emit:
+Use `describeViewSet(...)` when the resource you want to document is a `ModelViewSet`. This is the case where Tango can infer the most, because the viewset already exposes the standard collection and detail surface.
 
-- `GET /<basePath>`
-- `POST /<basePath>`
-- `GET /<basePath>/{id}`
-- `PUT /<basePath>/{id}`
-- `PATCH /<basePath>/{id}`
-- `DELETE /<basePath>/{id}`
+```ts
+import { describeViewSet } from '@danceroutine/tango-openapi';
+import { PostViewSet } from './viewsets/PostViewSet';
 
-When the viewset defines custom actions, the generator also emits those routes using the resolved action paths from the resource itself. Per-action OpenAPI overrides can refine summaries, request bodies, or responses when an action needs more detail than the default structural route description.
+describeViewSet({
+    basePath: '/api/posts',
+    resource: new PostViewSet(),
+    tags: ['Posts'],
+});
+```
 
-## `describeGenericAPIView()`
+`basePath` and `resource` are the required pieces here. `basePath` is the route prefix for the resource, and `resource` is the viewset instance to inspect. `tags` groups the generated operations under one or more OpenAPI tags. `actions` lets application code refine custom action routes when the action metadata alone is not enough.
 
-`describeGenericAPIView()` documents a `GenericAPIView` resource. Application code supplies the explicit collection and detail paths that the host framework exposes.
+From that one resource description, Tango generates the usual collection and detail operations for the viewset:
+
+- `GET /api/posts`
+- `POST /api/posts`
+- `GET /api/posts/{id}`
+- `PUT /api/posts/{id}`
+- `PATCH /api/posts/{id}`
+- `DELETE /api/posts/{id}`
+
+It also adds any custom action routes declared on the viewset. When a custom action needs richer OpenAPI detail than Tango can infer on its own, add an entry to `actions` keyed by the action name and supply the missing operation metadata there.
+
+## `describeGenericAPIView(...)`
+
+Use `describeGenericAPIView(...)` when the resource is a `GenericAPIView`. This fits routes that still follow Tango's generic resource conventions, but do not expose the full CRUD shape of a `ModelViewSet`.
 
 ```ts
 import { describeGenericAPIView } from '@danceroutine/tango-openapi';
@@ -53,11 +70,15 @@ describeGenericAPIView({
 });
 ```
 
-The generator uses the resource's allowed methods and lookup metadata to document the supported operations on those paths.
+`resource` is always required. The description must also include at least one of `collectionPath` or `detailPath`, because a generic view may expose only a collection route, only a detail route, or both. `tags` works the same way it does for viewsets. `methods` lets application code refine one or more inferred operations without replacing the rest.
 
-## `describeAPIView()`
+From that resource description, Tango reads the generic view's HTTP method surface, lookup configuration, serializer schemas, search fields, ordering fields, pagination contract, and any explicit OpenAPI metadata already declared on the view. It then builds the matching collection and detail operations.
 
-`describeAPIView()` covers plain `APIView` endpoints. Because a plain `APIView` can contain arbitrary behavior, application code supplies the per-method OpenAPI metadata explicitly.
+Use OpenAPI path syntax such as `{id}` in `detailPath`. Express-style `:id` syntax is rejected. When a generic view uses a custom lookup parameter, the path should use that same name so the generated path parameter matches the resource contract.
+
+## `describeAPIView(...)`
+
+Use `describeAPIView(...)` when the resource is a plain `APIView`. This is the most explicit case, because a plain API view does not expose enough structured information for Tango to infer request and response metadata on its own.
 
 ```ts
 import { z } from 'zod';
@@ -78,39 +99,57 @@ describeAPIView({
 });
 ```
 
-The generator validates those documented methods against `resource.getAllowedMethods()` before adding them to the document.
+`path`, `resource`, and `methods` are all required. `path` tells Tango where the route lives. `resource` is the API view instance to inspect. `methods` is where application code supplies the operation metadata that a plain API view does not expose structurally by itself. `tags` remains optional.
 
-## `generateSchemaFromModel()`
+Tango can still confirm that the resource implements the documented HTTP methods. What it cannot do here is infer the request body, response body, and operation detail just from the class alone, so `methods` becomes the place to supply that information.
 
-`generateSchemaFromModel()` maps an `OpenAPIModel` into a schema object suitable for `components.schemas`.
+## `OpenAPIOperationOverride`
 
-Use it when an application needs schema generation separately from full document generation, or when a custom tool wants a model-derived schema without building a full OpenAPI document.
+`OpenAPIOperationOverride` is the type application code uses when Tango gets the route right but still needs help with the operation details.
 
-## `generateSchemaFromZod()`
+You will use that same override shape in three places:
 
-`generateSchemaFromZod()` converts a Zod schema into an OpenAPI schema object.
+- `describeAPIView(...).methods` for plain API views
+- `describeGenericAPIView(...).methods` for generic views
+- `describeViewSet(...).actions` for custom viewset actions
 
-The resource-aware generator uses this internally for request and response bodies derived from serializer output, create, and update schemas. Application code can also use it directly when building explicit `describeAPIView()` overrides.
+Use `summary`, `description`, `tags`, `parameters`, and `requestBody` when the generated operation needs more explicit request-side metadata. Use `responseStatus`, `responseDescription`, and `responseSchema` when one primary response is enough. Use `responses` when the operation should document several status codes explicitly.
 
-## `mapTypeToOpenAPI()`
+## Schema helpers
 
-`mapTypeToOpenAPI()` maps Tango-style field type names to OpenAPI type names. Common SQL-oriented field names such as `serial`, `int`, `text`, `uuid`, `bool`, and `jsonb` are covered out of the box. Unknown types fall back to `string`.
+The lower-level schema helpers are useful when code needs the schema-mapping part of the package without generating a full OpenAPI document.
 
-## `OpenAPISpec`
+### `generateSchemaFromModel(...)`
 
-`OpenAPISpec` is the document shape returned by the generator. The returned object is ready for:
+`generateSchemaFromModel(...)` accepts a minimal model-shaped object with a `name` and field metadata, then returns the OpenAPI schema for that model. Use it when code already has Tango model metadata in hand and only needs the model-to-schema mapping step.
 
-- `Response.json(...)`
-- Express `res.json(...)`
-- writing to disk for code generation or validation
-- passing into documentation tooling that expects an OpenAPI object
+### `generateSchemaFromZod(...)`
+
+`generateSchemaFromZod(...)` accepts a Zod schema and returns the corresponding OpenAPI schema object. This is the same mapper the document generator uses for serializer schemas and for explicit request or response overrides.
+
+### `mapTypeToOpenAPI(...)`
+
+`mapTypeToOpenAPI(...)` maps Tango field-type names such as `serial`, `int`, `text`, `uuid`, `bool`, `jsonb`, and `timestamptz` to the corresponding OpenAPI scalar or object types. Unknown field types fall back to `string`.
+
+## Public types
+
+A small part of the exported type surface is enough for most application code:
+
+- `OpenAPISpec` for the final document shape
+- `OpenAPIGeneratorConfig` for local helpers that build a document
+- `OpenAPIOperationOverride` when refining one generated operation
+- `OpenAPIResponseOverride` when defining explicit multi-status `responses`
+
+`OpenAPIViewSetDescriptor`, `OpenAPIGenericAPIViewDescriptor`, and `OpenAPIAPIViewDescriptor` are useful when code wants to type its own resource-description helpers directly.
 
 ## Current boundary
 
-The package follows Tango resource metadata and covers the standard CRUD surface, generic view routes, pagination and list-query basics, and custom action paths. Plain `APIView` endpoints still rely on manual operation metadata, and custom actions benefit from explicit overrides when they need detailed request or response documentation.
+The generator covers Tango's standard `ModelViewSet` CRUD surface, `GenericAPIView` collection and detail routes, list-query basics such as search, ordering, and default offset pagination, and custom viewset action paths.
+
+Plain `APIView` routes still need explicit method metadata. Custom actions and generic routes may also need explicit overrides when request bodies, response bodies, or status codes go beyond what Tango can infer from the resource itself.
 
 ## Related pages
 
-- [Auto-document your API](/how-to/auto-document-your-api)
+- [How to auto-document your API](/how-to/auto-document-your-api)
 - [Resources API](/reference/resources-api)
-- [Models and schema](/topics/models-and-schema)
+- [API layer](/topics/api-layer)

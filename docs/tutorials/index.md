@@ -22,19 +22,9 @@ Choose this tutorial when you want to see the same Tango layers inside the Next.
 
 Choose this tutorial when you are building with Nuxt and want to see how Tango fits into Nitro route handlers. It shows the same broad framework ideas as the Express and Next.js tutorials, but in a host runtime with a different routing model and deployment story.
 
-## A good reading order
-
-If you are new to Tango, start with the Express tutorial first. It makes the boundary between the host framework and Tango especially easy to see.
-
-After that, read the tutorial for the host framework you care about most:
-
-- [Blog API (Express + SQLite)](/tutorials/express-blog-api)
-- [Next.js blog (App Router + SQLite)](/tutorials/nextjs-blog)
-- [Nuxt blog (Nitro + SQLite)](/tutorials/nuxt-blog)
+## Related sections
 
 Once a tutorial has made the whole application feel concrete, move into the topic guides and how-to pages for deeper explanations and narrower tasks.
-
-## Related sections
 
 - [Guide](/guide/)
 - [Topics](/topics/)
