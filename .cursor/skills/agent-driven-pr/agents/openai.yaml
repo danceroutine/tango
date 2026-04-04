@@ -1,0 +1,7 @@
+interface:
+  display_name: "Agent-Driven PR"
+  short_description: "Run the full PR lifecycle end to end"
+  default_prompt: "Use $agent-driven-pr to take this change from branch creation through PR, reviews, checks, and merge."
+
+policy:
+  allow_implicit_invocation: false
