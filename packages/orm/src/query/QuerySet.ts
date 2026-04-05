@@ -27,11 +27,32 @@ export interface QueryExecutor<T> {
     run(compiled: { sql: string; params: readonly unknown[] }): Promise<T[]>;
 }
 
+type QueryShapeFunction<TInput, TOutput> = (row: TInput) => TOutput;
+
+type QueryShapeParser<TInput, TOutput> = {
+    parse: (row: TInput) => TOutput;
+};
+
+type QueryShape<TInput> = QueryShapeFunction<TInput, unknown> | QueryShapeParser<TInput, unknown>;
+
+type QueryShapeOutput<TInput, TShape> =
+    TShape extends QueryShapeFunction<TInput, infer TOutput>
+        ? TOutput
+        : TShape extends QueryShapeParser<TInput, infer TOutput>
+          ? TOutput
+          : never;
+
+type ProjectedResult<
+    TModel extends Record<string, unknown>,
+    TKeys extends readonly (keyof TModel)[],
+> = number extends TKeys['length'] ? TModel : [TKeys[number]] extends [never] ? TModel : Pick<TModel, TKeys[number]>;
+
 /**
  * Django-inspired query builder for constructing and executing database queries.
  * Provides a fluent API for filtering, ordering, pagination, and eager loading.
  *
- * @template T - The model type being queried
+ * @template TModel - The full model row type used for query composition
+ * @template TResult - The fetched row shape returned by execution methods
  *
  * @example
  * ```typescript
@@ -44,19 +65,21 @@ export interface QueryExecutor<T> {
  *   .fetch();
  * ```
  */
-export class QuerySet<T extends Record<string, unknown>> {
+export class QuerySet<TModel extends Record<string, unknown>, TResult extends Record<string, unknown> = TModel> {
     static readonly BRAND = 'tango.orm.query_set' as const;
     readonly __tangoBrand: typeof QuerySet.BRAND = QuerySet.BRAND;
 
     constructor(
-        private executor: QueryExecutor<T>,
-        private state: QuerySetState<T> = {}
+        private executor: QueryExecutor<TModel>,
+        private state: QuerySetState<TModel> = {}
     ) {}
 
     /**
      * Narrow an unknown value to `QuerySet`.
      */
-    static isQuerySet<T extends Record<string, unknown>>(value: unknown): value is QuerySet<T> {
+    static isQuerySet<TModel extends Record<string, unknown>, TResult extends Record<string, unknown> = TModel>(
+        value: unknown
+    ): value is QuerySet<TModel, TResult> {
         return (
             typeof value === 'object' &&
             value !== null &&
@@ -69,10 +92,10 @@ export class QuerySet<T extends Record<string, unknown>> {
      *
      * Multiple `filter()` calls are composed with `AND`.
      */
-    filter(q: FilterInput<T> | QNode<T>): QuerySet<T> {
-        const wrapped: QNode<T> = (q as QNode<T>).kind
-            ? (q as QNode<T>)
-            : { kind: InternalQNodeType.ATOM, where: q as FilterInput<T> };
+    filter(q: FilterInput<TModel> | QNode<TModel>): QuerySet<TModel, TResult> {
+        const wrapped: QNode<TModel> = (q as QNode<TModel>).kind
+            ? (q as QNode<TModel>)
+            : { kind: InternalQNodeType.ATOM, where: q as FilterInput<TModel> };
         const merged = this.state.q ? Q.and(this.state.q, wrapped) : wrapped;
         return new QuerySet(this.executor, { ...this.state, q: merged });
     }
@@ -82,10 +105,10 @@ export class QuerySet<T extends Record<string, unknown>> {
      *
      * Exclusions are translated to `NOT (...)` predicates.
      */
-    exclude(q: FilterInput<T> | QNode<T>): QuerySet<T> {
-        const wrapped: QNode<T> = (q as QNode<T>).kind
-            ? (q as QNode<T>)
-            : { kind: InternalQNodeType.ATOM, where: q as FilterInput<T> };
+    exclude(q: FilterInput<TModel> | QNode<TModel>): QuerySet<TModel, TResult> {
+        const wrapped: QNode<TModel> = (q as QNode<TModel>).kind
+            ? (q as QNode<TModel>)
+            : { kind: InternalQNodeType.ATOM, where: q as FilterInput<TModel> };
         const excludes = [...(this.state.excludes ?? []), wrapped];
         return new QuerySet(this.executor, { ...this.state, excludes });
     }
@@ -93,13 +116,13 @@ export class QuerySet<T extends Record<string, unknown>> {
     /**
      * Apply ordering tokens such as `'name'` or `'-createdAt'`.
      */
-    orderBy(...tokens: OrderToken<T>[]): QuerySet<T> {
+    orderBy(...tokens: OrderToken<TModel>[]): QuerySet<TModel, TResult> {
         const order = tokens.map((t) => {
             const str = String(t);
             if (str.startsWith('-')) {
-                return { by: str.slice(1) as keyof T, dir: InternalDirection.DESC };
+                return { by: str.slice(1) as keyof TModel, dir: InternalDirection.DESC };
             }
-            return { by: t as keyof T, dir: InternalDirection.ASC };
+            return { by: t as keyof TModel, dir: InternalDirection.ASC };
         });
         return new QuerySet(this.executor, { ...this.state, order });
     }
@@ -107,28 +130,37 @@ export class QuerySet<T extends Record<string, unknown>> {
     /**
      * Limit the maximum number of rows returned.
      */
-    limit(n: number): QuerySet<T> {
+    limit(n: number): QuerySet<TModel, TResult> {
         return new QuerySet(this.executor, { ...this.state, limit: n });
     }
 
     /**
      * Skip the first `n` rows.
      */
-    offset(n: number): QuerySet<T> {
+    offset(n: number): QuerySet<TModel, TResult> {
         return new QuerySet(this.executor, { ...this.state, offset: n });
     }
 
     /**
-     * Restrict selected columns.
+     * Restrict selected columns and narrow the fetched row type when the
+     * selected keys are known precisely at the call site.
+     *
+     * Empty selections reset back to the full model row, and repeated
+     * `select(...)` calls replace the previous projection rather than
+     * intersecting it.
      */
-    select(cols: (keyof T)[]): QuerySet<T> {
-        return new QuerySet(this.executor, { ...this.state, select: cols });
+    select<const TKeys extends readonly (keyof TModel)[]>(
+        cols: TKeys
+    ): QuerySet<TModel, ProjectedResult<TModel, TKeys>>;
+    select(cols: readonly (keyof TModel)[]): QuerySet<TModel, TModel>;
+    select(cols: readonly (keyof TModel)[]): QuerySet<TModel, TModel> {
+        return new QuerySet(this.executor, { ...this.state, select: [...cols] as (keyof TModel)[] });
     }
 
     /**
      * Request SQL joins for related data when supported by relation metadata.
      */
-    selectRelated(...rels: string[]): QuerySet<T> {
+    selectRelated(...rels: string[]): QuerySet<TModel, TResult> {
         return new QuerySet(this.executor, { ...this.state, selectRelated: rels });
     }
 
@@ -137,24 +169,36 @@ export class QuerySet<T extends Record<string, unknown>> {
      *
      * Prefetch orchestration is adapter-specific.
      */
-    prefetchRelated(...rels: string[]): QuerySet<T> {
+    prefetchRelated(...rels: string[]): QuerySet<TModel, TResult> {
         return new QuerySet(this.executor, { ...this.state, prefetchRelated: rels });
     }
 
     /**
      * Execute the query and optionally shape each row.
+     *
+     * When the queryset has been narrowed by `select(...)`, rows passed to the
+     * shaping callback or parser use that narrowed fetched-row type.
      */
-    async fetch<Out = T>(shape?: ((r: T) => Out) | { parse: (r: T) => Out }): Promise<QueryResult<Out>> {
+    async fetch(): Promise<QueryResult<TResult>>;
+    async fetch<Out>(shape: QueryShapeFunction<TResult, Out>): Promise<QueryResult<Out>>;
+    async fetch<Out>(shape: QueryShapeParser<TResult, Out>): Promise<QueryResult<Out>>;
+    async fetch<TShape extends QueryShape<TResult> | undefined>(
+        shape: TShape
+    ): Promise<QueryResult<TResult | QueryShapeOutput<TResult, NonNullable<TShape>>>>;
+    async fetch<Out>(
+        shape?: QueryShapeFunction<TResult, Out> | QueryShapeParser<TResult, Out>
+    ): Promise<QueryResult<TResult | Out>> {
         const compiler = new QueryCompiler(this.executor.meta, this.executor.dialect);
         const compiled = compiler.compile(this.state);
         const rows = await this.executor.run(compiled);
         const normalizedRows = this.normalizeRowsForSchemaParsing(rows, shape);
+        const projectedRows = normalizedRows as unknown as TResult[];
 
-        const results: Out[] = !shape
-            ? (normalizedRows as unknown as Out[])
+        const results: Array<TResult | Out> = !shape
+            ? projectedRows
             : typeof shape === 'function'
-              ? normalizedRows.map(shape)
-              : normalizedRows.map((r) => shape.parse(r));
+              ? projectedRows.map(shape)
+              : projectedRows.map((r) => shape.parse(r));
 
         return {
             results,
@@ -164,10 +208,25 @@ export class QuerySet<T extends Record<string, unknown>> {
 
     /**
      * Execute the query and return the first row, or `null`.
+     *
+     * As with `fetch(...)`, parser and function overloads receive the current
+     * fetched-row type after any `select(...)` projection narrowing.
      */
-    async fetchOne<Out = T>(shape?: ((r: T) => Out) | { parse: (r: T) => Out }): Promise<Out | null> {
+    async fetchOne(): Promise<TResult | null>;
+    async fetchOne<Out>(shape: QueryShapeFunction<TResult, Out>): Promise<Out | null>;
+    async fetchOne<Out>(shape: QueryShapeParser<TResult, Out>): Promise<Out | null>;
+    async fetchOne<TShape extends QueryShape<TResult> | undefined>(
+        shape: TShape
+    ): Promise<TResult | QueryShapeOutput<TResult, NonNullable<TShape>> | null>;
+    async fetchOne<Out>(
+        shape?: QueryShapeFunction<TResult, Out> | QueryShapeParser<TResult, Out>
+    ): Promise<TResult | Out | null> {
         const limited = this.limit(1);
-        const result = await limited.fetch(shape);
+        const result = !shape
+            ? await limited.fetch()
+            : typeof shape === 'function'
+              ? await limited.fetch(shape)
+              : await limited.fetch(shape);
         return result.results[0] ?? null;
     }
 
@@ -190,7 +249,10 @@ export class QuerySet<T extends Record<string, unknown>> {
         return count > 0;
     }
 
-    private normalizeRowsForSchemaParsing<Out>(rows: T[], shape?: ((r: T) => Out) | { parse: (r: T) => Out }): T[] {
+    private normalizeRowsForSchemaParsing<Out>(
+        rows: TModel[],
+        shape?: QueryShapeFunction<TResult, Out> | QueryShapeParser<TResult, Out>
+    ): TModel[] {
         if (!shape || typeof shape === 'function' || this.executor.dialect !== InternalDialect.SQLITE) {
             return rows;
         }
@@ -220,8 +282,8 @@ export class QuerySet<T extends Record<string, unknown>> {
         return value;
     }
 
-    private normalizeBooleanColumns(row: T, columns: readonly string[]): T {
-        let normalized: T | null = null;
+    private normalizeBooleanColumns(row: TModel, columns: readonly string[]): TModel {
+        let normalized: TModel | null = null;
 
         for (const column of columns) {
             const current = (row as Record<string, unknown>)[column];

@@ -67,12 +67,7 @@ import { z } from 'zod';
 import { ModelDataFactory } from '@danceroutine/tango-testing';
 
 const PostShape = {
-    create: (data: {
-        id: number;
-        title: string;
-        slug: string;
-        published: boolean;
-    }) => data,
+    create: (data: { id: number; title: string; slug: string; published: boolean }) => data,
     parse: (data: unknown) =>
         z
             .object({

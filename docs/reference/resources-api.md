@@ -69,10 +69,7 @@ The exported concrete classes are:
 For example, `ListCreateAPIView` already binds `GET` to the shared list workflow and `POST` to the shared create workflow:
 
 ```ts
-class BlogPostListCreateAPIView extends ListCreateAPIView<
-    BlogPostRecord,
-    typeof BlogPostSerializer
-> {
+class BlogPostListCreateAPIView extends ListCreateAPIView<BlogPostRecord, typeof BlogPostSerializer> {
     constructor() {
         super({
             serializer: BlogPostSerializer,
@@ -93,10 +90,7 @@ Tango also exports the single-workflow mixin base classes `ListModelMixin`, `Cre
 Use these when one workflow is the part you want to inherit directly, or when you are defining your own intermediate base class around one of the shared generic behaviors.
 
 ```ts
-class BlogPostListAPIView extends ListModelMixin<
-    BlogPostRecord,
-    typeof BlogPostSerializer
-> {
+class BlogPostListAPIView extends ListModelMixin<BlogPostRecord, typeof BlogPostSerializer> {
     constructor() {
         super({
             serializer: BlogPostSerializer,

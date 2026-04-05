@@ -56,6 +56,9 @@ Do not use this skill for contributor-only code changes that do not touch techni
     - Draft in the order established by the roadmap.
     - Introduce the concept before introducing the Tango term of art that names it, unless the term is explicitly part of the reader's assumed prior knowledge.
     - Ground example domains before relying on example nouns such as `Post`, `Comment`, or `User`.
+    - For reference pages, organize the page around individual contracts and methods rather than export inventories.
+    - When a method or contract is important enough to name, give it its own subsection and explain its behavior before or alongside the example.
+    - When examples materially improve understanding, place fenced code blocks inside the relevant subsection instead of collecting them into a generic example dump.
 9. Run a fresh-reader review before polishing the prose.
     - Read the draft linearly as the target audience.
     - After each section, ask what question the reader is likely asking at that point.
@@ -104,27 +107,29 @@ For substantial documentation work, the agent must also expose a roadmap checkpo
 
 ## Required Checks
 
-- Use the principles in `references/principles.md`.
-- Use the anti-pattern catalog in `references/anti-patterns.md`.
-- If the work is substantial, expose the roadmap checkpoint before drafting.
-- If the roadmap grows into taxonomy work instead of drafting guidance, collapse it and move on.
-- If a Tango term of art appears before the concept that makes it intelligible, rewrite again.
-- If a section introduces an abstraction before the roadmap has established its prerequisites, rewrite again.
-- If the first mention of a term relies on the writer's prior context instead of the reader's available context, rewrite again.
-- If subagents are available, use them for fresh-reader review when that gives you a cleaner audience simulation.
-- When you use a subagent for review, do not give it the full working conversation if the goal is to simulate a reader who has not seen it.
-- If a page about one abstraction starts answering questions about a different abstraction too early, rewrite again.
-- If an example noun is not semantically grounded before it is used, rewrite again.
-- If a section order does not match the reader's likely questions, rewrite again.
-- If a paragraph only makes sense because the writer already knows the surrounding conversation or codebase context, rewrite again.
-- If the reader would have to scan ahead to infer what a term means, rewrite again.
-- If the draft still sounds like it is announcing the explanation instead of delivering it, rewrite again.
-- If end-user docs or README text still sounds like a repo tour instead of framework documentation, rewrite again.
-- If the draft defines something primarily by what it is not, rewrite it in affirmative terms.
-- If a sentence uses contrastive `X, not Y` framing, rewrite it as a direct affirmative explanation.
-- If the draft relies on clipped sentences, label-and-colon scaffolding, or other outline-like shorthand where prose would teach better, rewrite it in fuller explanatory sentences.
-- If prose terminology does not match current exported contract names, rewrite with accurate names.
-- If the draft uses absolute language, verify that the claim is truly unconditional in the current contract. Rewrite only when capability flags, environment differences, or alternate execution paths make the statement misleading.
+1. Use the principles in `references/principles.md`.
+2. Use the anti-pattern catalog in `references/anti-patterns.md`.
+3. If the work is substantial, expose the roadmap checkpoint before drafting.
+4. If the roadmap grows into taxonomy work instead of drafting guidance, collapse it and move on.
+5. If a Tango term of art appears before the concept that makes it intelligible, rewrite again.
+6. If a section introduces an abstraction before the roadmap has established its prerequisites, rewrite again.
+7. If the first mention of a term relies on the writer's prior context instead of the reader's available context, rewrite again.
+8. If subagents are available, use them for fresh-reader review when that gives you a cleaner audience simulation.
+9. When you use a subagent for review, do not give it the full working conversation if the goal is to simulate a reader who has not seen it.
+10. If a page about one abstraction starts answering questions about a different abstraction too early, rewrite again.
+11. If an example noun is not semantically grounded before it is used, rewrite again.
+12. If a section order does not match the reader's likely questions, rewrite again.
+13. If a paragraph only makes sense because the writer already knows the surrounding conversation or codebase context, rewrite again.
+14. If the reader would have to scan ahead to infer what a term means, rewrite again.
+15. If the draft still sounds like it is announcing the explanation instead of delivering it, rewrite again.
+16. If end-user docs or README text still sounds like a repo tour instead of framework documentation, rewrite again.
+17. If the draft defines something primarily by what it is not, rewrite it in affirmative terms.
+18. If a sentence uses contrastive `X, not Y` framing, rewrite it as a direct affirmative explanation.
+19. If a sentence tells the reader that something is `simple`, `easy`, `obvious`, or similar, rewrite it to describe the structure directly rather than asserting how difficult it should feel.
+20. If the draft relies on clipped sentences, label-and-colon scaffolding, or other outline-like shorthand where prose would teach better, rewrite it in fuller explanatory sentences.
+21. If prose terminology does not match current exported contract names, rewrite with accurate names.
+22. If the draft uses absolute language, verify that the claim is truly unconditional in the current contract. Rewrite only when capability flags, environment differences, or alternate execution paths make the statement misleading.
+23. If a reference page collapses into a contract dump, the default remediation is a structural rewrite: split the page into contract- or method-level subsections, add fenced examples where they teach behavior, and explain each subsection in application-facing language.
 
 ## Persona Review
 
@@ -158,6 +163,14 @@ For substantial documentation work, the agent must also expose a roadmap checkpo
 - Does it stay focused on the package boundary instead of adjacent packages?
 - Does it funnel clearly to the official docs?
 - Could a reader who has never used Tango understand the opening section without outside context?
+
+### Reference pages
+
+- Does the page describe the public contract instead of dumping exports or type signatures?
+- Does each major contract or method have its own subsection when readers need separate behavioral guidance?
+- Do fenced examples sit next to the subsection they teach rather than appearing as a detached example dump?
+- Does the prose explain when application code uses the contract, what it supplies, and what behavior it should expect?
+- Does the page avoid telling the reader that something is simple or obvious instead of describing the structure directly?
 
 ### Docstrings
 

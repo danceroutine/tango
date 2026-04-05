@@ -12,31 +12,31 @@ Use this skill only when the user explicitly requests an adversarial review. Do 
 1. Announce `Executing adversarial-review.`
 2. State to yourself that disagreement is useful and you are allowed to disagree when the plan is weak, incomplete, or likely to create future problems.
 3. Before finalizing your own critique, spawn exactly two subagents if the tool is available.
-   - Give both the current proposal or plan.
-   - Instruct both to review it in detail with an adversarial eye.
-   - Instruct both to aggressively raise concerns about:
-     - flaws in the design itself
-     - hidden assumptions
-     - operational risks
-     - future knock-on effects
-     - migration or maintenance burden
-     - edge cases and failure modes
-   - Tell each subagent that disagreement is desirable when warranted and that weak objections should be omitted.
-   - Prefer independent framing for the two reviews so they do not collapse into the same critique.
+    - Give both the current proposal or plan.
+    - Instruct both to review it in detail with an adversarial eye.
+    - Instruct both to aggressively raise concerns about:
+        - flaws in the design itself
+        - hidden assumptions
+        - operational risks
+        - future knock-on effects
+        - migration or maintenance burden
+        - edge cases and failure modes
+    - Tell each subagent that disagreement is desirable when warranted and that weak objections should be omitted.
+    - Prefer independent framing for the two reviews so they do not collapse into the same critique.
 4. Aggregate the two subagent reviews with your own judgment.
-   - Deduplicate overlapping points.
-   - Preserve meaningful disagreement.
-   - Present the critique to the user in a structured list, ordered from highest-risk concern to lowest.
+    - Deduplicate overlapping points.
+    - Preserve meaningful disagreement.
+    - Present the critique to the user in a structured list, ordered from highest-risk concern to lowest.
 5. Stop and wait for the user's acknowledgement and any further detail.
-   - Do not move into execution while the adversarial review loop is still active.
+    - Do not move into execution while the adversarial review loop is still active.
 6. After the user responds, merge the user's feedback with the subagent feedback and address each point explicitly and individually.
-   - For each point, either:
-     - agree and modify the plan, or
-     - disagree and explain why the original plan should stand.
-   - Do not silently absorb or discard a concern.
+    - For each point, either:
+        - agree and modify the plan, or
+        - disagree and explain why the original plan should stand.
+    - Do not silently absorb or discard a concern.
 7. The user may push back further. You are allowed to continue disagreeing if the objection remains unconvincing.
-   - If the user sends `<disagree_and_commit>`, stop arguing, accept the user's decision as final, and proceed on that basis.
-   - If the user changes their mind, update the plan accordingly.
+    - If the user sends `<disagree_and_commit>`, stop arguing, accept the user's decision as final, and proceed on that basis.
+    - If the user changes their mind, update the plan accordingly.
 8. This skill may be applied multiple times in series to stress-test a proposal before execution.
 
 ## Operating Rules
