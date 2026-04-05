@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type { QuerySet } from '@danceroutine/tango-orm';
 import { aQueryResult } from '../aQueryResult';
 import { aQuerySet } from '../aQuerySet';
@@ -60,5 +60,18 @@ describe(aQuerySet, () => {
         await expect(qs.fetchOne()).resolves.toBeNull();
         await expect(qs.count()).resolves.toBe(0);
         await expect(qs.exists()).resolves.toBe(false);
+    });
+
+    it('supports explicit projected result typing for selected query doubles', async () => {
+        type Model = { id: number; email: string };
+        type Selected = Pick<Model, 'id'>;
+        const qs = aQuerySet<Model, Selected>({
+            fetch: async () => aQueryResult<Selected>({ results: [{ id: 1 }], nextCursor: null }),
+            fetchOne: async () => ({ id: 1 }),
+        });
+
+        await expect(qs.fetch()).resolves.toEqual({ results: [{ id: 1 }], nextCursor: null });
+        await expect(qs.fetchOne()).resolves.toEqual({ id: 1 });
+        expectTypeOf(qs).toEqualTypeOf<QuerySet<Model, Selected>>();
     });
 });

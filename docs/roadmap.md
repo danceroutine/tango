@@ -16,12 +16,6 @@ It will change as the framework evolves. For the current supported surface, see 
 
 The next immediate improvement in this area is to hydrate related model data into the returned row shape, so queries that join an author can expose typed access to fields such as `post.author.email`.
 
-### Type narrowing from `select(...)`
-
-`select(...)` already narrows the SQL projection so the database returns only the requested columns.
-
-The next immediate improvement in this area is to let the TypeScript surface narrow with that projection as well, so a query such as `select(['id', 'title', 'slug'])` can produce a correspondingly narrowed result type without requiring an extra shaping step.
-
 ### ORM transaction support
 
 The ORM currently focuses on ordinary manager-driven reads and writes.
@@ -30,7 +24,7 @@ Transaction support for application code is still missing from the supported ORM
 
 ### Agentic Development Support
 
-Tango currently uses agentic skills and subagents for it's own development, and wants to package that type of development workflow to enable your own agents to understand how to work with the framework.
+Tango currently uses agentic skills and subagents for its own development, and wants to package that type of development workflow to enable your own agents to understand how to work with the framework.
 
 ### NoSQL support
 
