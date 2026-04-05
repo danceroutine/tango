@@ -10,52 +10,57 @@ import { aQueryExecutor } from './aQueryExecutor';
  * All methods are wrapped in `vi.fn()` so they can be asserted on directly
  * without an additional `vi.mocked()` call.
  */
-export function aQuerySet<TModel extends Record<string, unknown>>(
-    overrides: Partial<QuerySet<TModel>> = {}
-): QuerySet<TModel> {
-    const queryset = new QuerySetClass<TModel>(aQueryExecutor<TModel>());
-    const filterImpl: QuerySet<TModel>['filter'] = overrides.filter ?? ((_input) => queryset);
-    const excludeImpl: QuerySet<TModel>['exclude'] = overrides.exclude ?? ((_input) => queryset);
-    const orderByImpl: QuerySet<TModel>['orderBy'] = overrides.orderBy ?? ((..._tokens) => queryset);
-    const limitImpl: QuerySet<TModel>['limit'] = overrides.limit ?? ((_n) => queryset);
-    const offsetImpl: QuerySet<TModel>['offset'] = overrides.offset ?? ((_n) => queryset);
-    const selectImpl: QuerySet<TModel>['select'] = overrides.select ?? ((_cols) => queryset);
-    const selectRelatedImpl: QuerySet<TModel>['selectRelated'] = overrides.selectRelated ?? ((..._rels) => queryset);
-    const prefetchRelatedImpl: QuerySet<TModel>['prefetchRelated'] =
+export function aQuerySet<TModel extends Record<string, unknown>, TResult extends Record<string, unknown> = TModel>(
+    overrides: Partial<QuerySet<TModel, TResult>> = {}
+): QuerySet<TModel, TResult> {
+    const queryset = new QuerySetClass<TModel, TResult>(aQueryExecutor<TModel>());
+    const filterImpl: QuerySet<TModel, TResult>['filter'] = overrides.filter ?? ((_input) => queryset);
+    const excludeImpl: QuerySet<TModel, TResult>['exclude'] = overrides.exclude ?? ((_input) => queryset);
+    const orderByImpl: QuerySet<TModel, TResult>['orderBy'] = overrides.orderBy ?? ((..._tokens) => queryset);
+    const limitImpl: QuerySet<TModel, TResult>['limit'] = overrides.limit ?? ((_n) => queryset);
+    const offsetImpl: QuerySet<TModel, TResult>['offset'] = overrides.offset ?? ((_n) => queryset);
+    const defaultSelect = ((_cols: readonly (keyof TModel)[]) => queryset) as unknown as QuerySet<
+        TModel,
+        TResult
+    >['select'];
+    const selectImpl = overrides.select ?? defaultSelect;
+    const selectRelatedImpl: QuerySet<TModel, TResult>['selectRelated'] =
+        overrides.selectRelated ?? ((..._rels) => queryset);
+    const prefetchRelatedImpl: QuerySet<TModel, TResult>['prefetchRelated'] =
         overrides.prefetchRelated ?? ((..._rels) => queryset);
-    const fetchImpl: QuerySet<TModel>['fetch'] =
+    const fetchImpl: QuerySet<TModel, TResult>['fetch'] =
         overrides.fetch ??
-        (async <Out = TModel>(_shape?: ((r: TModel) => Out) | { parse: (r: TModel) => Out }) => aQueryResult<Out>());
-    const fetchOneImpl: QuerySet<TModel>['fetchOne'] =
+        (async <Out = TResult>(_shape?: ((r: TResult) => Out) | { parse: (r: TResult) => Out }) => aQueryResult<Out>());
+    const fetchOneImpl: QuerySet<TModel, TResult>['fetchOne'] =
         overrides.fetchOne ??
-        (async <Out = TModel>(_shape?: ((r: TModel) => Out) | { parse: (r: TModel) => Out }) => null as Out | null);
-    const countImpl: QuerySet<TModel>['count'] = overrides.count ?? (async () => 0);
-    const existsImpl: QuerySet<TModel>['exists'] = overrides.exists ?? (async () => false);
+        (async <Out = TResult>(_shape?: ((r: TResult) => Out) | { parse: (r: TResult) => Out }) => null as Out | null);
+    const countImpl: QuerySet<TModel, TResult>['count'] = overrides.count ?? (async () => 0);
+    const existsImpl: QuerySet<TModel, TResult>['exists'] = overrides.exists ?? (async () => false);
 
-    queryset.filter = vi.fn((input: Parameters<QuerySet<TModel>['filter']>[0]) =>
+    queryset.filter = vi.fn((input: Parameters<QuerySet<TModel, TResult>['filter']>[0]) =>
         filterImpl(input)
-    ) as QuerySet<TModel>['filter'];
-    queryset.exclude = vi.fn((input: Parameters<QuerySet<TModel>['exclude']>[0]) =>
+    ) as QuerySet<TModel, TResult>['filter'];
+    queryset.exclude = vi.fn((input: Parameters<QuerySet<TModel, TResult>['exclude']>[0]) =>
         excludeImpl(input)
-    ) as QuerySet<TModel>['exclude'];
-    queryset.orderBy = vi.fn((...tokens: Parameters<QuerySet<TModel>['orderBy']>) =>
+    ) as QuerySet<TModel, TResult>['exclude'];
+    queryset.orderBy = vi.fn((...tokens: Parameters<QuerySet<TModel, TResult>['orderBy']>) =>
         orderByImpl(...tokens)
-    ) as QuerySet<TModel>['orderBy'];
-    queryset.limit = vi.fn((n: number) => limitImpl(n)) as QuerySet<TModel>['limit'];
-    queryset.offset = vi.fn((n: number) => offsetImpl(n)) as QuerySet<TModel>['offset'];
-    queryset.select = vi.fn((cols: Parameters<QuerySet<TModel>['select']>[0]) =>
+    ) as QuerySet<TModel, TResult>['orderBy'];
+    queryset.limit = vi.fn((n: number) => limitImpl(n)) as QuerySet<TModel, TResult>['limit'];
+    queryset.offset = vi.fn((n: number) => offsetImpl(n)) as QuerySet<TModel, TResult>['offset'];
+    queryset.select = vi.fn((cols: Parameters<QuerySet<TModel, TResult>['select']>[0]) =>
         selectImpl(cols)
-    ) as QuerySet<TModel>['select'];
-    queryset.selectRelated = vi.fn((...rels: Parameters<QuerySet<TModel>['selectRelated']>) =>
+    ) as unknown as QuerySet<TModel, TResult>['select'];
+    queryset.selectRelated = vi.fn((...rels: Parameters<QuerySet<TModel, TResult>['selectRelated']>) =>
         selectRelatedImpl(...rels)
-    ) as QuerySet<TModel>['selectRelated'];
-    queryset.prefetchRelated = vi.fn((...rels: Parameters<QuerySet<TModel>['prefetchRelated']>) =>
+    ) as QuerySet<TModel, TResult>['selectRelated'];
+    queryset.prefetchRelated = vi.fn((...rels: Parameters<QuerySet<TModel, TResult>['prefetchRelated']>) =>
         prefetchRelatedImpl(...rels)
-    ) as QuerySet<TModel>['prefetchRelated'];
-    queryset.fetch = vi.fn(fetchImpl) as QuerySet<TModel>['fetch'];
-    queryset.fetchOne = vi.fn(fetchOneImpl) as QuerySet<TModel>['fetchOne'];
-    queryset.count = vi.fn(() => countImpl()) as QuerySet<TModel>['count'];
-    queryset.exists = vi.fn(() => existsImpl()) as QuerySet<TModel>['exists'];
+    ) as QuerySet<TModel, TResult>['prefetchRelated'];
+    queryset.fetch = vi.fn(fetchImpl) as unknown as QuerySet<TModel, TResult>['fetch'];
+    queryset.fetchOne = vi.fn(fetchOneImpl) as unknown as QuerySet<TModel, TResult>['fetchOne'];
+    queryset.count = vi.fn(() => countImpl()) as QuerySet<TModel, TResult>['count'];
+    queryset.exists = vi.fn(() => existsImpl()) as QuerySet<TModel, TResult>['exists'];
 
     return queryset;
 }

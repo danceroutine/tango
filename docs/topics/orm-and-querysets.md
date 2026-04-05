@@ -164,7 +164,27 @@ const postHeaders = await PostModel.objects.query().select(['id', 'title', 'slug
 
 At execution time, that changes the SQL projection, so the database returns only the selected columns. In other words, `postHeaders` contains rows with `id`, `title`, and `slug`, not complete post records with every model field still present.
 
-The TypeScript surface does not yet narrow automatically from `select(...)` alone. The queryset still begins from the model's row contract, so if application code wants the narrower result shape to be explicit in its own types, it is usually clearer to pair `select(...)` with a shaping function or parser.
+The fetched TypeScript row type narrows with that projection as well when the selected keys are known precisely at the call site. Inline literals, readonly tuples, and `as const` arrays preserve that narrowing automatically.
+
+```ts
+const postHeaders = await PostModel.objects
+    .query()
+    .select(['id', 'title', 'slug'] as const)
+    .orderBy('-createdAt')
+    .fetch();
+```
+
+In that example, each row in `postHeaders.results` is typed as `{ id, title, slug }`.
+
+Widened arrays still work for SQL projection, but they fall back to the full row type because TypeScript can no longer prove which exact keys are present:
+
+```ts
+const columns: ReadonlyArray<'id' | 'title' | 'slug'> = ['id', 'title', 'slug'];
+
+const projected = await PostModel.objects.query().select(columns).fetch();
+```
+
+`select([])` resets back to the full row, and a later `select(...)` call replaces the earlier projection rather than composing with it.
 
 `fetch(...)` can also accept a shaping function or parser when the calling code wants to project the returned rows into another form:
 
@@ -175,7 +195,7 @@ const titles = await PostModel.objects
     .fetch((row) => row.title);
 ```
 
-This keeps the query definition and the result shape close together when a caller needs a narrower view of the returned data.
+This keeps the query definition and the final application-facing shape close together when a caller wants something narrower or more specialized than the selected columns alone.
 
 ## Working with related data
 

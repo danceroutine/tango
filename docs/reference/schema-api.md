@@ -253,9 +253,7 @@ const PostModel = Model({
     namespace: 'blog',
     name: 'Post',
     schema: PostSchema,
-    indexes: [
-        i.index(['publishedAt', 'id'], { where: 'published_at is not null' }),
-    ],
+    indexes: [i.index(['publishedAt', 'id'], { where: 'published_at is not null' })],
 });
 ```
 

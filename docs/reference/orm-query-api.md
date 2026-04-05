@@ -2,7 +2,9 @@
 
 `@danceroutine/tango-orm` provides the query and write surface behind `Model.objects`.
 
-Application code usually meets this package in two places. `Model.objects` is the per-model entrypoint for lookups and writes. `QuerySet<T>` is the immutable query builder returned by `Model.objects.query()`. After those core surfaces, this page covers the lower-level exports that startup code, tests, and tooling may use directly.
+Application code usually meets this package in two places. `Model.objects` is the per-model entrypoint for lookups and writes. `QuerySet<TModel, TResult = TModel>` is the immutable query builder returned by `Model.objects.query()`. `TModel` remains the full model contract while the query is being built. `TResult` describes the row shape returned when the query runs. After those core surfaces, this page covers the lower-level exports that startup code, tests, and tooling may use directly.
+
+The examples below assume an application with a `PostModel` whose row shape includes fields such as `id`, `title`, `slug`, `published`, and `createdAt`.
 
 ## `Model.objects` and `ModelManager<T>`
 
@@ -16,7 +18,7 @@ The core lookup methods are:
 - `findById(id)`
 - `getOrThrow(id)`
 
-`query()` starts a new `QuerySet<T>`. `findById(id)` returns one row or `null`. `getOrThrow(id)` returns one row or throws `NotFoundError` when the row does not exist.
+`query()` starts a new `QuerySet<TModel, TModel>`. `findById(id)` returns one row or `null`. `getOrThrow(id)` returns one row or throws `NotFoundError` when the row does not exist.
 
 The core write methods are:
 
@@ -28,22 +30,21 @@ The core write methods are:
 These methods are the standard write path through the ORM. Model-owned write hooks run here, so create, update, delete, and bulk insert behavior that belongs to the model stays attached to the same contract.
 
 ```ts
-const draft = await PostModel.objects.create({
+const created = await PostModel.objects.create({
     title: 'First post',
     slug: 'first-post',
-    published: false,
 });
 
-const samePost = await PostModel.objects.findById(draft.id);
+const samePost = await PostModel.objects.findById(created.id);
 
-const published = await PostModel.objects.update(draft.id, {
+const updated = await PostModel.objects.update(created.id, {
     published: true,
 });
 ```
 
-## `QuerySet<T>`
+## `QuerySet<TModel, TResult = TModel>`
 
-`QuerySet<T>` represents a database query against one model. Each refinement returns a new queryset, leaving the earlier one unchanged. The query only runs when application code calls an execution method such as `fetch(...)`, `fetchOne(...)`, `count()`, or `exists()`.
+`QuerySet<TModel, TResult = TModel>` represents a database query against one model. Each refinement returns a new queryset, leaving the earlier one unchanged. The query only runs when application code calls an execution method such as `fetch(...)`, `fetchOne(...)`, `count()`, or `exists()`.
 
 ### Refining the query
 
@@ -51,9 +52,9 @@ Use `filter(q)` and `exclude(q)` to describe which rows belong in the result set
 
 Use `orderBy(...tokens)`, `limit(n)`, and `offset(n)` to control result ordering and result size. Ordering tokens follow the usual Django pattern, such as `'title'` for ascending order or `'-createdAt'` for descending order.
 
-Use `select(cols)` when the SQL query should only project a subset of columns.
+Use `select(cols)` when the SQL query should only project a subset of columns. When the selected keys are known precisely at the call site, the fetched row type narrows to that same projection. Inline literals, readonly tuples, and `as const` arrays preserve the strongest narrowing. Widened field arrays still narrow the SQL projection, but the fetched row type falls back to the full model row because TypeScript can no longer prove which exact fields are present. Calling `select([])` resets back to the full model projection, and a later `select(...)` call replaces the earlier projection instead of composing with it.
 
-Use `selectRelated(...rels)` when declared relation metadata should change the SQL query itself. It tells the ORM to plan joins for the named relations.
+Use `selectRelated(...rels)` when declared relation metadata should change the SQL query itself. It tells the ORM to plan joins for the named relations, but it does not yet hydrate nested related model objects onto each returned row.
 
 Use `prefetchRelated(...rels)` when the query should record relation names for prefetch behavior outside the core SQL join path. The exact behavior there depends on the active adapter and caller.
 
@@ -79,43 +80,48 @@ Use `count()` when application code needs the number of matching rows rather tha
 Use `exists()` when application code only needs to know whether at least one row matches.
 
 ```ts
-const page = await PostModel.objects
-    .query()
-    .filter({ published: true })
-    .orderBy('-createdAt')
-    .fetch();
+const page = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetch();
 
 const first = await PostModel.objects.query().orderBy('title').fetchOne();
 const total = await PostModel.objects.query().filter({ published: true }).count();
 const hasDrafts = await PostModel.objects.query().filter({ published: false }).exists();
 ```
 
-### Shaping results and current limits
+### Shaping results and projection semantics
 
-`fetch(...)` and `fetchOne(...)` accept an optional shaping function or parser when application code wants a result shape that differs from the full model row.
+`fetch(...)` and `fetchOne(...)` accept an optional shaping function or parser when application code wants a result shape that differs from the current fetched row.
 
 ```ts
 const titles = await PostModel.objects
     .query()
-    .filter({ published: true })
+    .select(['title'] as const)
     .fetch((row) => row.title);
-```
 
-This is the main way to make a narrower result shape explicit in application code today.
+const titleRecord = await PostModel.objects
+    .query()
+    .select(['title'] as const)
+    .fetchOne({
+        parse: (row) => ({ title: row.title }),
+    });
+```
 
 `select(...)` and `fetch(shape?)` solve related but different problems.
 
-`select(...)` works at the database-query level. It changes which columns the SQL query asks the database to return. Use it when the database should only send a smaller projection in the first place.
+`select(...)` works at the database-query level. It changes which columns the SQL query asks the database to return. When the selection is statically known, it also narrows the fetched row type to those same fields.
 
-`fetch(shape?)` works at the TypeScript application-code level. It takes whatever row shape the query returned and turns it into the shape the caller wants to work with. Use it when the calling code should receive a narrower or transformed result type.
+`fetch(shape?)` works at the TypeScript application-code level. It takes the current fetched row shape and turns it into the shape the caller wants to work with.
 
-In practice, use `select(...)` to reduce the SQL projection, and use `fetch(shape?)` when the calling code should see an explicit transformed result. It is common to use both together when you want a smaller database query and a narrower application-facing type in the same workflow.
+In practice, use `select(...)` to reduce the SQL projection and to narrow fetched rows when the selected keys are explicit. Use `fetch(shape?)` when the calling code should receive a transformed result type. It is common to use both together when you want a smaller database query and a narrower application-facing type in the same workflow.
 
-`select(...)` does not yet narrow the TypeScript result type by itself.
+When a shaping function or parser is provided, its input row uses the current `TResult` shape. That means `select(...)` narrowing flows through to the callback or parser automatically.
 
-`selectRelated(...)` affects join planning, but it does not yet hydrate nested related model objects onto each returned row.
+If the selected fields are stored in a widened array, the query still projects only those columns, but the fetched type falls back to the full row:
 
-`prefetchRelated(...)` is part of the public query contract, but the exact prefetch behavior depends on the active adapter.
+```ts
+const fields: ReadonlyArray<'id' | 'title' | 'slug'> = ['id', 'title', 'slug'];
+
+const projected = await PostModel.objects.query().select(fields).fetch();
+```
 
 ## `Q`
 
@@ -132,12 +138,7 @@ The main helpers are:
 ```ts
 const visiblePosts = await PostModel.objects
     .query()
-    .filter(
-        Q.and(
-            { published: true },
-            Q.or({ featured: true }, { visibility: 'public' })
-        )
-    )
+    .filter(Q.and({ published: true }, Q.or({ featured: true }, { visibility: 'public' })))
     .fetch();
 ```
 

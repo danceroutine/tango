@@ -188,17 +188,19 @@ if (search) {
 Then update the rendered card so the page shows `summary` when it exists, and falls back to the existing excerpt otherwise:
 
 ```tsx
-{post.summary ? (
-    <p className="text-gray-600 mb-4">{post.summary}</p>
-) : post.excerpt ? (
-    <p className="text-gray-600 mb-4">{post.excerpt}</p>
-) : null}
+{
+    post.summary ? (
+        <p className="text-gray-600 mb-4">{post.summary}</p>
+    ) : post.excerpt ? (
+        <p className="text-gray-600 mb-4">{post.excerpt}</p>
+    ) : null;
+}
 ```
 
 While you are in the same file, update the search input placeholder so the page's UI matches the broader search behavior:
 
 ```tsx
-placeholder="Search title, summary, or content"
+placeholder = 'Search title, summary, or content';
 ```
 
 This is the clearest place to see the distinction between the server component and the API route. The home page reads the same model-backed post contract directly, so it needs its own search and rendering change.

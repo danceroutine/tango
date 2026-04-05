@@ -132,6 +132,25 @@ describe.each(selectedDialects())('ORM integration (%s)', (dialect) => {
             const first = await queryset.filter({ slug: 'first' }).fetchOne();
             expect(first?.title).toBe('First');
 
+            const projected = await queryset
+                .filter({ published: true })
+                .orderBy('id')
+                .select(['id', 'slug'] as const)
+                .fetch();
+            expect(projected.results).toEqual([
+                { id: 1, slug: 'first' },
+                { id: 3, slug: 'third' },
+            ]);
+
+            const shaped = await queryset
+                .filter({ published: true })
+                .orderBy('id')
+                .select(['id', 'slug'] as const)
+                .fetch({
+                    parse: (row) => `${row.id}:${row.slug}`,
+                });
+            expect(shaped.results).toEqual(['1:first', '3:third']);
+
             const count = await queryset.count();
             expect(count).toBe(3);
         } finally {
