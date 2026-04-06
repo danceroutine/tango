@@ -75,6 +75,7 @@ export default defineConfig({
             '/guide/': [
                 {
                     text: 'Guide',
+                    collapsed: true,
                     items: [
                         { text: 'Guide overview', link: '/guide/' },
                         { text: 'Getting started', link: '/guide/getting-started' },
@@ -87,6 +88,7 @@ export default defineConfig({
             '/tutorials/': [
                 {
                     text: 'Tutorials',
+                    collapsed: true,
                     items: [
                         { text: 'Tutorials overview', link: '/tutorials/' },
                         { text: 'Blog API (Express + SQLite)', link: '/tutorials/express-blog-api' },
@@ -98,6 +100,7 @@ export default defineConfig({
             '/topics/': [
                 {
                     text: 'Topics',
+                    collapsed: true,
                     items: [
                         { text: 'Topics overview', link: '/topics/' },
                         { text: 'Architecture', link: '/topics/architecture' },
@@ -112,6 +115,7 @@ export default defineConfig({
             '/how-to/': [
                 {
                     text: 'How-to',
+                    collapsed: true,
                     items: [
                         { text: 'How-to overview', link: '/how-to/' },
                         { text: 'Configure databases', link: '/how-to/databases' },
@@ -127,6 +131,7 @@ export default defineConfig({
             '/reference/': [
                 {
                     text: 'Reference',
+                    collapsed: true,
                     items: [
                         { text: 'Reference overview', link: '/reference/' },
                         { text: 'Config API', link: '/reference/config-api' },
@@ -141,6 +146,7 @@ export default defineConfig({
             '/contributors/': [
                 {
                     text: 'Contributors',
+                    collapsed: true,
                     items: [
                         { text: 'Overview', link: '/contributors/' },
                         { text: 'Setup', link: '/contributors/setup' },
@@ -151,13 +157,19 @@ export default defineConfig({
                 },
                 {
                     text: 'Contributor topics',
+                    collapsed: true,
                     items: [
                         { text: 'Topics overview', link: '/contributors/topics/' },
                         { text: 'Dialects in Tango', link: '/contributors/topics/dialects' },
+                        {
+                            text: 'Foreign Keys, Many-to-Many, and the Relation Seam',
+                            link: '/contributors/topics/resolved-relation-graph',
+                        },
                     ],
                 },
                 {
                     text: 'Contributor how-to',
+                    collapsed: true,
                     items: [
                         { text: 'How-to guides', link: '/contributors/how-to/' },
                         {
@@ -170,6 +182,7 @@ export default defineConfig({
             '/api/': [
                 {
                     text: 'Reference',
+                    collapsed: true,
                     items: [{ text: 'Schema API', link: '/reference/schema-api' }],
                 },
             ],

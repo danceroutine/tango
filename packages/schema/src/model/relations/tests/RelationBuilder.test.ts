@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RelationBuilder } from '../index';
+import { RelationBuilder } from '../RelationBuilder';
 
 describe(RelationBuilder, () => {
     it('creates hasMany relation', () => {

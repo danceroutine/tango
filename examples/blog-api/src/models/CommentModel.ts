@@ -53,14 +53,16 @@ export const CommentModel = Model({
     name: 'Comment',
     schema: CommentReadSchema.extend({
         id: t.primaryKey(z.number().int()),
-        postId: t.foreignKey('blog/Post', z.number().int(), {
+        postId: t.foreignKey('blog/Post', {
+            field: z.number().int(),
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
         }),
-        authorId: t.foreignKey('blog/User', z.number().int(), {
+        authorId: t.foreignKey('blog/User', {
+            field: z.number().int(),
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
         }),
-        createdAt: t.default(z.string(), { now: true }),
+        createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
     }),
 });

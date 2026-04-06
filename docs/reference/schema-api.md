@@ -13,7 +13,7 @@ import { z } from 'zod';
 
 ## `Model(...)`
 
-`Model(...)` creates a Tango model from a Zod object schema and a model definition object. The returned model carries the Zod schema, the derived metadata Tango needs later, and any write hooks you declared. Tango also registers the model on the shared `ModelRegistry` before returning it, so the rest of the framework can resolve it by key.
+`Model(...)` creates a Tango model from a Zod object schema and a model definition object. The returned model carries the Zod schema, the derived metadata Tango needs later, and any write hooks you declared. Tango registers the model on a `ModelRegistry` before returning it so the rest of the framework can resolve it by key.
 
 ```ts
 const PostModel = Model({
@@ -23,16 +23,15 @@ const PostModel = Model({
         id: t.primaryKey(z.number().int()),
         title: z.string(),
         slug: t.unique(z.string()),
-        authorId: t.foreignKey('blog/User', z.number().int()),
-    }),
-    relations: (r) => ({
-        author: r.belongsTo('blog/User', 'authorId'),
+        authorId: t.foreignKey('blog/User', {
+            field: z.number().int(),
+            name: 'author',
+            relatedName: 'posts',
+        }),
     }),
     ordering: ['-id'],
 });
 ```
-
-`Model(...)` accepts a `ModelDefinition<TSchema>`. In practice, that definition is easier to understand in a few groups.
 
 ### Identity and schema
 
@@ -44,7 +43,7 @@ const PostModel = Model({
 
 `table` lets you override Tango's default table-name derivation. Leave it out when the derived plural snake-case table name is good enough. Set it when the database table name must be fixed explicitly.
 
-`fields` lets you provide explicit `Field[]` metadata instead of relying on inference from the Zod schema and field decorators. Most application code can omit it. Reach for it when generated field metadata is not the shape you want to publish to the rest of Tango.
+`fields` lets you provide explicit `Field[]` metadata instead of relying on inference from the Zod schema and field decorators. Most application code can omit it. Reach for it when Tango's generated field metadata is not the shape you want migrations, schema diffing, or similar tooling to consume.
 
 ```ts
 const PostModel = Model({
@@ -68,15 +67,15 @@ const PostModel = Model({
 });
 ```
 
-This explicit form is useful when you want to see or control the exact `Field` metadata Tango publishes to the rest of the framework.
+This explicit form gives you direct control over the `Field` metadata that Tango publishes to field-oriented tooling. Field decorators define foreign-key semantics and straightforward relation names; `relations` remains available for model-level relation overrides.
 
 ### Relations and model-level metadata
 
 `relations` lets you declare named relations through `RelationBuilder`. It fits models that need relation names such as `author`, `comments`, or `profile` for other Tango layers to read later.
 
-This is different from `t.foreignKey(...)`. `t.foreignKey(...)` lives on the field that stores the foreign key value, such as `authorId`, and contributes field-level reference metadata. `relations` names the higher-level relationship that other Tango layers can refer to, such as `author`. In the future, we hope to deprecate this in favor of just using t.foreignKey.
+`t.foreignKey(...)` lives on the field that stores the foreign-key value, such as `authorId`, and records how that field points to another model. Prefer putting straightforward storage-backed relation names on the field decorator through `name` and `relatedName`.
 
-On many models the two surfaces coexist. A model might use `t.foreignKey(...)` on `authorId` so the field carries database reference metadata, and also use `relations` to publish an `author` relation name. If you only need the foreign key field metadata, the field decorator may be enough. If you want a named relation surface as well, add `relations`.
+`relations` is still supported for compatibility with the original relation architecture and for cases where naming needs to be centralized at the model level. Use it when a field-authored relation needs a model-level override or when several field-authored edges would otherwise compete for the same relation name.
 
 `indexes` and `constraints` attach table-level database metadata to the model. They are usually built with the `i.*` and `c.*` helpers described later in this page.
 
@@ -113,7 +112,7 @@ const PostModel = Model({
     name: 'Post',
     schema: z.object({
         id: t.primaryKey(z.number().int()),
-        authorId: t.foreignKey('blog/User', z.number().int()),
+        authorId: t.foreignKey('blog/User', { field: z.number().int() }),
     }),
     relations: (r) => ({
         author: r.belongsTo('blog/User', 'authorId'),
@@ -137,7 +136,11 @@ In this builder, `target` is the target model key, usually a string such as `blo
 const PostSchema = z.object({
     id: t.primaryKey(z.number().int()),
     slug: t.unique(z.string()),
-    authorId: t.foreignKey('blog/User', z.number().int()),
+    authorId: t.foreignKey('blog/User', {
+        field: z.number().int(),
+        name: 'author',
+        relatedName: 'posts',
+    }),
 });
 ```
 
@@ -155,35 +158,66 @@ These helpers can be used directly on a schema or, for the unary helpers, as dec
 
 ### Default, column, and indexing helpers
 
-`default(schema, value)` records an application-level default on the field contract. It fits fields that should carry a default value in Tango metadata, such as a literal string, `null`, or `{ now: true }`.
+`field(schema)` starts a fluent builder for scalar field metadata. Use it when a field needs several metadata helpers and nested calls would obscure the schema:
 
-`dbDefault(schema, value)` records a database-side default expression. It fits columns where the database should provide the value rather than relying on application code to fill it in first.
+```ts
+const score = t
+    .field(z.number())
+    .defaultValue('0')
+    .dbColumn('score_value')
+    .choices([0, 1, 2])
+    .helpText('Score between 0 and 2')
+    .build();
+```
 
-`dbColumn(schema, name)` records an explicit database column name. It fits fields whose property name in application code should map to a different column name.
+`build()` returns the original Zod schema after applying the Tango metadata.
 
-`dbIndex(schema)` records field-level index metadata without a separate table-level index definition. It fits single columns that should be indexed.
+`defaultValue(value)` records an application-level default on the field contract. `value` is the default Tango should publish in metadata, such as a literal string, `null`, or `{ now: true }`. This is Tango metadata; use Zod's `.default(...)` when you want parse-time default behavior. The older `default(schema, value)` helper still works for compatibility.
+
+`dbDefault(value)` records a database-side default expression. Use it when the database should provide the value rather than relying on application code to fill it in first. The older `dbDefault(schema, value)` helper still works for compatibility.
+
+`dbColumn(name)` records an explicit database column name. Use it when the property name in application code should map to a different column name. The older `dbColumn(schema, name)` helper still works for compatibility.
+
+`dbIndex()` records field-level index metadata without a separate table-level index definition. The older `dbIndex(schema)` helper still works for compatibility.
 
 ### Choice, validation, and display helpers
 
-`choices(schema, values)` records an allowed choice set on the field metadata. Use it when the field should carry an explicit list of allowed values for higher-level consumers.
+`choices(values)` records an allowed choice set on the field metadata. `values` is the list of allowed choices that higher-level consumers may inspect. The older `choices(schema, values)` helper still works for compatibility.
 
-`validators(schema, ...values)` records additional validator functions on the field metadata. Use it when field-aware tooling should know about validators beyond the raw Zod contract.
+`validators(...values)` records additional validator functions on the field metadata. `values` is the list of field-aware validation functions Tango should publish. The older `validators(schema, ...values)` helper still works for compatibility.
 
-`helpText(schema, text)` records help text on the field metadata. Use it when the field needs human-readable explanatory text.
+`helpText(text)` records human-readable explanatory text on the field metadata. The older `helpText(schema, text)` helper still works for compatibility.
 
-`errorMessages(schema, map)` records custom error messages on the field metadata. Use it when the field contract should carry message overrides that higher-level tooling can inspect.
+`errorMessages(map)` records custom error messages on the field metadata. `map` stores message overrides that higher-level tooling can inspect. The older `errorMessages(schema, map)` helper still works for compatibility.
 
 ### Relation field helpers
 
 These helpers solve the problem of declaring relation metadata on the field that stores the relation value, rather than in a separate metadata structure.
 
-`foreignKey(target, schema?, options?)` declares a foreign-key relation. Use it on fields such as `authorId` or `postId`. If you omit the schema, Tango creates a default `z.number().int()` field for you.
+`foreignKey(target, config?)` declares a foreign-key relation. Use it on fields such as `authorId` or `postId`. The second argument is an object with these options:
 
-`oneToOne(target, schema?, options?)` declares a one-to-one relation. Use it when the current model points to exactly one related row and the foreign-key field should also be unique. If you omit the schema, Tango again creates a default `z.number().int()` field.
+- `field` supplies the Zod schema for the stored reference value. If you omit it, Tango creates a default `z.number().int()` field.
+- `column` names the target column when the relation should point at something other than the target model's primary key.
+- `onDelete` and `onUpdate` record referential actions for schema tooling.
+- `name` publishes an explicit forward relation name such as `author`.
+- `relatedName` publishes an explicit reverse relation name such as `posts`.
 
-`manyToMany(target, schema?)` declares many-to-many relation metadata on a field. Use it when the field itself should carry that relation information. If you omit the schema, Tango creates a default `z.array(z.number().int())` field.
+`oneToOne(target, config?)` declares a one-to-one relation. Use it when the current model points to exactly one related row and the foreign-key field should also be unique. It accepts the same options as `foreignKey(...)`: `field`, `column`, `onDelete`, `onUpdate`, `name`, and `relatedName`. If you omit `field`, Tango creates a default `z.number().int()` field.
 
-Unlike `RelationBuilder`, these helpers accept the broader model-reference forms used across the schema package: a model key string, a direct model object, or a callback that returns a model.
+`manyToMany(target, config?)` declares many-to-many relation metadata on a field-authored schema declaration. Tango records that relation intent on the [relation graph](/contributors/topics/resolved-relation-graph) and leaves the generated database field list and persisted row contracts unchanged. Its config object supports:
+
+- `field`, which supplies the relation-facing Zod schema. If you omit it, Tango creates a default `z.array(z.number().int())` declaration for the schema surface.
+- `name`, which publishes the forward relation name.
+
+Reverse many-to-many naming remains fenced, so only `name` participates in the resolved relation graph for now.
+
+The object form is the preferred public contract. The older positional schema overloads remain available for compatibility.
+
+Unlike `RelationBuilder`, these helpers accept a model key string such as `blog/User`, a direct model object, or a callback that returns a model.
+
+`foreignKey(...)` and `oneToOne(...)` affect both the database field metadata and the named relation surface. `name` lets the field decorator publish an explicit forward relation name, and `relatedName` lets it publish an explicit reverse relation name without a separate `relations` block.
+
+`manyToMany(...)` records relation intent today and stays out of the generated database field list until join-table support is implemented.
 
 ## `Meta` and `m`
 
@@ -259,7 +293,7 @@ const PostModel = Model({
 
 ## `ModelRegistry`
 
-`ModelRegistry` resolves models by their `namespace/name` key. Most application code uses the shared registry that `Model(...)` writes to automatically. Separate registry instances are mainly useful in tests and tooling that need an isolated set of models.
+`ModelRegistry` resolves models by their `namespace/name` key. Most application code uses the shared registry that `Model(...)` writes to automatically. Separate registry instances are useful when you need an isolated model set.
 
 ```ts
 const registry = new ModelRegistry();

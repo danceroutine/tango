@@ -8,7 +8,9 @@
             "@danceroutine/tango-config": ["../config/src/index.ts"],
             "@danceroutine/tango-config/*": ["../config/src/*"],
             "@danceroutine/tango-core": ["../core/src/index.ts"],
-            "@danceroutine/tango-core/*": ["../core/src/*"]
+            "@danceroutine/tango-core/*": ["../core/src/*"],
+            "@danceroutine/tango-schema": ["../schema/src/index.ts"],
+            "@danceroutine/tango-schema/*": ["../schema/src/*"]
         }
     },
     "include": ["src"],

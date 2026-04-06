@@ -45,6 +45,7 @@
         "directory": "packages/schema"
     },
     "dependencies": {
+        "@danceroutine/tango-core": "workspace:*",
         "zod": "^4.0.0"
     },
     "devDependencies": {

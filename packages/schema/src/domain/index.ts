@@ -10,7 +10,7 @@ export type { Field } from './Field';
 export type { IndexDef } from './IndexDef';
 export type { RelationDef } from './RelationDef';
 export type { ModelMetadata } from './ModelMetadata';
-export type { Model, ModelAugmentations } from './Model';
+export type { Model, ModelAugmentations, PersistedModelOutput } from './Model';
 export type {
     ModelHookModel,
     ModelWriteHookManager,

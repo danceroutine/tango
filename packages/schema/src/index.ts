@@ -13,6 +13,7 @@ export type {
     ModelHookModel,
     ModelAugmentations,
     ModelMetadata,
+    PersistedModelOutput,
     ModelWriteHookManager,
     ModelWriteHooks,
     BeforeCreateHookArgs,
@@ -41,4 +42,8 @@ export {
     m,
     t,
     type ModelDefinition,
+    type ForeignKeyDecoratorConfig,
+    type FieldDecoratorBuilder,
+    type ManyToManyDecoratorConfig,
+    type OneToOneDecoratorConfig,
 } from './model/index';

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { c, i, m } from '../index';
+import { c, i } from '../../index';
+import { m } from '../index';
 
 describe('meta and constraint builders', () => {
     it('builds model meta fragments and merges them', () => {

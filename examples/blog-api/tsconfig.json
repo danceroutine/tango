@@ -1,22 +1,28 @@
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
-        "composite": true,
+        "composite": false,
         "outDir": "./dist",
-        "rootDir": ".",
         "paths": {
+            "@danceroutine/tango-adapters-core": ["../../packages/adapters/core/src/index.ts"],
+            "@danceroutine/tango-adapters-core/*": ["../../packages/adapters/core/src/*"],
             "@danceroutine/tango-adapters-express": ["../../packages/adapters/express/src/index.ts"],
-            "@danceroutine/tango-adapters-express/*": ["../../packages/adapters/express/src/*"]
+            "@danceroutine/tango-adapters-express/*": ["../../packages/adapters/express/src/*"],
+            "@danceroutine/tango-config": ["../../packages/config/src/index.ts"],
+            "@danceroutine/tango-config/*": ["../../packages/config/src/*"],
+            "@danceroutine/tango-core": ["../../packages/core/src/index.ts"],
+            "@danceroutine/tango-core/*": ["../../packages/core/src/*"],
+            "@danceroutine/tango-migrations": ["../../packages/migrations/src/index.ts"],
+            "@danceroutine/tango-migrations/*": ["../../packages/migrations/src/*"],
+            "@danceroutine/tango-openapi": ["../../packages/openapi/src/index.ts"],
+            "@danceroutine/tango-openapi/*": ["../../packages/openapi/src/*"],
+            "@danceroutine/tango-orm": ["../../packages/orm/src/index.ts"],
+            "@danceroutine/tango-orm/*": ["../../packages/orm/src/*"],
+            "@danceroutine/tango-resources": ["../../packages/resources/src/index.ts"],
+            "@danceroutine/tango-resources/*": ["../../packages/resources/src/*"],
+            "@danceroutine/tango-schema": ["../../packages/schema/src/index.ts"],
+            "@danceroutine/tango-schema/*": ["../../packages/schema/src/*"]
         }
     },
-    "include": ["src/**/*.ts", "scripts/bootstrap.ts", "migrations/**/*.ts", "tango.config.ts"],
-    "references": [
-        { "path": "../../packages/core" },
-        { "path": "../../packages/schema" },
-        { "path": "../../packages/orm" },
-        { "path": "../../packages/resources" },
-        { "path": "../../packages/adapters/express" },
-        { "path": "../../packages/migrations" },
-        { "path": "../../packages/config" }
-    ]
+    "include": ["src/**/*.ts", "scripts/bootstrap.ts", "migrations/**/*.ts", "tango.config.ts"]
 }

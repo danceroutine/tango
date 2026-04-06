@@ -12,7 +12,9 @@
             "@danceroutine/tango-core": ["../core/src/index.ts"],
             "@danceroutine/tango-core/*": ["../core/src/*"],
             "@danceroutine/tango-migrations": ["../migrations/src/index.ts"],
-            "@danceroutine/tango-migrations/*": ["../migrations/src/*"]
+            "@danceroutine/tango-migrations/*": ["../migrations/src/*"],
+            "@danceroutine/tango-schema": ["../schema/src/index.ts"],
+            "@danceroutine/tango-schema/*": ["../schema/src/*"]
         }
     },
     "include": ["src"],

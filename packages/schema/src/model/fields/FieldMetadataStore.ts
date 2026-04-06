@@ -1,4 +1,5 @@
-import type { TangoFieldMeta, ZodTypeAny } from '../decorators/types';
+import type { ZodTypeAny } from '../decorators/domain/ZodTypeAny';
+import type { TangoFieldMeta } from '../decorators/domain/TangoFieldMeta';
 
 const fieldMetadataStore = new WeakMap<ZodTypeAny, TangoFieldMeta>();
 

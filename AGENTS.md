@@ -64,6 +64,12 @@ This skill is the canonical Tango writing standard for:
 
 Use the writing skill for technical prose work only, and do not apply it to unrelated code-only changes.
 
+## 6) Adversarial Review Skill
+
+When asked to perform an adversarial review, read and apply:
+
+- `.cursor/skills/adversarial-review/SKILL.md`
+
 ## Skill Stacking Rule
 
 When a task spans multiple categories, apply all matching skills in this order:
