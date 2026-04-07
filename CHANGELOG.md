@@ -2,6 +2,10 @@
 
 This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
 
+## 1.1.3 - 2026-04-07
+
+- Fixed type narrowing on select() to align with database projection Affected packages: `@danceroutine/tango-orm`, `@danceroutine/tango-testing`.
+
 ## 1.1.2 - 2026-04-04
 
 - Update package documentation to reflect docsite url changes Affected packages: `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-resources`, `@danceroutine/tango-openapi`, `@danceroutine/tango-migrations`, `@danceroutine/tango-adapters-next`, `@danceroutine/tango-adapters-nuxt`, `@danceroutine/tango-adapters-express`.
