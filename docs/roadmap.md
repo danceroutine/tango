@@ -6,15 +6,11 @@ It will change as the framework evolves. For the current supported surface, see 
 
 ## What is on the roadmap?
 
-### Improved developer experience with t.foreignKey
+### Deeper relation hydration
 
-`t.foreignKey` today needs additional support from the `relations` lookup. This violates DRY for no added benefit.
+Tango supports one-level relation hydration for `belongsTo`, `hasOne`, and `hasMany` relations through `selectRelated(...)` and `prefetchRelated(...)`.
 
-### Relation hydration from `selectRelated(...)`
-
-`selectRelated(...)` already gives the ORM enough relation metadata to plan SQL joins through declared `belongsTo` relationships.
-
-The next immediate improvement in this area is to hydrate related model data into the returned row shape, so queries that join an author can expose typed access to fields such as `post.author.email`.
+Future relation work should extend that foundation to nested traversal such as `author__profile`, related-row projection, many-to-many hydration, and ambient or generated typing that removes explicit target-model generics from reverse relation calls.
 
 ### ORM transaction support
 

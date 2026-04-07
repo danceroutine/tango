@@ -20,10 +20,16 @@ export { Decorators, t } from './decorators/index';
 export type {
     TangoDecorators,
     FieldDecoratorBuilder,
+    DecoratedFieldKind,
+    ModelRef,
+    ModelRefTarget,
+    RelationDecoratedSchema,
+    TypedModelRef,
     ForeignKeyDecoratorConfig,
     OneToOneDecoratorConfig,
     ManyToManyDecoratorConfig,
 } from './decorators/index';
+export { createTypedModelRef, InternalDecoratedFieldKind, isTypedModelRef } from './decorators/index';
 export { Meta, m } from './meta/index';
 export type { ModelConstraint, ModelMetaFragment } from './meta/index';
 export { Constraints, Indexes, c, i } from './constraints/index';

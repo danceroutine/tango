@@ -5,8 +5,8 @@ export type RelationKind = (typeof InternalRelationKind)[keyof typeof InternalRe
 export interface RelationMeta {
     kind: RelationKind;
     table: string;
-    targetPk: string;
-    localKey?: string;
-    foreignKey?: string;
+    sourceKey: string;
+    targetKey: string;
+    targetColumns: Record<string, string>;
     alias: string;
 }

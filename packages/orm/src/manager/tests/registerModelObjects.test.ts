@@ -37,7 +37,7 @@ describe(registerModelObjects, () => {
         expect(() => registerModelObjects()).not.toThrow();
     });
 
-    it('derives query relation metadata from the resolved relation graph and filters many-to-many edges', () => {
+    it('derives query relation metadata from the resolved relation graph and filters unsupported many-to-many edges', () => {
         const UserModel = Model({
             namespace: 'test',
             name: 'User',
@@ -53,7 +53,7 @@ describe(registerModelObjects, () => {
             namespace: 'test',
             name: 'Tag',
             schema: z.object({
-                id: t.primaryKey(z.number().int()),
+                id: z.number().int(),
             }),
         });
 
@@ -74,19 +74,25 @@ describe(registerModelObjects, () => {
             author: {
                 kind: 'belongsTo',
                 table: 'users',
-                targetPk: 'id',
-                localKey: 'authorId',
-                foreignKey: 'authorId',
+                sourceKey: 'authorId',
+                targetKey: 'id',
+                targetColumns: {
+                    id: 'int',
+                },
                 alias: 'user_author',
             },
         });
+        expect(PostModel.objects.meta.relations).not.toHaveProperty('tags');
         expect(UserModel.objects.meta.relations).toEqual({
             posts: {
                 kind: 'hasMany',
                 table: 'posts',
-                targetPk: 'authorId',
-                localKey: 'id',
-                foreignKey: 'authorId',
+                sourceKey: 'id',
+                targetKey: 'authorId',
+                targetColumns: {
+                    id: 'int',
+                    authorId: 'int',
+                },
                 alias: 'post_posts',
             },
         });
@@ -114,10 +120,48 @@ describe(registerModelObjects, () => {
             author: {
                 kind: 'belongsTo',
                 table: 'users',
-                targetPk: 'id',
-                localKey: 'authorId',
-                foreignKey: 'authorId',
+                sourceKey: 'authorId',
+                targetKey: 'id',
+                targetColumns: {
+                    id: 'int',
+                },
                 alias: 'user_author',
+            },
+        });
+    });
+
+    it('derives reverse one-to-one query relation metadata from field-authored relations', () => {
+        const UserModel = Model({
+            namespace: 'test',
+            name: 'User',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+
+        Model({
+            namespace: 'test',
+            name: 'Profile',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                userId: t.oneToOne(UserModel, {
+                    field: z.number().int(),
+                    relatedName: 'profile',
+                }),
+            }),
+        });
+
+        expect(UserModel.objects.meta.relations).toEqual({
+            profile: {
+                kind: 'hasOne',
+                table: 'profiles',
+                sourceKey: 'id',
+                targetKey: 'userId',
+                targetColumns: {
+                    id: 'int',
+                    userId: 'int',
+                },
+                alias: 'profile_profile',
             },
         });
     });

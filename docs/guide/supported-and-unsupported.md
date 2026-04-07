@@ -22,11 +22,11 @@ That model metadata is not isolated to one package. The same contract feeds migr
 
 ### ORM and data access
 
-The ORM layer already includes model managers through `Model.objects`, immutable `QuerySet` composition, boolean query composition through `Q`, column projection through `select(...)`, fetched-row type narrowing for projected columns, and relation-aware query planning through `selectRelated(...)` and `prefetchRelated(...)`.
+The ORM layer already includes model managers through `Model.objects`, immutable `QuerySet` composition, boolean query composition through `Q`, field projection through `select(...)`, fetched-record type narrowing for projected fields, and direct relation hydration through `selectRelated(...)` and `prefetchRelated(...)` for `belongsTo`, `hasOne`, and `hasMany` relations.
 
 The ORM surface is designed for application code that wants a Django-shaped querying model without giving up TypeScript-native contracts. Collection filtering, ordering, slicing, existence checks, row shaping through `fetch(...)`, and manager-backed persistence are all part of the current story.
 
-Two ORM features are still outside the supported boundary today. `selectRelated(...)` can plan relation joins, but it does not yet hydrate nested related model objects into the returned row shape. The ORM also does not yet provide a supported transaction workflow for application code.
+The current unsupported ORM boundary includes nested relation traversal such as `author__profile`, related-row projection, many-to-many hydration, and a supported transaction workflow for application code.
 
 ### Database dialects
 
@@ -98,11 +98,11 @@ MariaDB is the SQL dialect currently called out on the roadmap, but it is not pa
 
 Several unsupported areas already have explicit follow-up work planned.
 
-At the ORM level, the roadmap includes relation hydration from `selectRelated(...)` and a supported transaction API for multi-step write workflows.
+At the ORM level, the roadmap includes deeper relation traversal, many-to-many hydration, related-row projection, and a supported transaction API for multi-step write workflows.
 
 At the platform level, the roadmap also includes MariaDB support, GraphQL support, custom Tango environments beyond `development`, `test`, and `production`, non-linear migration dependency chains for larger teams, agentic development support for AI-assisted workflows, and longer-term exploration of NoSQL support.
 
-The roadmap page is the right place to follow those items as they evolve. This page should be read as the current support boundary, not as a promise that every planned item will arrive on a fixed schedule.
+The roadmap page tracks those items as they evolve. The support boundary describes current framework behavior rather than promising that every planned item will arrive on a fixed schedule.
 
 ## Related pages
 

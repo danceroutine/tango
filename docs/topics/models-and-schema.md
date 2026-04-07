@@ -9,12 +9,12 @@ The basics:
 - a model is created with `Model(...)`
 - a model has a stable identity through `namespace` and `name`
 - a model's `schema` is a Zod object
-- field helpers such as `t.primaryKey(...)`, `t.foreignKey(...)`, and `t.default(...)` attach persistence metadata to that schema
+- field helpers such as `t.primaryKey(...)`, `t.foreignKey(...)`, and `t.field(...)` attach persistence metadata to that schema
 - Tango registers the model so that relations, queries, migrations, and resources can refer to it later
 
 ## A quick example
 
-This example defines a blog post model:
+This example defines a blog post model. It assumes the application also exports a `UserModel` whose stable model key is `blog/User`.
 
 ```ts
 import { Model, t } from '@danceroutine/tango-schema';
@@ -22,8 +22,14 @@ import { z } from 'zod';
 
 export const PostSchema = z.object({
     id: t.primaryKey(z.number().int()),
-    authorId: t.foreignKey('blog/User', {
+    authorId: t.foreignKey(t.modelRef<typeof import('./UserModel').UserModel>('blog/User'), {
+        // Stored foreign-key value on the Post record.
         field: z.number().int(),
+        // Forward relation exposed as Post.author.
+        name: 'author',
+        // Reverse relation exposed as User.posts.
+        relatedName: 'posts',
+        // Database referential actions used by migrations and constraints.
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE',
     }),
@@ -52,13 +58,15 @@ First, it preserves the Zod schema you wrote. Application code can still use tha
 
 Second, it builds the model metadata that Tango's persistence-oriented layers need. That metadata includes the model identity, the table name, the field list, relation information, defaults, indexes, and ordering hints.
 
-For application code, the practical result is simple: the model becomes the place where Tango learns what kind of record this is, where to store it, and how to look for it.
+For application code, the model becomes the place where Tango learns what kind of record this is, where to store it, and how to look for it.
 
 ## Model identity and table names
 
 Every model has a stable identity in the form `namespace/name`.
 
-That identity is important to ensure Tango is able to navigate when one model needs to refer to another. In the example above, `authorId` points at `blog/User`, not at an imported TypeScript symbol. That keeps relation metadata stable even when the application grows across several files or packages, and avoids circular dependencies.
+Django can use the application module as part of a model's identity, so examples such as `core.User` and `posts.Post` inherit a namespace from the Django app that owns the model. Tango runs inside host frameworks with different project layouts and cannot rely on one app-module structure. Each model therefore declares its own `namespace` and `name`.
+
+That identity lets Tango deterministically resolve to the correct model when one model needs to refer to another. In the example above, `authorId` points at `blog/User` through `t.modelRef<typeof import('./UserModel').UserModel>(...)`. The string key keeps runtime relation metadata stable when the application grows across several files or packages, while the generic target model gives TypeScript enough information to type relation hydration.
 
 The model also has a table name. If you do not set `table` explicitly, Tango derives one from `name` by converting it to snake case and pluralizing it. `Post` becomes `posts`, and `BlogPost` becomes `blog_posts`.
 
@@ -72,7 +80,7 @@ Some fields only need their Zod shape. A `title` or `content` field may only nee
 
 - `t.primaryKey(...)` for the primary key
 - `t.foreignKey(...)` for relations stored through foreign-key columns
-- `t.default(...)` for values that should exist by default at persistence time
+- `t.field(...).defaultValue(...).build()` for values that should exist by default at persistence time
 
 These helpers extend the capabilities offered by Zod to inject database-facing metadata.
 
@@ -80,7 +88,7 @@ These helpers extend the capabilities offered by Zod to inject database-facing m
 
 When you declare a relationship in a Tango model, you are describing part of the stored record contract. The relationship tells Tango which records may point at one another, how that link should be represented in SQL, and which connections the ORM can safely reason about later. A blog post belongs to one author. A user may have one profile. A tagging system may connect one post to many tags and one tag to many posts. Those relationships belong in the model because they change the shape of the stored data.
 
-A foreign key begins with a field that stores the reference itself. In the blog example, `authorId: t.foreignKey('blog/User', { field: z.number().int() })` says that the field is an integer and that the integer points at the `blog/User` model. When Tango prepares that model for database and query work, it resolves the stable model identity into concrete metadata such as the target table, the referenced column, and any delete or update behavior configured through `onDelete` or `onUpdate`. The migration system can then emit a real foreign-key constraint, and the database can enforce that every `authorId` points at a row that actually exists.
+A foreign key begins with a field that stores the reference itself. In the blog example, `authorId: t.foreignKey(t.modelRef<typeof import('./UserModel').UserModel>('blog/User'), { field: z.number().int() })` says that the field is an integer and that the integer points at the `blog/User` model. When Tango prepares that model for database and query work, it resolves the stable model identity into concrete metadata such as the target table, the referenced column, and any delete or update behavior configured through `onDelete` or `onUpdate`. The migration system can then emit a real foreign-key constraint, and the database can enforce that every `authorId` points at a row that actually exists.
 
 A one-to-one relationship follows the same path, but with one extra guarantee. `t.oneToOne(...)` still resolves to a database reference, and it also marks the column as unique. At the SQL level, that combination means each row may point at one parent row, and no two rows may point at the same parent through that column. This is the usual fit for data such as a user profile, where the relationship should behave like an extension of the main record instead of a repeating child table.
 
@@ -103,9 +111,15 @@ const recentPosts = await PostModel.objects
     .selectRelated('author')
     .orderBy('-createdAt')
     .fetch();
+
+recentPosts.results[0].author?.email;
 ```
 
-Today, `selectRelated('author')` tells the ORM which related model to join through the resolved relation metadata. In this example, Tango derives `author` from the `authorId` field. The returned row still keeps the base post shape, so nested relation hydration such as `post.author.email` is not part of the ORM contract yet.
+`selectRelated('author')` follows the resolved relation metadata, loads the related `UserModel`, and attaches it as `author`. Reverse collection relations use `prefetchRelated(...)`; for example, `UserModel.objects.query().prefetchRelated<typeof PostModel>('posts')` loads each user's `PostModel` records as `posts`.
+
+::: warning
+Relation hydration covers direct relations. Nested traversal such as `author__profile` remains future query work.
+:::
 
 Relation changes therefore affect several layers at once. Changing a relation changes the schema that migrations apply, the constraints that the database enforces, and the paths that ORM queries can use when they walk from one model to another.
 
@@ -119,9 +133,9 @@ Those benefits map naturally onto Tango's model layer. A stored record already n
 
 However, a persistence layer needs additional information beyond data shape. It needs to know which field is the primary key, which column points at another table, which default should be treated as a persistence concern, which table name belongs to the model, and which hooks should run when a record is created or updated. It also needs a stable way for one model to refer to another model without hard-coding database details all over the application.
 
-Tango adds those missing capabilities on top of Zod. Field helpers such as `t.primaryKey(...)`, `t.foreignKey(...)`, `t.oneToOne(...)`, and `t.default(...)` enrich Zod fields with persistence metadata. `Model(...)` wraps the schema with model-level metadata such as the namespace, model name, table name, relations, and lifecycle hooks. Tango also keeps stable model identities such as `blog/User`, so migrations and the ORM can resolve those references into the table and relation metadata they need later.
+Tango adds those missing capabilities on top of Zod. Field helpers such as `t.primaryKey(...)`, `t.foreignKey(...)`, `t.oneToOne(...)`, and `t.field(...)` enrich Zod fields with persistence metadata. `Model(...)` wraps the schema with model-level metadata such as the namespace, model name, table name, relations, and lifecycle hooks. Tango also keeps stable model identities such as `blog/User`, so migrations and the ORM can resolve those references into the table and relation metadata they need later.
 
-This structure also makes it practical to keep model and serializer work dry. A team can define shared Zod fragments for a blog post once, derive `PostCreateSchema` and `PostUpdateSchema` from those fragments for serializer use, and derive the stored record schema for `Model(...)` from the same family of Zod definitions. The model still carries database-specific metadata that serializers do not need, and serializers still remain free to shape request and response contracts differently, but the underlying field vocabulary can be shared instead of rewritten by hand in each layer.
+This structure also supports dry model and serializer work. A team can define shared Zod fragments for a blog post once, derive `PostCreateSchema` and `PostUpdateSchema` from those fragments for serializer use, and derive the stored record schema for `Model(...)` from the same family of Zod definitions. The model still carries database-specific metadata that serializers do not need, and serializers still remain free to shape request and response contracts differently, but the underlying field vocabulary can be shared instead of rewritten by hand in each layer.
 
 ## Related pages
 

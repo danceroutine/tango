@@ -132,11 +132,13 @@ In this builder, `target` is the target model key, usually a string such as `blo
 
 `Decorators`, also exported as `t`, attaches database-facing metadata directly to Zod fields. This solves the common problem where the field shape and the field's persistence metadata belong together, and writing them in separate places would duplicate the declaration.
 
+This example assumes `UserModel` is imported from the model module that owns the `blog/User` model key.
+
 ```ts
 const PostSchema = z.object({
     id: t.primaryKey(z.number().int()),
     slug: t.unique(z.string()),
-    authorId: t.foreignKey('blog/User', {
+    author: t.foreignKey(t.modelRef<typeof UserModel>('blog/User'), {
         field: z.number().int(),
         name: 'author',
         relatedName: 'posts',
@@ -192,32 +194,113 @@ const score = t
 
 ### Relation field helpers
 
-These helpers solve the problem of declaring relation metadata on the field that stores the relation value, rather than in a separate metadata structure.
+Relation helpers attach model-relationship metadata to the field that stores or represents the relation. They let the model schema describe the stored reference, the target model, and the relation names that querysets can hydrate later.
 
-`foreignKey(target, config?)` declares a foreign-key relation. Use it on fields such as `authorId` or `postId`. The second argument is an object with these options:
+#### `modelRef<TModel>(key)`
 
-- `field` supplies the Zod schema for the stored reference value. If you omit it, Tango creates a default `z.number().int()` field.
-- `column` names the target column when the relation should point at something other than the target model's primary key.
-- `onDelete` and `onUpdate` record referential actions for schema tooling.
-- `name` publishes an explicit forward relation name such as `author`.
-- `relatedName` publishes an explicit reverse relation name such as `posts`.
+Use `modelRef<TModel>(key)` when a relation should keep the runtime decoupling of a string model key while still giving TypeScript the target model type.
 
-`oneToOne(target, config?)` declares a one-to-one relation. Use it when the current model points to exactly one related row and the foreign-key field should also be unique. It accepts the same options as `foreignKey(...)`: `field`, `column`, `onDelete`, `onUpdate`, `name`, and `relatedName`. If you omit `field`, Tango creates a default `z.number().int()` field.
+```ts
+const authorTarget = t.modelRef<typeof UserModel>('blog/User');
+```
 
-`manyToMany(target, config?)` declares many-to-many relation metadata on a field-authored schema declaration. Tango records that relation intent on the [relation graph](/contributors/topics/resolved-relation-graph) and leaves the generated database field list and persisted row contracts unchanged. Its config object supports:
+At runtime, Tango resolves `blog/User` through the model registry. At type-check time, the generic carries `typeof UserModel`, which lets querysets infer hydrated relation shapes from string-key references. A plain string key still works for runtime relation resolution when application code does not need strict hydrated relation typing.
 
-- `field`, which supplies the relation-facing Zod schema. If you omit it, Tango creates a default `z.array(z.number().int())` declaration for the schema surface.
-- `name`, which publishes the forward relation name.
+#### `foreignKey(target, config?)`
 
-Reverse many-to-many naming remains fenced, so only `name` participates in the resolved relation graph for now.
+Use `foreignKey(target, config?)` when the current model stores a reference to one record on another model. A blog post author is the usual example: the post stores a value such as `authorId`, and that value points at the user model.
 
-The object form is the preferred public contract. The older positional schema overloads remain available for compatibility.
+```ts
+const PostSchema = z.object({
+    id: t.primaryKey(z.number().int()),
+    authorId: t.foreignKey(t.modelRef<typeof UserModel>('blog/User'), {
+        field: z.number().int(),
+        name: 'author',
+        relatedName: 'posts',
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE',
+    }),
+});
+```
 
-Unlike `RelationBuilder`, these helpers accept a model key string such as `blog/User`, a direct model object, or a callback that returns a model.
+The config object controls the relation contract:
 
-`foreignKey(...)` and `oneToOne(...)` affect both the database field metadata and the named relation surface. `name` lets the field decorator publish an explicit forward relation name, and `relatedName` lets it publish an explicit reverse relation name without a separate `relations` block.
+- `field` supplies the Zod schema for the stored reference value. If it is omitted, Tango uses `z.number().int()`.
+- `column` names the target model field when the relation should point at something other than the target model's primary key.
+- `onDelete` and `onUpdate` record referential actions for migration and schema tooling.
+- `name` publishes the forward relation name, such as `Post.author`.
+- `relatedName` publishes the reverse relation name, such as `User.posts`.
 
-`manyToMany(...)` records relation intent today and stays out of the generated database field list until join-table support is implemented.
+When Tango turns that model metadata into database schema, the relation is equivalent to a foreign-key constraint from the source field to the target model:
+
+```sql
+ALTER TABLE posts
+ADD CONSTRAINT posts_author_id_fkey
+FOREIGN KEY (authorId) REFERENCES users(id)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
+```
+
+The field key and relation name can be the same when you want Django-style relation access:
+
+```ts
+const PostSchema = z.object({
+    author: t.foreignKey(t.modelRef<typeof UserModel>('blog/User'), {
+        name: 'author',
+        relatedName: 'posts',
+    }),
+});
+```
+
+An unhydrated result exposes `author` as the stored reference value. A queryset that calls `selectRelated('author')` exposes `author` as the hydrated user model or `null`.
+
+#### `oneToOne(target, config?)`
+
+Use `oneToOne(target, config?)` when the current model points at one target record and no other record should point at that same target through this field. A user profile is the common fit: one profile belongs to one user, and one user should have at most one profile.
+
+```ts
+const ProfileSchema = z.object({
+    id: t.primaryKey(z.number().int()),
+    userId: t.oneToOne(t.modelRef<typeof UserModel>('blog/User'), {
+        field: z.number().int(),
+        name: 'user',
+        relatedName: 'profile',
+    }),
+});
+```
+
+`oneToOne(...)` accepts the same config options as `foreignKey(...)`: `field`, `column`, `onDelete`, `onUpdate`, `name`, and `relatedName`. In the ORM layer it creates a single-valued forward relation and a single-valued reverse relation. In the persistence layer, it behaves like a foreign key plus a uniqueness constraint on the source field:
+
+```sql
+ALTER TABLE profiles
+ADD CONSTRAINT profiles_user_id_fkey
+FOREIGN KEY (userId) REFERENCES users(id);
+
+CREATE UNIQUE INDEX profiles_user_id_unique ON profiles(userId);
+```
+
+#### `manyToMany(target, config?)`
+
+Use `manyToMany(target, config?)` when the model contract needs to record many-to-many relation intent on the schema surface. Tango records that relation in the [relation graph](/contributors/topics/resolved-relation-graph) while keeping generated database fields and persisted record contracts unchanged.
+
+```ts
+const PostSchema = z.object({
+    tagIds: t.manyToMany(t.modelRef<typeof TagModel>('blog/Tag'), {
+        field: z.array(z.number().int()),
+        name: 'tags',
+    }),
+});
+```
+
+The config object supports `field` and `name`. `field` supplies the relation-facing Zod schema. If it is omitted, Tango uses `z.array(z.number().int())`. `name` publishes the forward relation name.
+
+A relational database represents many-to-many storage through a join table rather than through one foreign-key field on either endpoint. Until join-table support owns that workflow directly, the usual Tango pattern is to model the join table explicitly with two foreign keys.
+
+`manyToMany(...)` supports the forward `name` option. Reverse many-to-many naming belongs to the future join-table workflow.
+
+The object form is the preferred public relation-decorator contract. The older positional schema overloads remain available for compatibility.
+
+Unlike `RelationBuilder`, relation field helpers accept a plain model key string such as `blog/User`, a typed model reference from `t.modelRef(...)`, a direct model object, or a callback that returns a model.
 
 ## `Meta` and `m`
 
@@ -256,7 +339,7 @@ const PostModel = Model({
 
 ## `Constraints` and `c`
 
-`Constraints`, also exported as `c`, builds table-level constraint definitions. Reach for this surface when the database rule lives at the table level and cannot be expressed as a simple per-field decorator.
+`Constraints`, also exported as `c`, builds table-level constraint definitions. Reach for this surface when the database rule lives at the table level and cannot be expressed as a per-field decorator.
 
 ```ts
 const PostModel = Model({
@@ -280,7 +363,7 @@ const PostModel = Model({
 
 `Indexes`, also exported as `i`, builds explicit table-level index definitions.
 
-`index(on, options?)` declares an index over one or more fields in one place. It fits indexes that belong at the model level rather than as simple field-level `dbIndex(...)` annotations.
+`index(on, options?)` declares an index over one or more fields in one place. It fits indexes that belong at the model level rather than as field-level `dbIndex(...)` annotations.
 
 ```ts
 const PostModel = Model({
@@ -309,7 +392,7 @@ const resolved = registry.resolveRef('blog/Post');
 
 `ModelRegistry.get(namespace, name)` and `ModelRegistry.getByKey(key)` look up models from the shared registry.
 
-`ModelRegistry.resolveRef(ref)` resolves any supported model-reference form against the shared registry. It accepts a model key string such as `blog/Post`, a direct model object, or a callback that returns a model.
+`ModelRegistry.resolveRef(ref)` resolves any supported model-reference form against the shared registry. It accepts a model key string such as `blog/Post`, a typed model reference from `t.modelRef(...)`, a direct model object, or a callback that returns a model.
 
 `ModelRegistry.clear()` clears the shared registry. That is mainly useful in tests.
 

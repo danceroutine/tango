@@ -1,13 +1,13 @@
 import type { DeleteReferentialAction, UpdateReferentialAction } from '../../domain/index';
 import type { ModelRef } from '../decorators/domain/ModelRef';
 
-export const INTERNAL_NORMALIZED_RELATION_ORIGIN = {
+export const InternalNormalizedRelationOrigin = {
     FOREIGN_KEY: 'foreignKey',
     ONE_TO_ONE: 'oneToOne',
     MANY_TO_MANY: 'manyToMany',
 } as const;
 export type NormalizedRelationOrigin =
-    (typeof INTERNAL_NORMALIZED_RELATION_ORIGIN)[keyof typeof INTERNAL_NORMALIZED_RELATION_ORIGIN];
+    (typeof InternalNormalizedRelationOrigin)[keyof typeof InternalNormalizedRelationOrigin];
 
 /**
  * Registry-independent relation descriptor produced immediately after model

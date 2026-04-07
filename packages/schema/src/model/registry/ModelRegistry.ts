@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Field, Model } from '../../domain/index';
 import type { ZodTypeAny } from '../decorators/domain/ZodTypeAny';
-import type { ModelRef } from '../decorators/domain/ModelRef';
+import { isTypedModelRef, type ModelRef } from '../decorators/domain/ModelRef';
 import { inferFieldsFromSchema } from '../fields/inferFieldsFromSchema';
 import { getFieldMetadata } from '../fields/FieldMetadataStore';
 import type { FinalizedStorageArtifacts, FinalizedStorageModel } from '../fields/FinalizedStorageArtifacts';
@@ -148,11 +148,12 @@ export class ModelRegistry {
      * Resolve a string, callback, or direct model reference into a model object.
      */
     resolveRef(ref: ModelRef): Model {
-        if (typeof ref === 'string') {
-            const model = this.getByKey(ref);
+        if (typeof ref === 'string' || isTypedModelRef(ref)) {
+            const key = typeof ref === 'string' ? ref : ref.key;
+            const model = this.getByKey(key);
             if (!model) {
                 throw new Error(
-                    `Unable to resolve model reference '${ref}'. Ensure it is registered in ModelRegistry.`
+                    `Unable to resolve model reference '${key}'. Ensure it is registered in ModelRegistry.`
                 );
             }
             return model;

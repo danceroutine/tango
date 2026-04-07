@@ -21,6 +21,7 @@ describe(ModelRegistry, () => {
         expect(ModelRegistry.get('blog', 'User')).toBe(user);
         expect(ModelRegistry.getByKey('blog/User')).toBe(user);
         expect(ModelRegistry.resolveRef('blog/User')).toBe(user);
+        expect(ModelRegistry.resolveRef(t.modelRef<typeof user>('blog/User'))).toBe(user);
         expect(ModelRegistry.resolveRef(user)).toBe(user);
         expect(ModelRegistry.resolveRef(() => user)).toBe(user);
     });

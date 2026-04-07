@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { Model, ModelRegistry } from '../index';
+import { Model, ModelRegistry, t } from '../index';
+import type { PersistedModelOutput } from '../../domain';
 import { InternalFieldType } from '../../domain/internal/InternalFieldType';
 
 describe(Model, () => {
@@ -284,6 +285,39 @@ describe(Model, () => {
 
         expect(result.hooks?.beforeCreate).toBeTypeOf('function');
         expect('hooks' in result.metadata).toBe(false);
+    });
+
+    it('does not omit opaque persisted fields when filtering many-to-many relation fields from row output', () => {
+        const UserModel = Model({
+            namespace: 'blog',
+            name: 'User',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+        const TagModel = Model({
+            namespace: 'blog',
+            name: 'Tag',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+        const opaqueForeignKey = t.foreignKey(UserModel, { field: z.number().int() }) as ReturnType<typeof JSON.parse>;
+        const schema = z.object({
+            id: t.primaryKey(z.number().int()),
+            authorId: opaqueForeignKey,
+        });
+        const manyToManySchema = z.object({
+            tags: t.manyToMany(TagModel),
+        });
+        type Row = PersistedModelOutput<typeof schema>;
+        type ManyToManyRow = PersistedModelOutput<typeof manyToManySchema>;
+
+        const row = {} as Row;
+        void row.authorId;
+        const manyToManyRow = {} as ManyToManyRow;
+        // @ts-expect-error many-to-many fields are relation storage, not persisted row fields.
+        void manyToManyRow.tags;
     });
 
     it('throws when table is provided as empty string', () => {

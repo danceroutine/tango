@@ -1,19 +1,19 @@
 import { VALIDATED_SQL_IDENTIFIER_BRAND, type ValidatedSqlIdentifier } from './ValidatedSqlIdentifier';
-import { INTERNAL_SQL_IDENTIFIER_ROLE, type SqlIdentifierRole } from './SqlIdentifierRole';
+import { InternalSqlIdentifierRole, type SqlIdentifierRole } from './SqlIdentifierRole';
 
 const SQL_IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 const ROLE_LABELS: Record<SqlIdentifierRole, string> = {
-    [INTERNAL_SQL_IDENTIFIER_ROLE.TABLE]: 'table name',
-    [INTERNAL_SQL_IDENTIFIER_ROLE.COLUMN]: 'column',
-    [INTERNAL_SQL_IDENTIFIER_ROLE.PRIMARY_KEY]: 'primary key',
-    [INTERNAL_SQL_IDENTIFIER_ROLE.INDEX]: 'index',
-    [INTERNAL_SQL_IDENTIFIER_ROLE.ALIAS]: 'alias',
-    [INTERNAL_SQL_IDENTIFIER_ROLE.CONSTRAINT]: 'constraint',
-    [INTERNAL_SQL_IDENTIFIER_ROLE.SCHEMA]: 'schema',
-    [INTERNAL_SQL_IDENTIFIER_ROLE.RELATION_TABLE]: 'relation table',
-    [INTERNAL_SQL_IDENTIFIER_ROLE.RELATION_FOREIGN_KEY]: 'relation foreign key',
-    [INTERNAL_SQL_IDENTIFIER_ROLE.RELATION_TARGET_PRIMARY_KEY]: 'relation target primary key',
+    [InternalSqlIdentifierRole.TABLE]: 'table name',
+    [InternalSqlIdentifierRole.COLUMN]: 'column',
+    [InternalSqlIdentifierRole.PRIMARY_KEY]: 'primary key',
+    [InternalSqlIdentifierRole.INDEX]: 'index',
+    [InternalSqlIdentifierRole.ALIAS]: 'alias',
+    [InternalSqlIdentifierRole.CONSTRAINT]: 'constraint',
+    [InternalSqlIdentifierRole.SCHEMA]: 'schema',
+    [InternalSqlIdentifierRole.RELATION_TABLE]: 'relation table',
+    [InternalSqlIdentifierRole.RELATION_FOREIGN_KEY]: 'relation foreign key',
+    [InternalSqlIdentifierRole.RELATION_TARGET_PRIMARY_KEY]: 'relation target primary key',
 };
 
 /**

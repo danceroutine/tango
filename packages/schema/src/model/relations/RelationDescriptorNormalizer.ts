@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ZodTypeAny } from '../decorators/domain/ZodTypeAny';
-import { INTERNAL_DECORATED_FIELD_KIND } from '../decorators/domain/DecoratedFieldKind';
+import { InternalDecoratedFieldKind } from '../decorators/domain/DecoratedFieldKind';
 import { getFieldMetadata } from '../fields/FieldMetadataStore';
 import type {
     NormalizedRelationOrigin,
@@ -79,7 +79,7 @@ export class RelationDescriptorNormalizer {
             referencedTargetColumn: meta.references.options?.column,
             onDelete: meta.references.options?.onDelete,
             onUpdate: meta.references.options?.onUpdate,
-            unique: meta.unique || meta.relationKind === INTERNAL_DECORATED_FIELD_KIND.ONE_TO_ONE,
+            unique: meta.unique || meta.relationKind === InternalDecoratedFieldKind.ONE_TO_ONE,
             explicitForwardName: meta.forwardName,
             explicitReverseName: meta.reverseName,
             namingHint: this.deriveNamingHint(candidate.sourceSchemaFieldKey),

@@ -1,0 +1,249 @@
+import type { z } from 'zod';
+import type { Model, PersistedModelOutput } from '@danceroutine/tango-schema/domain';
+import type {
+    DecoratedFieldKind,
+    InternalDecoratedFieldKind,
+    RelationDecoratedSchema,
+} from '@danceroutine/tango-schema/model';
+
+export const InternalRelationHydrationCardinality = {
+    SINGLE: 'single',
+    MANY: 'many',
+} as const;
+
+export type RelationHydrationCardinality =
+    (typeof InternalRelationHydrationCardinality)[keyof typeof InternalRelationHydrationCardinality];
+export type SingleRelationHydrationCardinality = typeof InternalRelationHydrationCardinality.SINGLE;
+export type ManyRelationHydrationCardinality = typeof InternalRelationHydrationCardinality.MANY;
+
+export type HydratedQueryResult<TBase extends Record<string, unknown>, THydrated extends Record<string, unknown>> =
+    // No relation hydration requested: keep the base projection exactly as-is.
+    [keyof THydrated] extends [never] ? TBase : Omit<TBase, keyof THydrated> & THydrated;
+
+// A model's own schema is the only source TypeScript can inspect without codegen or an ambient registry.
+// These helpers progressively peel that schema apart into field definitions and persisted row shapes.
+// "AnyModel" is a structural upper bound for model values when the exact schema/key is not important.
+type AnyModel = Model<z.ZodObject<z.ZodRawShape>, string>;
+// If the caller gave us a Tango Model type, infer the Zod schema type stored inside it.
+type ModelSchema<TModel> =
+    TModel extends Model<infer TSchema extends z.ZodObject<z.ZodRawShape>, string> ? TSchema : never;
+// If we have a Zod object schema, infer its raw object shape so we can inspect individual fields.
+type ModelShape<TModel> = ModelSchema<TModel> extends z.ZodObject<infer TShape> ? TShape : never;
+// Convert the inferred model schema back into the persisted row shape applications receive from the ORM.
+type ModelRow<TModel> =
+    TModel extends Model<infer TSchema extends z.ZodObject<z.ZodRawShape>, string>
+        ? PersistedModelOutput<TSchema>
+        : never;
+
+// Relation typing only works when model keys remain literal. Once a model key widens to plain string,
+// TypeScript can no longer prove that one relation target matches another model.
+// This conditional rejects widened strings while accepting literal keys such as "blog/User".
+type IsLiteralString<TValue> = TValue extends string ? (string extends TValue ? false : true) : false;
+// A model has strict relation typing only when its model key is still a literal type.
+type HasStrictModelKey<TModel> =
+    TModel extends Model<z.ZodObject<z.ZodRawShape>, infer TKey> ? IsLiteralString<TKey> : false;
+
+export type HasStrictRelationTyping<TSourceModel> = HasStrictModelKey<TSourceModel>;
+
+// Reverse relation typing compares the literal model key carried by the target field against the source model key.
+type ModelKeysMatch<TCandidate, TExpected> =
+    TCandidate extends Model<z.ZodObject<z.ZodRawShape>, infer TCandidateKey>
+        ? // The candidate relation target is a Tango model. Now check whether the expected source is also a model.
+          TExpected extends Model<z.ZodObject<z.ZodRawShape>, infer TExpectedKey>
+            ? // Both sides must keep literal keys, otherwise a plain string could accidentally match anything.
+              IsLiteralString<TCandidateKey> extends true
+                ? IsLiteralString<TExpectedKey> extends true
+                    ? // Tuple wrapping avoids distributive conditional behavior and compares the keys as whole values.
+                      [TCandidateKey] extends [TExpectedKey]
+                        ? true
+                        : false
+                    : false
+                : false
+            : false
+        : false;
+
+// Keep this in sync with RelationDescriptorNormalizer.deriveNamingHint(...), which currently recognizes
+// camelCase "Id" and snake_case "_id" suffixes but does not treat lowercase "id" as a relation suffix.
+type FieldNamingHint<TKey extends string> = TKey extends `${infer TBase}Id`
+    ? // Convert authorId -> author for relation names when the decorator did not configure name explicitly.
+      TBase
+    : TKey extends `${infer TBase}_id`
+      ? // Convert author_id -> author for snake_case field names.
+        TBase
+      : // Otherwise the field key is already the best available relation-name hint.
+        TKey;
+
+// Prefer an explicitly configured forward relation name. Fall back to the field-name heuristic.
+type RelationName<TKey extends string, TName> = TName extends string ? TName : FieldNamingHint<TKey>;
+// Reverse relations cannot be inferred without an explicit relatedName, so missing names become never.
+type RelatedName<TName> = TName extends string ? TName : never;
+
+// Relation decorators brand their Zod field with type-only metadata. The next group extracts that metadata:
+// relation target, configured forward name, configured reverse name, and relation kind.
+type RelationTarget<TField> =
+    TField extends RelationDecoratedSchema<
+        z.ZodTypeAny,
+        DecoratedFieldKind,
+        infer TTarget,
+        string | undefined,
+        string | undefined
+    >
+        ? // infer TTarget captures the typed model target carried by direct refs, callbacks, or t.modelRef<TModel>(...).
+          TTarget
+        : never;
+
+type RelationConfiguredName<TField> =
+    TField extends RelationDecoratedSchema<z.ZodTypeAny, DecoratedFieldKind, AnyModel, infer TName, string | undefined>
+        ? // infer TName captures config.name when the decorator call used a literal string.
+          TName
+        : undefined;
+
+type RelationConfiguredRelatedName<TField> =
+    TField extends RelationDecoratedSchema<
+        z.ZodTypeAny,
+        DecoratedFieldKind,
+        AnyModel,
+        string | undefined,
+        infer TRelatedName
+    >
+        ? // infer TRelatedName captures config.relatedName when the decorator call used a literal string.
+          TRelatedName
+        : undefined;
+
+type RelationKindOf<TField> =
+    TField extends RelationDecoratedSchema<z.ZodTypeAny, infer TKind, AnyModel, string | undefined, string | undefined>
+        ? // infer TKind tells us whether the field was branded by foreignKey, oneToOne, or manyToMany.
+          TKind
+        : never;
+
+// Forward relations live on the source model's own schema. A foreign key and a one-to-one field are both
+// single-valued from the source model's point of view, so both hydrate through selectRelated(...).
+export type ForwardSingleRelations<TSourceModel> =
+    HasStrictModelKey<TSourceModel> extends true
+        ? // Strict source model: inspect its own schema and emit only fields that are forward single relations.
+          {
+              [TKey in keyof ModelShape<TSourceModel> as TKey extends string
+                  ? // Non-relation fields have no decorator brand and therefore map to never.
+                    [RelationKindOf<ModelShape<TSourceModel>[TKey]>] extends [never]
+                      ? never
+                      : // foreignKey and oneToOne are both single-valued when loaded from the source model.
+                        RelationKindOf<ModelShape<TSourceModel>[TKey]> extends
+                              | typeof InternalDecoratedFieldKind.FOREIGN_KEY
+                              | typeof InternalDecoratedFieldKind.ONE_TO_ONE
+                        ? // The relation must carry a typed model target; plain string refs cannot hydrate a typed result.
+                          RelationTarget<ModelShape<TSourceModel>[TKey]> extends AnyModel
+                            ? // The mapped-type key is the public relation name accepted by selectRelated(...).
+                              RelationName<TKey, RelationConfiguredName<ModelShape<TSourceModel>[TKey]>>
+                            : never
+                        : never
+                  : never]: {
+                  kind: typeof InternalDecoratedFieldKind.FOREIGN_KEY;
+                  target: RelationTarget<ModelShape<TSourceModel>[TKey]>;
+              };
+          }
+        : // Weak source model: allow runtime strings but do not add precise hydrated result properties.
+          Record<string, { kind: typeof InternalDecoratedFieldKind.FOREIGN_KEY; target: AnyModel }>;
+
+// A reverse single relation is only visible when the caller supplies the target model generic. We inspect that
+// target model for a one-to-one field pointing back to the source model and use its relatedName.
+export type ReverseSingleRelations<TSourceModel, TTargetModel> =
+    HasStrictModelKey<TSourceModel> extends true
+        ? // Reverse typing needs both the current source model and the away/target model to keep literal keys.
+          HasStrictModelKey<TTargetModel> extends true
+            ? {
+                  [TKey in keyof ModelShape<TTargetModel> as [RelationKindOf<ModelShape<TTargetModel>[TKey]>] extends [
+                      never,
+                  ]
+                      ? // Ignore ordinary fields on the away model.
+                        never
+                      : // Only oneToOne creates a single-valued reverse relation.
+                        RelationKindOf<
+                              ModelShape<TTargetModel>[TKey]
+                          > extends typeof InternalDecoratedFieldKind.ONE_TO_ONE
+                        ? // The away model's oneToOne target must point back at the current source model.
+                          ModelKeysMatch<RelationTarget<ModelShape<TTargetModel>[TKey]>, TSourceModel> extends true
+                            ? // The reverse call-site key is the away field's configured relatedName.
+                              RelatedName<RelationConfiguredRelatedName<ModelShape<TTargetModel>[TKey]>>
+                            : never
+                        : never]: {
+                      kind: typeof InternalDecoratedFieldKind.ONE_TO_ONE;
+                      target: TTargetModel;
+                  };
+              }
+            : // A widened target model cannot prove reverse relation names.
+              // oxlint-disable-next-line typescript/ban-types, typescript/no-empty-object-type
+              {}
+        : // Weak source model: allow runtime strings but do not add precise hydrated result properties.
+          Record<string, { kind: typeof InternalDecoratedFieldKind.ONE_TO_ONE; target: AnyModel }>;
+
+// A reverse collection relation follows the same target-model inspection path, but only foreign keys produce hasMany.
+export type ReverseCollectionRelations<TSourceModel, TTargetModel> =
+    HasStrictModelKey<TSourceModel> extends true
+        ? // Reverse collection typing also needs both model keys to remain literal.
+          HasStrictModelKey<TTargetModel> extends true
+            ? {
+                  [TKey in keyof ModelShape<TTargetModel> as [RelationKindOf<ModelShape<TTargetModel>[TKey]>] extends [
+                      never,
+                  ]
+                      ? // Ignore ordinary fields on the away model.
+                        never
+                      : // A foreign key on the away model creates a hasMany collection from the source model.
+                        RelationKindOf<
+                              ModelShape<TTargetModel>[TKey]
+                          > extends typeof InternalDecoratedFieldKind.FOREIGN_KEY
+                        ? // The away model's foreign key must point back at the current source model.
+                          ModelKeysMatch<RelationTarget<ModelShape<TTargetModel>[TKey]>, TSourceModel> extends true
+                            ? // The reverse call-site key is the away field's configured relatedName.
+                              RelatedName<RelationConfiguredRelatedName<ModelShape<TTargetModel>[TKey]>>
+                            : never
+                        : never]: {
+                      kind: typeof InternalDecoratedFieldKind.FOREIGN_KEY;
+                      target: TTargetModel;
+                  };
+              }
+            : // A widened target model cannot prove reverse relation names.
+              // oxlint-disable-next-line typescript/ban-types, typescript/no-empty-object-type
+              {}
+        : // Weak source model: allow runtime strings but do not add precise hydrated result properties.
+          Record<string, { kind: typeof InternalDecoratedFieldKind.FOREIGN_KEY; target: AnyModel }>;
+
+export type SelectRelatedRelations<TSourceModel, TTargetModel> = [TTargetModel] extends [undefined]
+    ? // No target generic: selectRelated(...) can only use forward relations from the source schema.
+      ForwardSingleRelations<TSourceModel>
+    : // Target generic supplied: include reverse hasOne relations discovered on that target model.
+      ForwardSingleRelations<TSourceModel> & ReverseSingleRelations<TSourceModel, TTargetModel>;
+
+// prefetchRelated(...) only loads collection relations in this pass, so it only accepts reverse hasMany metadata.
+export type PrefetchRelatedRelations<TSourceModel, TTargetModel> = ReverseCollectionRelations<
+    TSourceModel,
+    TTargetModel
+>;
+
+// QuerySet method parameters need a string union of accepted relation names.
+export type RelationKeys<TRelations> = Extract<keyof TRelations, string>;
+
+// Convert a selected relation-key union into the result object that fetch(...) exposes.
+export type HydratedRelationMap<TRelations, TKeys extends string, TCardinality extends RelationHydrationCardinality> = {
+    [TKey in TKeys]: TKey extends keyof TRelations
+        ? // The relation map value carries the target model; infer that target so we can derive its row type.
+          TRelations[TKey] extends { target: infer TTarget }
+            ? // Single-valued relation hydration returns the target model or null when the join finds no row.
+              TCardinality extends typeof InternalRelationHydrationCardinality.SINGLE
+                ? ModelRow<TTarget> | null
+                : // Collection relation hydration returns zero or more target model rows.
+                  ModelRow<TTarget>[]
+            : never
+        : never;
+};
+
+export type MaybeHydratedRelationMap<
+    TSourceModel,
+    TRelations,
+    TKeys extends string,
+    TCardinality extends RelationHydrationCardinality,
+> =
+    HasStrictModelKey<TSourceModel> extends true
+        ? // Strict source model: materialize the requested hydrated relation properties into the fetched result type.
+          HydratedRelationMap<TRelations, TKeys, TCardinality>
+        : // Weak source model: preserve runtime support, but avoid pretending we know the hydrated result shape.
+          Record<never, never>;

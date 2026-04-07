@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import '@danceroutine/tango-orm/runtime';
 import { Model, t } from '@danceroutine/tango-schema';
+import type { PostModel } from './PostModel';
+import type { UserModel } from './UserModel';
 /**
  * Read schema for comments returned by manager and resource workflows.
  *
@@ -53,13 +55,25 @@ export const CommentModel = Model({
     name: 'Comment',
     schema: CommentReadSchema.extend({
         id: t.primaryKey(z.number().int()),
-        postId: t.foreignKey('blog/Post', {
+        // `t.modelRef(...)` keeps the runtime relation decoupled through the stable model key while preserving TypeScript's target-model type.
+        postId: t.foreignKey(t.modelRef<typeof PostModel>('blog/Post'), {
+            // Stored foreign-key value for this comment's post.
             field: z.number().int(),
+            // Forward relation exposed as Comment.post.
+            name: 'post',
+            // Reverse relation exposed as Post.comments.
+            relatedName: 'comments',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
         }),
-        authorId: t.foreignKey('blog/User', {
+        // `t.modelRef(...)` keeps the runtime relation decoupled through the stable model key while preserving TypeScript's target-model type.
+        authorId: t.foreignKey(t.modelRef<typeof UserModel>('blog/User'), {
+            // Stored foreign-key value for this comment's author.
             field: z.number().int(),
+            // Forward relation exposed as Comment.author.
+            name: 'author',
+            // Reverse relation exposed as User.comments.
+            relatedName: 'comments',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
         }),
