@@ -139,15 +139,20 @@ export class OrmSqlSafetyAdapter implements SQLValidationEngine {
         if (!relation) {
             throw new Error(`Unknown relation '${relationName}' for table '${meta.table}'.`);
         }
+        if (!(relation.targetKey in relation.targetColumns)) {
+            throw new Error(`Unknown relation target key '${relation.targetKey}' for relation '${relationName}'.`);
+        }
 
         const validated = this.engine.validate({
             identifiers: [
                 { key: 'table', role: 'relationTable', value: relation.table },
                 { key: 'alias', role: 'alias', value: relation.alias },
-                { key: 'targetPk', role: 'relationTargetPrimaryKey', value: relation.targetPk },
-                ...(relation.foreignKey
-                    ? [{ key: 'foreignKey', role: 'relationForeignKey' as const, value: relation.foreignKey }]
-                    : []),
+                { key: 'targetKey', role: 'relationTargetPrimaryKey', value: relation.targetKey },
+                ...Object.keys(relation.targetColumns).map<SqlIdentifierRequest>((column) => ({
+                    key: `targetColumn:${column}`,
+                    role: 'column',
+                    value: column,
+                })),
             ],
         });
 
@@ -155,9 +160,14 @@ export class OrmSqlSafetyAdapter implements SQLValidationEngine {
             ...relation,
             table: validated.identifiers.table!.value,
             alias: validated.identifiers.alias!.value,
-            targetPk: validated.identifiers.targetPk!.value,
-            localKey: relation.localKey ? this.resolveColumn(meta, relation.localKey) : undefined,
-            foreignKey: relation.foreignKey ? validated.identifiers.foreignKey!.value : undefined,
+            sourceKey: this.resolveColumn(meta, relation.sourceKey),
+            targetKey: validated.identifiers.targetKey!.value,
+            targetColumns: Object.fromEntries(
+                Object.keys(relation.targetColumns).map((column) => [
+                    validated.identifiers[`targetColumn:${column}`]!.value,
+                    relation.targetColumns[column]!,
+                ])
+            ),
         };
     }
 
@@ -193,10 +203,6 @@ export class OrmSqlSafetyAdapter implements SQLValidationEngine {
         const relation = meta.relations?.[relationName];
         if (!relation) {
             throw new Error(`Unknown relation '${relationName}' for table '${meta.table}'.`);
-        }
-
-        if (relation.kind === 'belongsTo' && !relation.localKey) {
-            throw new Error(`Relation '${relationName}' for table '${meta.table}' requires a local key.`);
         }
 
         return relation;

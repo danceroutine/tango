@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { ModelManager } from '../manager/ModelManager';
-import type { PersistedModelOutput } from '@danceroutine/tango-schema/domain';
+import type { Model, PersistedModelOutput } from '@danceroutine/tango-schema/domain';
 import { registerModelObjects } from '../manager/registerModelObjects';
 
 /**
@@ -8,8 +8,11 @@ import { registerModelObjects } from '../manager/registerModelObjects';
  */
 
 declare global {
-    interface TangoSchemaModelAugmentations<TSchema extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>> {
-        readonly objects: ModelManager<PersistedModelOutput<TSchema>>;
+    interface TangoSchemaModelAugmentations<
+        TSchema extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>,
+        TKey extends string = string,
+    > {
+        readonly objects: ModelManager<PersistedModelOutput<TSchema>, Model<TSchema, TKey>>;
     }
 }
 

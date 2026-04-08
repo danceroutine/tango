@@ -1,4 +1,4 @@
-export const INTERNAL_SQL_IDENTIFIER_ROLE = {
+export const InternalSqlIdentifierRole = {
     TABLE: 'table',
     COLUMN: 'column',
     PRIMARY_KEY: 'primaryKey',
@@ -11,4 +11,4 @@ export const INTERNAL_SQL_IDENTIFIER_ROLE = {
     RELATION_TARGET_PRIMARY_KEY: 'relationTargetPrimaryKey',
 } as const;
 
-export type SqlIdentifierRole = (typeof INTERNAL_SQL_IDENTIFIER_ROLE)[keyof typeof INTERNAL_SQL_IDENTIFIER_ROLE];
+export type SqlIdentifierRole = (typeof InternalSqlIdentifierRole)[keyof typeof InternalSqlIdentifierRole];

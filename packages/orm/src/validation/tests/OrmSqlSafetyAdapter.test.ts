@@ -19,8 +19,9 @@ const sqlSafetyTestMeta: TableMeta = {
         organization: {
             kind: 'belongsTo',
             table: 'organizations',
-            targetPk: 'id',
-            localKey: 'organization_id',
+            sourceKey: 'organization_id',
+            targetKey: 'id',
+            targetColumns: { id: 'text', name: 'text' },
             alias: 'organizations',
         },
     },
@@ -51,8 +52,9 @@ function buildRejectValidationPlan(testCase: SqlInjectionCase) {
                         organization: {
                             kind: 'belongsTo' as const,
                             table: testCase.payload,
-                            targetPk: 'id',
-                            localKey: 'organization_id',
+                            sourceKey: 'organization_id',
+                            targetKey: 'id',
+                            targetColumns: { id: 'text', name: 'text' },
                             alias: 'organizations',
                         },
                     },
@@ -231,7 +233,7 @@ describe(OrmSqlSafetyAdapter, () => {
         ).toThrow(/invalid sql lookup key/i);
     });
 
-    it('rejects belongsTo relations without a validated local key', () => {
+    it('rejects relations without a validated source key', () => {
         expect(() =>
             sqlSafetyAdapter.validate({
                 kind: 'select',
@@ -242,8 +244,9 @@ describe(OrmSqlSafetyAdapter, () => {
                             kind: 'belongsTo',
                             table: 'organizations',
                             alias: 'organizations',
-                            localKey: 'missing_local_key',
-                            targetPk: 'id',
+                            sourceKey: 'missing_local_key',
+                            targetKey: 'id',
+                            targetColumns: { id: 'text' },
                         },
                     },
                 },
@@ -271,7 +274,7 @@ describe(OrmSqlSafetyAdapter, () => {
         ).toThrow(/unknown relation 'missing'/i);
     });
 
-    it('validates optional relation foreign keys when present', () => {
+    it('validates relation target keys when present', () => {
         const result = sqlSafetyAdapter.validate({
             kind: 'select',
             meta: {
@@ -281,15 +284,16 @@ describe(OrmSqlSafetyAdapter, () => {
                         kind: 'hasMany',
                         table: 'memberships',
                         alias: 'memberships',
-                        foreignKey: 'user_id',
-                        targetPk: 'id',
+                        sourceKey: 'id',
+                        targetKey: 'user_id',
+                        targetColumns: { id: 'text', user_id: 'text' },
                     },
                 },
             },
             relationNames: ['memberships'],
         });
 
-        expect(result.relations.memberships!.foreignKey).toBe('user_id');
+        expect(result.relations.memberships!.targetKey).toBe('user_id');
     });
 
     it.each(safeValidationCases)('$id', ({ assert }) => {

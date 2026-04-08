@@ -19,7 +19,7 @@ type FieldLike = {
     primaryKey?: boolean;
 };
 
-type ModelLike<T extends Record<string, unknown>> = {
+type ModelLike<TModelRow extends Record<string, unknown>> = {
     metadata: {
         key?: string;
         name: string;
@@ -27,24 +27,26 @@ type ModelLike<T extends Record<string, unknown>> = {
         fields: FieldLike[];
     };
     schema: {
-        parse(input: unknown): T;
+        parse(input: unknown): TModelRow;
     };
-    hooks?: ModelWriteHooks<T>;
+    hooks?: ModelWriteHooks<TModelRow>;
 };
 
 /**
  * Model-backed data access API exposed as `Model.objects`.
  */
-export class ModelManager<T extends Record<string, unknown>> implements ManagerLike<T> {
+export class ModelManager<TModelRow extends Record<string, unknown>, TSourceModel = unknown>
+    implements ManagerLike<TModelRow, TSourceModel>
+{
     static readonly BRAND = 'tango.orm.model_manager' as const;
     readonly __tangoBrand: typeof ModelManager.BRAND = ModelManager.BRAND;
-    private readonly queryExecutor: QueryExecutor<T>;
+    private readonly queryExecutor: QueryExecutor<TModelRow>;
     private readonly mutationCompiler: MutationCompiler;
-    private readonly model: ModelLike<T>;
+    private readonly model: ModelLike<TModelRow>;
     private readonly client: RuntimeBoundClient;
     private readonly dialect: Dialect;
 
-    constructor(model: ModelLike<T>, runtime: TangoRuntime) {
+    constructor(model: ModelLike<TModelRow>, runtime: TangoRuntime) {
         this.model = model;
         this.client = new RuntimeBoundClient(runtime);
         this.dialect = runtime.getDialect() as Dialect;
@@ -56,7 +58,7 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
             client: this.client,
             dialect: this.dialect,
             run: async (compiled) => {
-                const result = await this.client.query<T>(compiled.sql, compiled.params);
+                const result = await this.client.query<TModelRow>(compiled.sql, compiled.params);
                 return result.rows;
             },
         };
@@ -69,7 +71,7 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
     /**
      * Narrow an unknown value to `ModelManager`.
      */
-    static isModelManager<T extends Record<string, unknown>>(value: unknown): value is ModelManager<T> {
+    static isModelManager<TModelRow extends Record<string, unknown>>(value: unknown): value is ModelManager<TModelRow> {
         return (
             typeof value === 'object' &&
             value !== null &&
@@ -77,7 +79,7 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         );
     }
 
-    private static createTableMeta<T extends Record<string, unknown>>(model: ModelLike<T>): TableMeta {
+    private static createTableMeta<TModelRow extends Record<string, unknown>>(model: ModelLike<TModelRow>): TableMeta {
         const pkField = model.metadata.fields.find((field) => field.primaryKey);
         if (!pkField) {
             throw new Error(`Model '${model.metadata.name}' cannot attach a manager without a primary key field.`);
@@ -93,22 +95,37 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
             const owner = ModelRegistry.getOwner(model as never);
             const relations = owner.getResolvedRelationGraph().byModel.get(model.metadata.key);
             if (relations && relations.size > 0) {
+                // This metadata is recomputed on access today. Most application tables have a small relation set, so
+                // keeping this path direct is acceptable until profiling points to a dedicated manager-meta cache.
                 rawMeta.relations = Object.fromEntries(
                     Array.from(relations.entries())
                         .filter(([, relation]) => relation.kind !== InternalRelationKind.MANY_TO_MANY)
                         .map(([name, relation]) => {
-                            const isForwardReference = relation.kind === InternalRelationKind.BELONGS_TO;
-                            const sourceKey = isForwardReference ? relation.localFieldName : relation.targetFieldName;
-                            const targetKey = isForwardReference ? relation.targetFieldName : relation.localFieldName;
+                            const targetModel = owner.getByKey(relation.targetModelKey)!;
+                            // Query planning needs the target model's SQL-facing shape so joined and prefetched rows can be
+                            // selected, normalized, and attached without leaking internal alias columns.
+                            const targetColumns = Object.fromEntries(
+                                targetModel.metadata.fields.map((field) => [field.name, field.type])
+                            );
+                            // Forward relations join from this table's FK to the target key. Reverse relations flip that:
+                            // this table's primary key matches the target model's FK back to this model.
+                            const sourceKey =
+                                relation.kind === InternalRelationKind.BELONGS_TO
+                                    ? relation.localFieldName
+                                    : relation.targetFieldName;
+                            const targetKey =
+                                relation.kind === InternalRelationKind.BELONGS_TO
+                                    ? relation.targetFieldName
+                                    : relation.localFieldName;
 
                             return [
                                 name,
                                 {
                                     kind: relation.kind as RelationMeta['kind'],
-                                    table: owner.getByKey(relation.targetModelKey)!.metadata.table,
-                                    targetPk: targetKey!,
-                                    localKey: sourceKey,
-                                    foreignKey: relation.localFieldName,
+                                    table: targetModel.metadata.table,
+                                    sourceKey: sourceKey as string,
+                                    targetKey: targetKey as string,
+                                    targetColumns,
                                     alias: relation.alias,
                                 },
                             ];
@@ -130,16 +147,16 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         return validatedMeta;
     }
 
-    query(): QuerySet<T> {
-        return new QuerySetClass<T>(this.queryExecutor, {});
+    query(): QuerySet<TModelRow, TModelRow, TSourceModel> {
+        return new QuerySetClass<TModelRow, TModelRow, TSourceModel>(this.queryExecutor, {});
     }
 
-    async findById(id: T[keyof T]): Promise<T | null> {
-        const filter = { [this.meta.pk]: id } as unknown as FilterInput<T>;
+    async findById(id: TModelRow[keyof TModelRow]): Promise<TModelRow | null> {
+        const filter = { [this.meta.pk]: id } as unknown as FilterInput<TModelRow>;
         return this.query().filter(filter).fetchOne();
     }
 
-    async getOrThrow(id: T[keyof T]): Promise<T> {
+    async getOrThrow(id: TModelRow[keyof TModelRow]): Promise<TModelRow> {
         const result = await this.findById(id);
         if (!result) {
             throw new NotFoundError(`${this.model.metadata.name} with ${this.meta.pk}=${String(id)} not found`);
@@ -147,7 +164,7 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         return result;
     }
 
-    async create(input: Partial<T>): Promise<T> {
+    async create(input: Partial<TModelRow>): Promise<TModelRow> {
         const prepared = await this.runBeforeCreate(input);
         const preparedKeys = Object.keys(prepared);
         if (preparedKeys.length === 0) {
@@ -161,9 +178,9 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         });
         const compiled = this.mutationCompiler.compileInsert(
             validatedPlan,
-            preparedKeys.map((key) => prepared[key as keyof T])
+            preparedKeys.map((key) => prepared[key as keyof TModelRow])
         );
-        const result = await this.queryExecutor.client.query<T>(compiled.sql, compiled.params);
+        const result = await this.queryExecutor.client.query<TModelRow>(compiled.sql, compiled.params);
         const created = result.rows[0]!;
         await this.model.hooks?.afterCreate?.({
             record: created,
@@ -173,7 +190,7 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         return created;
     }
 
-    async update(id: T[keyof T], patch: Partial<T>): Promise<T> {
+    async update(id: TModelRow[keyof TModelRow], patch: Partial<TModelRow>): Promise<TModelRow> {
         const current = await this.getOrThrow(id);
         const prepared = await this.runBeforeUpdate(id, patch, current);
         const preparedKeys = Object.keys(prepared);
@@ -188,10 +205,10 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         });
         const compiled = this.mutationCompiler.compileUpdate(
             validatedPlan,
-            preparedKeys.map((key) => prepared[key as keyof T]),
+            preparedKeys.map((key) => prepared[key as keyof TModelRow]),
             id
         );
-        const result = await this.queryExecutor.client.query<T>(compiled.sql, compiled.params);
+        const result = await this.queryExecutor.client.query<TModelRow>(compiled.sql, compiled.params);
         const updated = result.rows[0]!;
         await this.model.hooks?.afterUpdate?.({
             id,
@@ -204,7 +221,7 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         return updated;
     }
 
-    async delete(id: T[keyof T]): Promise<void> {
+    async delete(id: TModelRow[keyof TModelRow]): Promise<void> {
         const current = await this.getOrThrow(id);
         await this.model.hooks?.beforeDelete?.({
             id,
@@ -226,13 +243,13 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         });
     }
 
-    async bulkCreate(inputs: Partial<T>[]): Promise<T[]> {
+    async bulkCreate(inputs: Partial<TModelRow>[]): Promise<TModelRow[]> {
         if (inputs.length === 0) {
             return [];
         }
 
         const perRowPrepared = await Promise.all(inputs.map((input) => this.runBeforeCreate(input)));
-        const batchPrepared: Partial<T>[] =
+        const batchPrepared: Partial<TModelRow>[] =
             (await this.model.hooks?.beforeBulkCreate?.({
                 rows: perRowPrepared,
                 model: this.model,
@@ -248,9 +265,9 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
             meta: this.meta,
             writeKeys: preparedKeys,
         });
-        const valueRows = batchPrepared.map((input) => preparedKeys.map((key) => input[key as keyof T]));
+        const valueRows = batchPrepared.map((input) => preparedKeys.map((key) => input[key as keyof TModelRow]));
         const compiled = this.mutationCompiler.compileBulkInsert(validatedPlan, valueRows);
-        const result = await this.queryExecutor.client.query<T>(compiled.sql, compiled.params);
+        const result = await this.queryExecutor.client.query<TModelRow>(compiled.sql, compiled.params);
         await Promise.all(
             result.rows.map((record) =>
                 this.model.hooks?.afterCreate?.({
@@ -268,7 +285,7 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         return result.rows;
     }
 
-    private async runBeforeCreate(data: Partial<T>): Promise<Partial<T>> {
+    private async runBeforeCreate(data: Partial<TModelRow>): Promise<Partial<TModelRow>> {
         return (
             (await this.model.hooks?.beforeCreate?.({
                 data,
@@ -278,7 +295,11 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
         );
     }
 
-    private async runBeforeUpdate(id: T[keyof T], patch: Partial<T>, current: T): Promise<Partial<T>> {
+    private async runBeforeUpdate(
+        id: TModelRow[keyof TModelRow],
+        patch: Partial<TModelRow>,
+        current: TModelRow
+    ): Promise<Partial<TModelRow>> {
         return (
             (await this.model.hooks?.beforeUpdate?.({
                 id,

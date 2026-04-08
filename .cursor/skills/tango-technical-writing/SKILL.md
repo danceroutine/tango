@@ -1,6 +1,6 @@
 ---
 name: tango-technical-writing
-description: Use this skill when writing or revising Tango documentation, package READMEs, or public-facing docstrings so the prose stays natural, pedagogical, and audience-aware.
+description: Use this skill when writing or revising Tango documentation, package READMEs, or public-facing docstrings so the prose stays natural, pedagogical, audience-aware, and contract-accurate.
 ---
 
 # Tango Technical Writing
@@ -15,171 +15,600 @@ Use this skill for:
 
 Do not use this skill for contributor-only code changes that do not touch technical prose.
 
-## Workflow
-
-**CRITICAL: STOP AND CREATE A TODO LIST ITEM FOR EACH STEP IN THIS WORKFLOW. FAILURE TO DO THIS DEGRADES PERFORMANCE**
+## Operating Rules
 
 1. State `Executing tango-technical-writing` before doing any other work.
-2. Identify the document type and audience.
-    - End-user docs
-    - Contributor docs
-    - Package README
-    - Docstring
-3. State the thesis of the page in one sentence.
-    - What should the reader be able to do or understand by the end?
-4. Identify the reader's likely questions before drafting.
-    - What is the reader trying to do or understand?
-    - What would they be confused about first?
-    - Which adjacent abstractions are out of scope for this page?
-5. Build a prerequisite roadmap before drafting.
-    - List the concepts or abstractions the page will need.
-    - For each one, ask what the reader must already understand for it to make sense.
-    - Distinguish between the underlying concept and the Tango name for that concept.
-    - Remove nodes that do not serve the page thesis.
-    - Order the remaining nodes from prerequisite to dependent concept.
-    - Keep the roadmap short and drafting-oriented. In most cases, use 3 to 7 nodes, not an exhaustive taxonomy.
-    - Do not polish the roadmap endlessly. If it is good enough to govern first mentions and section order, move on.
-6. For substantial documentation work, expose a roadmap checkpoint to the user before drafting.
-    - This is required for new pages, major rewrites, README overhauls, and major restructuring work.
-    - Share:
-        - the page thesis
-        - the assumed reader knowledge
-        - the ordered roadmap
-        - the major scope cuts
-    - End the checkpoint by saying you will draft from that roadmap unless the user wants to redirect it.
-    - Do not stall waiting for approval unless a risky scope decision or ambiguity genuinely requires it.
-7. Verify behavior against current code or the current public contract.
-8. Draft or rewrite from the reader's task, concept, or contract.
-    - Lead with architectural or conceptual intent before mechanics.
-    - In contributor docs, map that intent to concrete maintainer responsibilities.
-    - Order sections so they answer the reader's likely questions in sequence.
-    - Draft in the order established by the roadmap.
-    - Introduce the concept before introducing the Tango term of art that names it, unless the term is explicitly part of the reader's assumed prior knowledge.
-    - Ground example domains before relying on example nouns such as `Post`, `Comment`, or `User`.
-    - For reference pages, organize the page around individual contracts and methods rather than export inventories.
-    - When a method or contract is important enough to name, give it its own subsection and explain its behavior before or alongside the example.
-    - When examples materially improve understanding, place fenced code blocks inside the relevant subsection instead of collecting them into a generic example dump.
-9. Run a fresh-reader review before polishing the prose.
-    - Read the draft linearly as the target audience.
-    - After each section, ask what question the reader is likely asking at that point.
-    - Mark every place where the reader would need to scan ahead to infer meaning.
-    - Mark every term, example noun, or abstraction that appears before it is grounded.
-    - Mark every place where the page answers a different question than the one the reader is likely asking.
-    - If subagents are available, prefer delegating this pass to a subagent that has not seen the working conversation context.
-    - Give that subagent a concrete persona tied to the audience. Example: `You are a new developer unfamiliar with Tango. Read this draft linearly and report where meaning is unclear, where terms appear before they are explained, where the page answers a question you were not asking yet, and where you had to scan ahead to understand the text.`
-10. Rewrite immediately to remove every issue found in step 9.
-11. Audit the draft for scope drift, non-sequiturs, and poorly grounded examples.
-12. Rewrite immediately to remove every issue found in step 11.
-13. Audit the revised draft for AI-style rhetoric, meta-commentary, defensive framing, and over-terse prose.
-14. Rewrite immediately to remove every issue found in step 13.
-15. Audit the revised draft for audience-mismatched implementation detail.
-    - End-user docs, READMEs, and docstrings should avoid source-location narration and repo-tour language.
-    - Contributor docs may include repository details only when those details are directly useful for maintenance work.
-16. Rewrite immediately to remove every issue found in step 15.
-17. Audit the revised draft for field-dump or type-mirroring prose.
-18. Rewrite immediately to replace every dump with contract-level explanation.
-19. Run the correct persona review.
-20. Rewrite again if the persona review exposes gaps in clarity, pedagogy, or audience fit.
-21. Finalize only after all audits pass. Do not stop after analysis if the next action is a rewrite.
+2. Treat `references/principles.md` and `references/anti-patterns.md` as the style and review source of truth when they are available.
+3. If those reference files are unavailable, continue using the embedded rules in this skill and note reduced certainty.
+4. Optimize first for reader clarity and contract accuracy, then for style polish.
+5. Verify behavior against current code or the current public contract before making claims about behavior, guarantees, names, or responsibilities.
+6. Perform every review pass against the current full draft text, not against memory or a summary of the draft.
+7. When a review pass finds problems, fix them before moving to the next pass.
 
-## Observability Protocol
+## Priority Order
 
-During anti-pattern audits, the agent must announce each audit pass in chat with this exact template before checking:
+When instructions compete, use this order:
 
-`I am now checking for instances of <anti-pattern>.`
+1. Verified code and current public contract
+2. The user’s requested task and scope
+3. Audience fit and reader comprehension
+4. This skill’s required workflow
+5. Default stylistic heuristics
 
-Source of truth for anti-pattern names:
+## Work Modes
 
-- `references/anti-patterns.md`
-- Use the anti-pattern section headings as the `<anti-pattern>` value.
+Choose the lightest mode that fits the task.
 
-Required anti-pattern passes are therefore the anti-pattern sections currently defined in `references/anti-patterns.md`.
+### Quick Mode
 
-For each pass, the agent must:
+Use for:
 
-1. state exactly `I am now checking for instances of <specific pattern>`,
-2. check the draft for that anti-pattern
-3. fix every instance found before continuing to the next pass
+- docstrings
+- small wording fixes
+- local paragraph rewrites
+- short README edits that do not change structure
 
-For substantial documentation work, the agent must also expose a roadmap checkpoint in chat before drafting. Use this exact opening:
+Required work:
+
+- identify document type and audience
+- verify names and behavior
+- draft or revise
+- run the required review passes for the material you changed
+- finalize
+
+Do not expose a roadmap checkpoint in Quick Mode unless the user asks for it.
+
+### Standard Mode
+
+Use for:
+
+- section rewrites
+- moderate README changes
+- moderate how-to or topic-guide edits
+- reference page rewrites that stay within the existing page shape
+
+Required work:
+
+- identify document type and audience
+- state the page thesis
+- build a short prerequisite roadmap
+- verify names and behavior
+- draft or revise
+- run all required review passes
+- finalize
+
+Expose a roadmap checkpoint only when it would materially help the user track a structural rewrite.
+
+### Deep Mode
+
+Use for:
+
+- new pages
+- major rewrites
+- README overhauls
+- major restructuring work
+- reference pages that need structural reorganization
+
+Required work:
+
+- identify document type and audience
+- state the page thesis
+- build a short prerequisite roadmap
+- expose a roadmap checkpoint before drafting
+- verify names and behavior
+- draft or revise
+- run all required review passes
+- finalize
+
+## Workflow
+
+### 1. Identify the document type and audience
+
+Choose the primary document type:
+
+- end-user docs
+- contributor docs
+- package README
+- reference page
+- docstring
+
+State the target reader in practical terms.
+
+Examples:
+
+- application developer integrating a resource
+- contributor maintaining migrations
+- package evaluator on npm
+- developer reading an IDE popup
+
+### 2. State the page thesis
+
+Write one sentence describing what the reader should be able to do or understand by the end.
+
+Examples:
+
+- “By the end of this page, the reader should understand when to use `ModelViewSet` and what contract it expects from application code.”
+- “By the end of this page, the reader should know how to add filtering to a resource and how that public API policy maps into ORM predicates.”
+
+### 3. Build a prerequisite roadmap
+
+Build a short drafting-oriented roadmap. In most cases, use 3 to 7 nodes.
+
+For each node:
+
+- name the concept the reader needs
+- distinguish the underlying concept from the Tango term of art when relevant
+- keep only nodes that directly serve the thesis
+- order them from prerequisite to dependent concept
+- name the primary Tango layer
+- name any planned cross-layer hand-offs
+
+Do not turn the roadmap into a taxonomy exercise. Collapse it once it is good enough to govern first mentions and section order.
+
+### 4. Expose a roadmap checkpoint when required
+
+For Deep Mode, and for other substantial work when structure is changing, expose a checkpoint before drafting.
+
+Use this exact opening:
 
 `Roadmap checkpoint:`
 
-## Required Checks
+Then share:
 
-1. Use the principles in `references/principles.md`.
-2. Use the anti-pattern catalog in `references/anti-patterns.md`.
-3. If the work is substantial, expose the roadmap checkpoint before drafting.
-4. If the roadmap grows into taxonomy work instead of drafting guidance, collapse it and move on.
-5. If a Tango term of art appears before the concept that makes it intelligible, rewrite again.
-6. If a section introduces an abstraction before the roadmap has established its prerequisites, rewrite again.
-7. If the first mention of a term relies on the writer's prior context instead of the reader's available context, rewrite again.
-8. If subagents are available, use them for fresh-reader review when that gives you a cleaner audience simulation.
-9. When you use a subagent for review, do not give it the full working conversation if the goal is to simulate a reader who has not seen it.
-10. If a page about one abstraction starts answering questions about a different abstraction too early, rewrite again.
-11. If an example noun is not semantically grounded before it is used, rewrite again.
-12. If a section order does not match the reader's likely questions, rewrite again.
-13. If a paragraph only makes sense because the writer already knows the surrounding conversation or codebase context, rewrite again.
-14. If the reader would have to scan ahead to infer what a term means, rewrite again.
-15. If the draft still sounds like it is announcing the explanation instead of delivering it, rewrite again.
-16. If end-user docs or README text still sounds like a repo tour instead of framework documentation, rewrite again.
-17. If the draft defines something primarily by what it is not, rewrite it in affirmative terms.
-18. If a sentence uses contrastive `X, not Y` framing, rewrite it as a direct affirmative explanation.
-19. If a sentence tells the reader that something is `simple`, `easy`, `obvious`, or similar, rewrite it to describe the structure directly rather than asserting how difficult it should feel.
-20. If the draft relies on clipped sentences, label-and-colon scaffolding, or other outline-like shorthand where prose would teach better, rewrite it in fuller explanatory sentences.
-21. If prose terminology does not match current exported contract names, rewrite with accurate names.
-22. If the draft uses absolute language, verify that the claim is truly unconditional in the current contract. Rewrite only when capability flags, environment differences, or alternate execution paths make the statement misleading.
-23. If a reference page collapses into a contract dump, the default remediation is a structural rewrite: split the page into contract- or method-level subsections, add fenced examples where they teach behavior, and explain each subsection in application-facing language.
+- the page thesis
+- the assumed reader knowledge
+- the ordered roadmap
+- the major scope cuts
+- the page’s primary Tango layer, if relevant
+- any planned cross-layer hand-offs, if relevant
 
-## Persona Review
+End by saying you will draft from that roadmap unless the user wants to redirect it.
 
-### End-user docs
+Do not stall waiting for approval unless a risky scope decision or real ambiguity requires intervention.
 
-- Does this help an application developer build, configure, or decide?
-- Could a new developer unfamiliar with Tango read this linearly without needing prior conversation context?
-- Does each section answer a question the reader is likely already asking?
-- Does each first mention follow the roadmap order rather than the writer's preferred order?
-- Does the page stay focused on its named subject rather than drifting into adjacent abstractions?
-- Does it avoid repo-tour language?
-- Does it explain when and why to use the abstraction?
-- Are example domains grounded immediately?
-- If subagents are available, has a fresh-reader review been done with a new-developer persona?
+### 5. Verify names, behavior, and contract boundaries
 
-### Contributor docs
+Before drafting claims about behavior, verify:
 
-- Does it support maintenance work directly?
-- Could a contributor unfamiliar with this subsystem follow the page without scanning ahead to infer basic terms?
-- Does the page establish the conceptual role of each subsystem before naming contributor-facing contracts or files?
-- Are repository details present only because they help maintainers do the job?
-- Is the page precise enough to guide implementation or review work?
-- Does it use current contract names consistently with the code?
-- Does it connect architectural intent to concrete maintainer responsibilities?
+- public contract names
+- exported names when exact naming matters
+- layer ownership
+- guarantees and constraints
+- whether a statement is universal or capability-dependent
 
-### Package READMEs
+If code access is unavailable, treat the current public docs and visible contract as provisional sources of truth and keep claims appropriately scoped.
 
-- Does it work as an NPM front page?
-- Does it explain what the package is, why it exists, and how to start?
-- Does the opening introduce the job the package solves before introducing package-local terms of art?
-- Does it stay focused on the package boundary instead of adjacent packages?
-- Does it funnel clearly to the official docs?
-- Could a reader who has never used Tango understand the opening section without outside context?
+### 6. Draft from the reader’s job
 
-### Reference pages
+Write from the reader’s task, concept, or contract.
 
-- Does the page describe the public contract instead of dumping exports or type signatures?
-- Does each major contract or method have its own subsection when readers need separate behavioral guidance?
-- Do fenced examples sit next to the subsection they teach rather than appearing as a detached example dump?
-- Does the prose explain when application code uses the contract, what it supplies, and what behavior it should expect?
-- Does the page avoid telling the reader that something is simple or obvious instead of describing the structure directly?
+Use these defaults:
 
-### Docstrings
+- lead with architectural or conceptual intent before mechanics
+- order sections around the reader’s likely questions
+- introduce the concept before the Tango term of art unless the term is already assumed knowledge
+- ground example domains before using example nouns such as `Post`, `Comment`, or `User`
+- surround commands and code with orienting prose so the reader knows why the snippet matters
+- keep one page about one task, concept, or contract
+- prefer public behavior over implementation detail
+- prefer explanation over emphasis
+- prefer affirmative framing over defensive framing
+- prefer explicit reasoning over abstract significance markers
 
-- Is it short enough for an IDE popup?
-- Does it explain behavior and intended use without restating types?
-- Is it durable against likely implementation churn?
-- Would it still make sense to a developer who has not read the surrounding file yet?
+### 7. Apply Tango layer language discipline
 
-## References
+Treat Tango’s default vertical architecture as:
 
-- `references/principles.md`
-- `references/anti-patterns.md`
+1. Host Framework
+2. Adapter Layer
+3. Resource Layer
+4. ORM Layer
+5. Persistence Layer
+
+Use the page’s primary layer to choose nouns and verbs.
+
+When prose needs another layer’s vocabulary:
+
+- add a hand-off before using it
+- name the current layer’s concept
+- explain why the next layer is now relevant
+- then introduce the target layer’s term
+
+For cross-layer workflows such as migrations, OpenAPI generation, CLI scaffolding, and testing:
+
+- name the workflow first
+- name the layers it crosses
+- only then mix vocabulary from those layers
+
+Qualify shared verbs such as `filter`, `validate`, `dispatch`, `register`, `execute`, and `hydrate` so the owning layer is clear.
+
+### 8. Organize by document type
+
+#### End-user docs
+
+Optimize for:
+
+- usage
+- concepts
+- workflows
+- public contracts
+- decisions an application developer needs to make
+
+Avoid:
+
+- source-location narration
+- package barrel explanations
+- repository-tour language
+- implementation-tour narration that does not help the reader build or decide
+
+#### Contributor docs
+
+Optimize for:
+
+- architectural intent mapped to concrete maintainer responsibilities
+- maintenance workflow
+- release workflow
+- implementation constraints
+- repository details only when they reduce maintainer ambiguity
+
+#### Package READMEs
+
+Treat each README as:
+
+- an npm landing page
+- a mini-documentation page
+- a funnel into the official docs
+
+The opening should explain what the package is and why its boundary exists in the same section.
+
+#### Reference pages
+
+Organize around contracts and behaviors, not export inventories.
+
+When a contract or method is important enough to name, give it its own subsection and explain:
+
+- when application code uses it
+- what application code supplies
+- what behavior the reader should expect
+
+Put fenced examples next to the subsection they teach rather than collecting them into a detached example dump.
+
+#### Docstrings
+
+Keep docstrings short enough for IDE popups.
+
+Explain:
+
+- behavior
+- intended use
+- relevant boundaries when needed
+
+Do not restate types unless the type alone would leave the behavior unclear.
+
+## Required Review Pipeline
+
+Run these passes in order against the current full draft text.
+
+### Pass 1: Structural Verification
+
+Check that the draft still matches:
+
+- the page thesis
+- the ordered roadmap
+- the intended audience
+- the chosen document type
+- the page’s primary Tango layer, if relevant
+
+If any major section violates the roadmap or answers a different question too early, fix structure before continuing.
+
+### Pass 2: Anti-Pattern Review
+
+Use the anti-pattern section headings from `references/anti-patterns.md` when available.
+
+During anti-pattern review, announce each pass in chat with this exact template before checking:
+
+`I am now checking for instances of <anti-pattern>.`
+
+For each anti-pattern pass:
+
+1. inspect the current full draft text
+2. enumerate candidate sentences or paragraphs that may match the pattern
+3. classify each candidate as:
+    - valid
+    - violation
+    - ambiguous
+
+4. rewrite every violation and ambiguous case before continuing
+5. do not mark the pass complete unless all candidates for that pass have been enumerated
+
+If a pass finds no candidates, state that no candidates were found.
+
+Do not use “I checked” as a substitute for findings.
+
+#### Detection rule
+
+When a pattern is surface-detectable, enumerate candidates explicitly.
+
+Examples of surface-detectable patterns include:
+
+- negative-opening sentences
+- contrast formulas such as `It’s not X, it’s Y`
+- contrastive comma clauses such as `X, not Y`
+- defensive framing
+- meta-intros
+- label-and-colon scaffolding
+- universal or absolute language
+- field dumps and type dumps
+
+When a pattern is semantic, produce a concrete defect report rather than a yes-no judgment.
+
+Examples of semantic patterns include:
+
+- scope drift
+- sequencing failures
+- reader-experience breaks
+- layer vocabulary bleed
+- contract-name drift when code verification is required to confirm it
+
+### Pass 3: Mandatory Surface Checks
+
+Run these extraction-based checks even if the broader anti-pattern pass seemed clean.
+
+#### Contrastive Framing Pass
+
+Inspect the current full draft sentence by sentence.
+
+Quote every sentence containing any of:
+
+- `not`
+- `rather than`
+- `instead of`
+- `unlike`
+- `as opposed to`
+- `isn't`
+- `aren't`
+- `doesn't`
+- `don't`
+- `can't`
+
+For each quoted sentence, classify it as:
+
+- required literal negation for technical correctness
+- contrastive teaching rhetoric
+- ambiguous
+
+Rewrite every sentence in the last two categories into affirmative prose.
+
+Do not claim this pass is complete unless every candidate sentence has been enumerated.
+
+If zero candidates are found, state:
+
+`Contrastive framing candidates found: 0`
+
+#### Meta-Intro and Scaffolding Pass
+
+Quote every sentence that resembles:
+
+- `This page...`
+- `This guide...`
+- `This section...`
+- `The official docs live here:`
+- similar explanation-announcing scaffolding
+
+Rewrite each case into direct explanation unless the phrase is required for navigational clarity.
+
+#### Absolute Language Pass
+
+Quote every sentence containing any of:
+
+- `always`
+- `never`
+- `all`
+- `only`
+- `every`
+- `none`
+- `without any additional consideration`
+- other universal language that may overstate the contract
+
+For each candidate:
+
+- verify whether the claim is truly unconditional
+- narrow the claim if constraints exist
+- retain absolute language only when the verified contract is unconditional
+
+#### Repo-Tour and Maintainer Leakage Pass
+
+Quote every sentence that references:
+
+- file paths
+- package paths
+- barrels or exports as navigation
+- repository structure
+- “authoritative source” language
+- source locations
+
+For end-user docs, READMEs, and docstrings, rewrite those sentences into role language unless the location is directly necessary for the reader’s task.
+
+### Pass 4: Reader Persona Defect Report
+
+Read the current draft linearly as the target audience.
+
+Do not answer this pass with general approval. Produce defects.
+
+At minimum, report:
+
+1. the first sentence where meaning becomes unclear, if any
+2. the first term of art that appears before grounding, if any
+3. the first place where the reader would need to scan ahead, if any
+4. the first section that answers a different question than the reader is likely asking, if any
+5. one place where detail level mismatches the audience, if any
+
+Fix every reported defect before continuing.
+
+If subagents or equivalent independent-review tooling are available and useful, use them for this pass. Do not provide them the whole working conversation when the goal is to simulate a fresh reader.
+
+If such tooling is unavailable, perform the persona reread yourself.
+
+### Pass 5: Adversarial Verification
+
+If independent-review tooling is available and policy permits using it, use it for this pass. Otherwise, perform the adversarial review yourself.
+
+Try to produce up to 5 concrete failure claims. Do not invent a claim if the draft does not support one.
+
+Examples:
+
+- a term appears before the concept that makes it intelligible
+- a paragraph uses another layer’s vocabulary without a hand-off
+- a section drifts into an adjacent abstraction too early
+- a sentence overstates a guarantee
+- a contract name may not match the public API
+- a code block appears before the reader knows why it matters
+
+For each claim, either:
+
+- fix the draft, or
+- rebut the claim using quoted draft text plus verified contract evidence
+
+Finalize only after all listed claims are resolved.
+
+## Required Anti-Pattern Coverage
+
+When `references/anti-patterns.md` is available, run a pass for each of its section headings.
+
+The required anti-pattern names are currently:
+
+- AI-Style Rhetoric
+- Maintainer Leakage in End-User Docs
+- Scope Drift and Sequencing Failures
+- Reader-Experience Breaks
+- Layer Vocabulary Bleed
+- Contract-Name Drift
+- Overstated Guarantees
+- Field Dumps and Type Dumps
+
+Use those section headings as the `<anti-pattern>` value in the observability template.
+
+## Evidence Requirements
+
+A review pass is not complete unless it produces evidence.
+
+Valid evidence includes:
+
+- quoted candidate sentences or paragraphs
+- explicit classifications
+- rewrites
+- defect reports tied to specific draft text
+- contract verification tied to exact claims
+
+Invalid evidence includes:
+
+- “looks good”
+- “checked”
+- “all clear” without candidate enumeration where enumeration is required
+- summary judgments that do not identify the text being judged
+
+## Completion Rule
+
+Finalize when all of the following are true:
+
+1. the draft matches verified code or the current public contract
+2. the opening states or strongly implies what the page helps the reader do or understand
+3. major terms appear in prerequisite order
+4. section order follows the reader’s likely questions
+5. cross-layer vocabulary is either absent or introduced with a hand-off
+6. examples are grounded before they are used
+7. no unresolved material defects remain from the review passes
+8. the draft no longer relies on meta-intros, defensive framing, rhetorical contrast formulas, or dump-style prose where direct explanation would teach better
+
+Do not continue polishing once these conditions are met unless the user requests deeper refinement.
+
+## Principles Summary
+
+Use the principles in `references/principles.md`.
+
+The most important defaults are:
+
+- start from the concept, task, or contract itself
+- write for the reader’s job, not the author’s familiarity with the repo
+- build a prerequisite roadmap before drafting
+- order sections around the reader’s likely questions
+- keep one page about one task, concept, or contract
+- prefer public behavior over implementation detail
+- prefer explanation over rhetorical emphasis
+- prefer affirmative framing over defensive framing
+- prefer explicit reasoning over abstract importance markers
+- prefer connected explanatory prose over clipped outline syntax when the material is not inherently list-shaped
+- ground example domains before relying on example nouns
+- use current exported contract names consistently
+- scope guarantees to supported behavior and capability constraints when relevant
+- documentation should be timeless and describe how things are now
+
+## Default Rewrite Direction
+
+When a sentence or section feels wrong, move it in this direction:
+
+- from meta-commentary to direct explanation
+- from repository detail to public contract in end-user docs, READMEs, and docstrings
+- from slogan-like emphasis to explicit reasoning
+- from defensive negation to affirmative role language
+- from outline-like scaffolding to continuous explanatory prose
+- from field dump to role and behavior
+- from maintainer voice to reader-task voice
+
+## Minimal Examples of Good Transformations
+
+### Meta-intro to direct explanation
+
+Before:
+
+`This page explains how filtering works.`
+
+After:
+
+`Filtering lets a resource expose a stable query interface without passing arbitrary query strings into the ORM.`
+
+### Negative contrast to affirmative role language
+
+Before:
+
+`It is not an HTTP framework. Tango lives inside Express or Next.js.`
+
+After:
+
+`Tango provides the application-facing layers while Express or Next.js continues to own routing and request lifecycle behavior.`
+
+### Contrastive comma clause to direct explanation
+
+Before:
+
+`These are contract surfaces, not incidental constants.`
+
+After:
+
+`These are contract surfaces and should be treated as deliberate, reviewable parts of Tango's public behavior.`
+
+### Maintainer leakage to role language
+
+Before:
+
+`The class is implemented in packages/resources/src/viewset/ModelViewSet.ts.`
+
+After:
+
+`ModelViewSet is the abstract base class for manager-backed CRUD resources.`
+
+### Field dump to contract explanation
+
+Before:
+
+`Config fields: manager, readSchema, writeSchema, updateSchema, filters, orderingFields, searchFields.`
+
+After:
+
+`Application code supplies the manager and the schemas that define the resource contract. Optional filtering, ordering, and search settings refine the public API.`
+
+## Final Reminder
+
+This skill exists to produce documentation that teaches clearly and survives contact with a fresh reader.
+
+Do not confuse visible process with verified quality. The required process is there to force evidence-backed checking, not to replace judgment.

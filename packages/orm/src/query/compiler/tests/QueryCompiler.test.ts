@@ -3,6 +3,7 @@ import { QueryCompiler } from '../QueryCompiler';
 import { Q } from '../..';
 import type { QNode } from '../../domain/QNode';
 import type { TableMeta } from '../../domain/TableMeta';
+import type { CompiledPrefetchHydration } from '../../domain/CompiledQuery';
 import {
     sqlInjectionRejectCases,
     sqlInjectionValueCases,
@@ -63,8 +64,9 @@ function buildRejectQueryState(testCase: SqlInjectionCase): {
                         organization: {
                             kind: 'belongsTo',
                             table: testCase.payload,
-                            targetPk: 'id',
-                            localKey: 'organization_id',
+                            sourceKey: 'organization_id',
+                            targetKey: 'id',
+                            targetColumns: { id: 'int' },
                             alias: 'organizations',
                         },
                     },
@@ -407,15 +409,17 @@ describe(QueryCompiler, () => {
                         kind: 'belongsTo',
                         table: 'organizations',
                         alias: 'org',
-                        localKey: 'organization_id',
-                        targetPk: 'id',
+                        sourceKey: 'organization_id',
+                        targetKey: 'id',
+                        targetColumns: { id: 'int', name: 'text' },
                     },
                     posts: {
                         kind: 'hasMany',
                         table: 'posts',
                         alias: 'posts',
-                        localKey: 'id',
-                        targetPk: 'author_id',
+                        sourceKey: 'id',
+                        targetKey: 'author_id',
+                        targetColumns: { id: 'int', author_id: 'int' },
                     },
                 },
             },
@@ -425,17 +429,114 @@ describe(QueryCompiler, () => {
         const result = compiler.compile<UserModel>({
             q: Q.and<UserModel>({ email: 'test@example.com' }, { age__gte: 18 }),
             excludes: [{ kind: 'atom', where: { name__contains: 'spam' } }],
-            selectRelated: ['organization', 'posts', 'missing'],
+            selectRelated: ['organization'],
             select: ['id'],
             order: [{ by: 'id', dir: 'desc' }],
         });
 
         expect(result.sql).toContain(
-            'SELECT users.id FROM users LEFT JOIN organizations org ON org.id = users.organization_id'
+            'SELECT users.id, org.id AS __tango_hydrate_org_id, org.name AS __tango_hydrate_org_name FROM users LEFT JOIN organizations org ON org.id = users.organization_id'
         );
         expect(result.sql).toContain('WHERE');
         expect(result.sql).toContain('NOT');
         expect(result.params).toEqual(['test@example.com', 18, '%spam%']);
+    });
+
+    it('rejects relation names used with the wrong eager-loading method', () => {
+        const compiler = new QueryCompiler(
+            {
+                ...mockMeta,
+                relations: {
+                    posts: {
+                        kind: 'hasMany',
+                        table: 'posts',
+                        alias: 'posts',
+                        sourceKey: 'id',
+                        targetKey: 'author_id',
+                        targetColumns: { id: 'int', author_id: 'int' },
+                    },
+                    organization: {
+                        kind: 'belongsTo',
+                        table: 'organizations',
+                        alias: 'org',
+                        sourceKey: 'organization_id',
+                        targetKey: 'id',
+                        targetColumns: { id: 'int' },
+                    },
+                },
+            },
+            'postgres'
+        );
+
+        expect(() => compiler.compile({ selectRelated: ['posts'] })).toThrow(/selectRelated/);
+        expect(() => compiler.compile({ prefetchRelated: ['organization'] })).toThrow(/prefetchRelated/);
+    });
+
+    it('compiles validated prefetch follow-up queries', () => {
+        const compiler = new QueryCompiler(
+            {
+                ...mockMeta,
+                relations: {
+                    posts: {
+                        kind: 'hasMany',
+                        table: 'posts',
+                        alias: 'posts',
+                        sourceKey: 'id',
+                        targetKey: 'author_id',
+                        targetColumns: { id: 'int', author_id: 'int', title: 'text' },
+                    },
+                },
+            },
+            'postgres'
+        );
+        const prefetch: CompiledPrefetchHydration = {
+            relationName: 'posts',
+            sourceKey: 'id',
+            table: 'posts',
+            targetKey: 'author_id',
+            targetColumns: { id: 'int', author_id: 'int', title: 'text' },
+        };
+
+        const result = compiler.compilePrefetch(prefetch, [1, 2]);
+
+        expect(result).toEqual({
+            sql: 'SELECT id, author_id, title FROM posts WHERE author_id IN ($1, $2) ORDER BY author_id ASC',
+            params: [1, 2],
+            targetKey: 'author_id',
+            targetColumns: { id: 'int', author_id: 'int', title: 'text' },
+        });
+    });
+
+    it('rejects prefetch follow-up queries when compiled metadata no longer matches validated relation metadata', () => {
+        const compiler = new QueryCompiler(
+            {
+                ...mockMeta,
+                relations: {
+                    posts: {
+                        kind: 'hasMany',
+                        table: 'posts',
+                        alias: 'posts',
+                        sourceKey: 'id',
+                        targetKey: 'author_id',
+                        targetColumns: { id: 'int', author_id: 'int' },
+                    },
+                },
+            },
+            'sqlite'
+        );
+
+        expect(() =>
+            compiler.compilePrefetch(
+                {
+                    relationName: 'posts',
+                    sourceKey: 'id',
+                    table: 'posts; DROP TABLE users;',
+                    targetKey: 'author_id',
+                    targetColumns: { id: 'int', author_id: 'int' },
+                },
+                [1]
+            )
+        ).toThrow(/failed validation/i);
     });
 
     it('ignores empty excludes that produce no SQL', () => {
@@ -559,8 +660,9 @@ describe(QueryCompiler, () => {
                         kind: 'belongsTo',
                         table: 'organizations',
                         alias: 'org',
-                        localKey: 'missing_column',
-                        targetPk: 'id',
+                        sourceKey: 'missing_column',
+                        targetKey: 'id',
+                        targetColumns: { id: 'int' },
                     },
                 },
             },
@@ -570,7 +672,7 @@ describe(QueryCompiler, () => {
         expect(() => compiler.compile({ selectRelated: ['organization'] })).toThrow(/unknown column/i);
     });
 
-    it('rejects belongsTo relations without a local key', () => {
+    it('rejects belongsTo relations whose target key is not a known target column', () => {
         const compiler = new QueryCompiler(
             {
                 ...mockMeta,
@@ -579,14 +681,41 @@ describe(QueryCompiler, () => {
                         kind: 'belongsTo',
                         table: 'organizations',
                         alias: 'org',
-                        targetPk: 'id',
+                        sourceKey: 'organization_id',
+                        targetKey: 'missing',
+                        targetColumns: { id: 'int' },
                     },
                 },
             },
             'postgres'
         );
 
-        expect(() => compiler.compile({ selectRelated: ['organization'] })).toThrow(/requires a local key/i);
+        expect(() => compiler.compile({ selectRelated: ['organization'] })).toThrow(/unknown relation target key/i);
+    });
+
+    it('rejects internal hydration aliases that collide with model fields', () => {
+        const compiler = new QueryCompiler(
+            {
+                ...mockMeta,
+                columns: {
+                    ...mockMeta.columns,
+                    __tango_hydrate_org_id: 'text',
+                },
+                relations: {
+                    organization: {
+                        kind: 'belongsTo',
+                        table: 'organizations',
+                        alias: 'org',
+                        sourceKey: 'organization_id',
+                        targetKey: 'id',
+                        targetColumns: { id: 'int' },
+                    },
+                },
+            },
+            'postgres'
+        );
+
+        expect(() => compiler.compile({ selectRelated: ['organization'] })).toThrow(/internal query alias/i);
     });
 
     describe('PostgreSQL', () => {

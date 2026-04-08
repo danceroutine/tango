@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import '@danceroutine/tango-orm/runtime';
 import { Model, t } from '@danceroutine/tango-schema';
+import type { UserModel } from './UserModel';
 /**
  * Read schema for posts returned by manager and resource workflows.
  *
@@ -58,8 +59,14 @@ export const PostModel = Model({
     name: 'Post',
     schema: PostReadSchema.extend({
         id: t.primaryKey(z.number().int()),
-        authorId: t.foreignKey('blog/User', {
+        // `t.modelRef(...)` keeps the runtime relation decoupled through the stable model key while preserving TypeScript's target-model type.
+        authorId: t.foreignKey(t.modelRef<typeof UserModel>('blog/User'), {
+            // Stored foreign-key value for this post.
             field: z.number().int(),
+            // Forward relation exposed as Post.author.
+            name: 'author',
+            // Reverse relation exposed as User.posts.
+            relatedName: 'posts',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
         }),

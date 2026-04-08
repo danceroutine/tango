@@ -24,10 +24,12 @@ export function aQuerySet<TModel extends Record<string, unknown>, TResult extend
         TResult
     >['select'];
     const selectImpl = overrides.select ?? defaultSelect;
-    const selectRelatedImpl: QuerySet<TModel, TResult>['selectRelated'] =
-        overrides.selectRelated ?? ((..._rels) => queryset);
-    const prefetchRelatedImpl: QuerySet<TModel, TResult>['prefetchRelated'] =
-        overrides.prefetchRelated ?? ((..._rels) => queryset);
+    const selectRelatedImpl =
+        (overrides.selectRelated as ((...rels: readonly string[]) => QuerySet<TModel, TResult>) | undefined) ??
+        ((..._rels: readonly string[]) => queryset);
+    const prefetchRelatedImpl =
+        (overrides.prefetchRelated as ((...rels: readonly string[]) => QuerySet<TModel, TResult>) | undefined) ??
+        ((..._rels: readonly string[]) => queryset);
     const fetchImpl: QuerySet<TModel, TResult>['fetch'] =
         overrides.fetch ??
         (async <Out = TResult>(_shape?: ((r: TResult) => Out) | { parse: (r: TResult) => Out }) => aQueryResult<Out>());
@@ -51,12 +53,13 @@ export function aQuerySet<TModel extends Record<string, unknown>, TResult extend
     queryset.select = vi.fn((cols: Parameters<QuerySet<TModel, TResult>['select']>[0]) =>
         selectImpl(cols)
     ) as unknown as QuerySet<TModel, TResult>['select'];
-    queryset.selectRelated = vi.fn((...rels: Parameters<QuerySet<TModel, TResult>['selectRelated']>) =>
-        selectRelatedImpl(...rels)
-    ) as QuerySet<TModel, TResult>['selectRelated'];
-    queryset.prefetchRelated = vi.fn((...rels: Parameters<QuerySet<TModel, TResult>['prefetchRelated']>) =>
+    queryset.selectRelated = vi.fn((...rels: readonly string[]) => selectRelatedImpl(...rels)) as unknown as QuerySet<
+        TModel,
+        TResult
+    >['selectRelated'];
+    queryset.prefetchRelated = vi.fn((...rels: readonly string[]) =>
         prefetchRelatedImpl(...rels)
-    ) as QuerySet<TModel, TResult>['prefetchRelated'];
+    ) as unknown as QuerySet<TModel, TResult>['prefetchRelated'];
     queryset.fetch = vi.fn(fetchImpl) as unknown as QuerySet<TModel, TResult>['fetch'];
     queryset.fetchOne = vi.fn(fetchOneImpl) as unknown as QuerySet<TModel, TResult>['fetchOne'];
     queryset.count = vi.fn(() => countImpl()) as QuerySet<TModel, TResult>['count'];

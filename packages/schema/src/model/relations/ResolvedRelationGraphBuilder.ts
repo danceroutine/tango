@@ -5,10 +5,10 @@ import type { NormalizedRelationStorageDescriptor } from './NormalizedRelationSt
 import type { ResolvedRelationDescriptor, ResolvedRelationGraph } from './ResolvedRelationGraph';
 import {
     type RelationCardinality,
-    INTERNAL_RELATION_CARDINALITY,
-    INTERNAL_RELATION_PUBLIC_KIND,
-    INTERNAL_RELATION_PROVENANCE,
-    INTERNAL_RELATION_STORAGE_STRATEGY,
+    InternalRelationCardinality,
+    InternalRelationPublicKind,
+    InternalRelationProvenance,
+    InternalRelationStorageStrategy,
 } from './RelationSpec';
 import { pluralize, toSnakeCase } from './SchemaNaming';
 
@@ -88,11 +88,11 @@ export class ResolvedRelationGraphBuilder {
                     sourceModelKey: model.metadata.key,
                     targetModelKey: targetModel.metadata.key,
                     name: relationName,
-                    kind: INTERNAL_RELATION_PUBLIC_KIND.MANY_TO_MANY,
-                    storageStrategy: INTERNAL_RELATION_STORAGE_STRATEGY.MANY_TO_MANY,
-                    cardinality: INTERNAL_RELATION_CARDINALITY.MANY,
+                    kind: InternalRelationPublicKind.MANY_TO_MANY,
+                    storageStrategy: InternalRelationStorageStrategy.MANY_TO_MANY,
+                    cardinality: InternalRelationCardinality.MANY,
                     capabilities: MANY_TO_MANY_CAPABILITIES,
-                    provenance: INTERNAL_RELATION_PROVENANCE.FIELD_DECORATOR,
+                    provenance: InternalRelationProvenance.FIELD_DECORATOR,
                     alias: `${toSnakeCase(model.metadata.name)}_${relationName}`,
                 });
                 continue;
@@ -121,13 +121,13 @@ export class ResolvedRelationGraphBuilder {
             targetModelKey: targetModel.metadata.key,
             name: forwardName,
             inverseEdgeId: `${descriptor.edgeId}:inverse`,
-            kind: INTERNAL_RELATION_PUBLIC_KIND.BELONGS_TO,
-            storageStrategy: INTERNAL_RELATION_STORAGE_STRATEGY.REFERENCE,
-            cardinality: INTERNAL_RELATION_CARDINALITY.SINGLE,
+            kind: InternalRelationPublicKind.BELONGS_TO,
+            storageStrategy: InternalRelationStorageStrategy.REFERENCE,
+            cardinality: InternalRelationCardinality.SINGLE,
             localFieldName: descriptor.dbColumnName,
             targetFieldName: descriptor.referencedTargetColumn ?? targetPrimaryKey,
             capabilities: REFERENCE_CAPABILITIES,
-            provenance: INTERNAL_RELATION_PROVENANCE.FIELD_DECORATOR,
+            provenance: InternalRelationProvenance.FIELD_DECORATOR,
             alias: `${toSnakeCase(targetModel.metadata.name)}_${forwardName}`,
         });
 
@@ -137,11 +137,11 @@ export class ResolvedRelationGraphBuilder {
         }
 
         const reverseKind = descriptor.unique
-            ? INTERNAL_RELATION_PUBLIC_KIND.HAS_ONE
-            : INTERNAL_RELATION_PUBLIC_KIND.HAS_MANY;
+            ? InternalRelationPublicKind.HAS_ONE
+            : InternalRelationPublicKind.HAS_MANY;
         const reverseCardinality = descriptor.unique
-            ? INTERNAL_RELATION_CARDINALITY.SINGLE
-            : INTERNAL_RELATION_CARDINALITY.MANY;
+            ? InternalRelationCardinality.SINGLE
+            : InternalRelationCardinality.MANY;
         const reverseName =
             reverseOverride?.[0] ??
             descriptor.explicitReverseName ??
@@ -153,14 +153,14 @@ export class ResolvedRelationGraphBuilder {
             name: reverseName,
             inverseEdgeId: descriptor.edgeId,
             kind: reverseKind,
-            storageStrategy: INTERNAL_RELATION_STORAGE_STRATEGY.REVERSE_REFERENCE,
+            storageStrategy: InternalRelationStorageStrategy.REVERSE_REFERENCE,
             cardinality: reverseCardinality,
             localFieldName: descriptor.dbColumnName,
             targetFieldName: descriptor.referencedTargetColumn ?? targetPrimaryKey,
             capabilities: REFERENCE_CAPABILITIES,
             provenance: reverseOverride
-                ? INTERNAL_RELATION_PROVENANCE.RELATIONS_API
-                : INTERNAL_RELATION_PROVENANCE.SYNTHESIZED_REVERSE,
+                ? InternalRelationProvenance.RELATIONS_API
+                : InternalRelationProvenance.SYNTHESIZED_REVERSE,
             alias: `${toSnakeCase(sourceModel.metadata.name)}_${reverseName}`,
         });
     }
@@ -174,7 +174,7 @@ export class ResolvedRelationGraphBuilder {
         return Object.entries(explicitRelations).find(([, relation]) => {
             const relationTargetKey = this.resolveRelationTargetKey(sourceModel, relation.target);
             return (
-                relation.type === INTERNAL_RELATION_PUBLIC_KIND.BELONGS_TO &&
+                relation.type === InternalRelationPublicKind.BELONGS_TO &&
                 relationTargetKey === targetModel.metadata.key &&
                 relation.foreignKey === descriptor.sourceSchemaFieldKey
             );
@@ -188,8 +188,8 @@ export class ResolvedRelationGraphBuilder {
     ): [string, RelationDef] | undefined {
         const reverseModelRelations = InternalSchemaModel.getExplicitRelations(targetModel) ?? {};
         const reverseKind = descriptor.unique
-            ? INTERNAL_RELATION_PUBLIC_KIND.HAS_ONE
-            : INTERNAL_RELATION_PUBLIC_KIND.HAS_MANY;
+            ? InternalRelationPublicKind.HAS_ONE
+            : InternalRelationPublicKind.HAS_MANY;
         return Object.entries(reverseModelRelations).find(([, relation]) => {
             const relationTargetKey = this.resolveRelationTargetKey(targetModel, relation.target);
             return (
@@ -257,6 +257,6 @@ export class ResolvedRelationGraphBuilder {
         }
 
         const snake = toSnakeCase(sourceModel.metadata.name);
-        return cardinality === INTERNAL_RELATION_CARDINALITY.MANY ? pluralize(snake) : snake;
+        return cardinality === InternalRelationCardinality.MANY ? pluralize(snake) : snake;
     }
 }

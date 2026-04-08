@@ -5,7 +5,7 @@ import { getFieldMetadata } from './FieldMetadataStore';
 import type { ZodTypeAny } from '../decorators/domain/ZodTypeAny';
 import type { ModelRef } from '../decorators/domain/ModelRef';
 import type { TangoFieldMeta } from '../decorators/domain/TangoFieldMeta';
-import { INTERNAL_DECORATED_FIELD_KIND } from '../decorators/domain/DecoratedFieldKind';
+import { InternalDecoratedFieldKind } from '../decorators/domain/DecoratedFieldKind';
 import { ModelRegistry } from '../registry/ModelRegistry';
 import {
     isDate,
@@ -113,7 +113,7 @@ function inferField(
 
     // Many-to-many declarations stay on the relation side of the seam. They do
     // not correspond to a stored column on the current table.
-    if (meta.relationKind === INTERNAL_DECORATED_FIELD_KIND.MANY_TO_MANY) {
+    if (meta.relationKind === InternalDecoratedFieldKind.MANY_TO_MANY) {
         return null;
     }
 

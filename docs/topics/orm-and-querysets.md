@@ -2,7 +2,7 @@
 
 Once you have defined your models, Tango gives you a database access API that lets application code create, retrieve, update, and delete stored records. This topic explains how that API works through `Model.objects` and `QuerySet`.
 
-Throughout this page, assume a blog application with models such as `PostModel` and `UserModel`. The examples focus on blog posts because they make it easy to talk about common query patterns such as "published posts," "posts by this author," and "the newest posts first."
+The examples use a blog application with models such as `PostModel` and `UserModel`. Blog posts make the common query patterns concrete: published posts, posts by one author, and the newest posts first.
 
 ## `Model.objects`
 
@@ -60,7 +60,7 @@ A `QuerySet` represents a database query before it is executed.
 
 Sometimes that query means "all posts." Sometimes it means "all published posts from this author, ordered by creation date." Sometimes it means "one post with this identifier, if it exists." In each case, the query can keep being refined before Tango asks the database to return rows.
 
-The simplest queryset begins with `query()`:
+A queryset begins with `query()`:
 
 ```ts
 const allPosts = PostModel.objects.query();
@@ -201,18 +201,45 @@ This keeps the query definition and the final application-facing shape close tog
 
 Relations declared in the model layer also influence queryset behavior.
 
-`selectRelated(...)` tells the ORM which declared relations should participate in SQL join planning. `prefetchRelated(...)` registers relation names for prefetch behavior where the active adapter supports it.
+Use `selectRelated(...)` when each fetched model record should include one related model. In the blog example, each `PostModel` has one author, so the queryset can attach the hydrated `author` model to each post result.
+
+When Tango prepares the database query for that ORM request, it uses a SQL join between the post table and the author table.
 
 ```ts
-const posts = await PostModel.objects
-    .query()
-    .filter({ published: true })
-    .selectRelated('author')
-    .prefetchRelated('comments')
-    .fetch();
+const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author').fetch();
+
+posts.results[0].author?.email;
 ```
 
-These methods control how related data should be fetched. They build on relation metadata that already exists in the model contract.
+`selectRelated(...)` is for single-valued relations such as `belongsTo` and `hasOne`. A missing related row is returned as `null`.
+
+In contrast, use `prefetchRelated(...)` when each fetched model record should include a collection relation such as `hasMany`. In the sample models for this article, the reverse side of `Post.author` is `User.posts`, which is declared on `PostModel`, so the call site supplies the target model generic to keep the reverse relation type-safe:
+
+```ts
+const users = await UserModel.objects.query().prefetchRelated<typeof PostModel>('posts').fetch();
+
+users.results[0].posts.map((post) => post.title);
+```
+
+In the example above, a user record with no matching posts receives `posts: []`.
+
+Hydrated relation properties stay attached even when the selected model fields change:
+
+```ts
+const postCards = await PostModel.objects
+    .query()
+    .selectRelated('author')
+    .select(['id', 'title'] as const)
+    .fetch();
+
+postCards.results[0].author?.email;
+```
+
+The selected `PostModel` fields in that example are `id` and `title`, while the hydrated `author` model remains available.
+
+::: info
+Relation hydration covers direct relations and returns full related models. Many-to-many hydration and nested traversal such as `author__profile` are separate future capabilities.
+:::
 
 ## Updating and deleting records
 

@@ -9,10 +9,10 @@ import type {
 
 export type ValidatedRelationMeta = RelationMeta & {
     table: string;
-    targetPk: string;
     alias: string;
-    localKey?: string;
-    foreignKey?: string;
+    sourceKey: string;
+    targetKey: string;
+    targetColumns: Record<string, string>;
 };
 
 export type ValidatedTableMeta = {

@@ -168,6 +168,17 @@ export default defineConfig({
                     ],
                 },
                 {
+                    text: 'Contributor ADRs',
+                    collapsed: true,
+                    items: [
+                        { text: 'ADR overview', link: '/contributors/adr/' },
+                        {
+                            text: '2026-04-06 Relation target typing without codegen',
+                            link: '/contributors/adr/relation-target-typing-without-codegen',
+                        },
+                    ],
+                },
+                {
                     text: 'Contributor how-to',
                     collapsed: true,
                     items: [

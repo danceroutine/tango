@@ -21,7 +21,9 @@ type AugmentableSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>> = {
     hooks?: SchemaModel<TSchema>['hooks'];
 };
 
-function defineObjectsProperty<TSchema extends z.ZodObject<z.ZodRawShape>>(model: SchemaModel<TSchema>): void {
+function defineObjectsProperty<TSchema extends z.ZodObject<z.ZodRawShape>, TKey extends string>(
+    model: SchemaModel<TSchema, TKey>
+): void {
     Object.defineProperty(model, 'objects', {
         configurable: true,
         enumerable: true,
@@ -32,7 +34,7 @@ function defineObjectsProperty<TSchema extends z.ZodObject<z.ZodRawShape>>(model
                 return cached.manager;
             }
 
-            const manager = new ModelManager<PersistedModelOutput<TSchema>>(
+            const manager = new ModelManager<PersistedModelOutput<TSchema>, SchemaModel<TSchema, TKey>>(
                 model as unknown as AugmentableSchemaModel<TSchema>,
                 runtime
             );

@@ -18,14 +18,18 @@ import { deriveTableName } from '../relations/SchemaNaming';
 type AnySchemaModel = Model<z.ZodObject<z.ZodRawShape>>;
 type AnyInternalSchemaModel = InternalSchemaModel<z.ZodObject<z.ZodRawShape>>;
 
-export class InternalSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>> implements Model<TSchema> {
+export class InternalSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>, TKey extends string = string>
+    implements Model<TSchema, TKey>
+{
     static readonly BRAND = 'tango.schema.internal_schema_model' as const;
 
     readonly __tangoBrand: typeof InternalSchemaModel.BRAND = InternalSchemaModel.BRAND;
     readonly metadata: ModelMetadata;
     readonly schema: TSchema;
     readonly hooks?: ModelWriteHooks<PersistedModelOutput<TSchema>>;
-    declare readonly objects: ModelAugmentations<TSchema> extends { readonly objects: infer TObject } ? TObject : never;
+    declare readonly objects: ModelAugmentations<TSchema, TKey> extends { readonly objects: infer TObject }
+        ? TObject
+        : never;
 
     private readonly registry: ModelRegistry;
     private readonly normalizedRelations: readonly NormalizedRelationStorageDescriptor[];

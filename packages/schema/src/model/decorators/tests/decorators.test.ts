@@ -93,6 +93,35 @@ describe('model decorators', () => {
         );
     });
 
+    it('supports typed model references in foreign keys', () => {
+        const userModel = Model({
+            namespace: 'blog',
+            name: 'User',
+            table: 'users',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+
+        const commentModel = Model({
+            namespace: 'blog',
+            name: 'Comment',
+            table: 'comments',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                authorId: t.foreignKey(t.modelRef<typeof userModel>('blog/User'), {
+                    field: z.number().int(),
+                }),
+            }),
+        });
+        // @ts-expect-error typed model refs must use the target model's literal key.
+        void t.modelRef<typeof userModel>('blog/Post');
+
+        expect(commentModel.metadata.fields.find((field) => field.name === 'authorId')?.references?.table).toBe(
+            'users'
+        );
+    });
+
     it("falls back to 'id' when target model has no explicit primary key field", () => {
         const target = Model({
             namespace: 'blog',

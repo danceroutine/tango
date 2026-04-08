@@ -11,6 +11,7 @@ Start with [Contributor setup](/contributors/setup). It explains how to get a lo
 If you are new to Tango's internals, these pages are a good next stop after setup:
 
 - [Contributor topics](/contributors/topics/)
+- [Architecture decisions](/contributors/adr/)
 - [Contributor how-to guides](/contributors/how-to/)
 
 ## Work on Tango
@@ -23,6 +24,7 @@ Code contributions include runtime behavior, public APIs, examples, tooling, tes
 
 - [Contributing code](/contributors/contributing-code)
 - [Contributor topics](/contributors/topics/)
+- [Architecture decisions](/contributors/adr/)
 - [Contributor how-to guides](/contributors/how-to/)
 - [Releasing packages](/contributors/releasing)
 
@@ -38,5 +40,6 @@ Documentation work includes the Tango documentation site, package READMEs, contr
 Some contributor pages are most useful once you already know the area you are changing and need architectural context or a procedure you can follow step by step.
 
 - [Contributor topics](/contributors/topics/)
+- [Architecture decisions](/contributors/adr/)
 - [Contributor how-to guides](/contributors/how-to/)
 - [Releasing packages](/contributors/releasing)

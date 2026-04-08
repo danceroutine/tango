@@ -1,34 +1,34 @@
 // Keep these as plain string literals rather than TS enums so the runtime
 // values stay identical across package boundaries without enum emit semantics.
-export const INTERNAL_RELATION_PUBLIC_KIND = {
+export const InternalRelationPublicKind = {
     BELONGS_TO: 'belongsTo',
     HAS_ONE: 'hasOne',
     HAS_MANY: 'hasMany',
     MANY_TO_MANY: 'manyToMany',
 } as const;
 
-export const INTERNAL_RELATION_STORAGE_STRATEGY = {
+export const InternalRelationStorageStrategy = {
     REFERENCE: 'reference',
     REVERSE_REFERENCE: 'reverse_reference',
     MANY_TO_MANY: 'many_to_many',
 } as const;
 
-export const INTERNAL_RELATION_CARDINALITY = {
+export const InternalRelationCardinality = {
     SINGLE: 'single',
     MANY: 'many',
 } as const;
 
-export const INTERNAL_RELATION_PROVENANCE = {
+export const InternalRelationProvenance = {
     FIELD_DECORATOR: 'field-decorator',
     RELATIONS_API: 'relations-api',
     SYNTHESIZED_REVERSE: 'synthesized-reverse',
 } as const;
 
-export type RelationPublicKind = (typeof INTERNAL_RELATION_PUBLIC_KIND)[keyof typeof INTERNAL_RELATION_PUBLIC_KIND];
+export type RelationPublicKind = (typeof InternalRelationPublicKind)[keyof typeof InternalRelationPublicKind];
 export type RelationStorageStrategy =
-    (typeof INTERNAL_RELATION_STORAGE_STRATEGY)[keyof typeof INTERNAL_RELATION_STORAGE_STRATEGY];
-export type RelationCardinality = (typeof INTERNAL_RELATION_CARDINALITY)[keyof typeof INTERNAL_RELATION_CARDINALITY];
-export type RelationProvenance = (typeof INTERNAL_RELATION_PROVENANCE)[keyof typeof INTERNAL_RELATION_PROVENANCE];
+    (typeof InternalRelationStorageStrategy)[keyof typeof InternalRelationStorageStrategy];
+export type RelationCardinality = (typeof InternalRelationCardinality)[keyof typeof InternalRelationCardinality];
+export type RelationProvenance = (typeof InternalRelationProvenance)[keyof typeof InternalRelationProvenance];
 
 /**
  * Author-time relation intent after target resolution but before full graph
