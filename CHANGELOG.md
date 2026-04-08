@@ -2,6 +2,14 @@
 
 This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
 
+## 1.3.0 - 2026-04-08
+
+- Add typed relation hydration for Tango querysets.
+
+Querysets can now hydrate direct single-valued relations with `selectRelated(...)` and reverse collection relations with `prefetchRelated(...)`. Relation hydration is typed from field-authored relation metadata, with `t.modelRef<TModel>(...)` providing a typed string-reference path for projects that want runtime model-key decoupling without losing TypeScript result typing.
+
+This also moves relation-aware query planning through the SQL validation layer, adds compiler-owned prefetch SQL generation, and updates ORM result typing so selected model fields and hydrated relation properties compose correctly. Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-resources`, `@danceroutine/tango-codegen`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`, `@danceroutine/tango-cli`.
+
 ## 1.2.0 - 2026-04-08
 
 - Add decorator-owned relation resolution and field metadata APIs.
