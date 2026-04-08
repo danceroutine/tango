@@ -1,8 +1,15 @@
-import type { RelationDef } from '../domain/index';
-import { InternalRelationType } from '../domain/internal/InternalRelationType';
+import type { RelationDef } from '../../domain/index';
+import { InternalRelationType } from '../../domain/internal/InternalRelationType';
 
 /**
- * Fluent helper for declaring model relation metadata.
+ * Public authoring DSL for model-level named relations.
+ *
+ * This is the first stage of the relations subdomain. Application code uses it
+ * inside `relations: (r) => ({ ... })` to declare stable relation names and
+ * resolve ambiguity that field decorators alone cannot express.
+ *
+ * Later internal stages normalize these authored definitions and combine them
+ * with field-authored relation metadata to build the resolved relation graph.
  */
 export class RelationBuilder {
     /** Declare a one-to-many relation from this model to `target`. */

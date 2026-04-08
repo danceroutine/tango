@@ -58,13 +58,14 @@ export const PostModel = Model({
     name: 'Post',
     schema: PostReadSchema.extend({
         id: t.primaryKey(z.number().int()),
-        authorId: t.foreignKey('blog/User', z.number().int(), {
+        authorId: t.foreignKey('blog/User', {
+            field: z.number().int(),
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
         }),
-        published: t.default(z.coerce.boolean(), 'false'),
-        createdAt: t.default(z.string(), { now: true }),
-        updatedAt: t.default(z.string(), { now: true }),
+        published: t.field(z.coerce.boolean()).defaultValue('false').build(),
+        createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
+        updatedAt: t.field(z.string()).defaultValue({ now: true }).build(),
     }),
     hooks: {
         async beforeUpdate({ patch }) {

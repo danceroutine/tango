@@ -38,7 +38,7 @@ describe('t decorator helpers', () => {
             table: 'users',
             schema: z.object({
                 id: t.primaryKey(z.number().int()),
-                profileId: t.oneToOne(profile, z.number().int()),
+                profileId: t.oneToOne(profile, { field: z.number().int() }),
                 tags: t.manyToMany('decorators/Profile'),
             }),
         });
@@ -47,7 +47,7 @@ describe('t decorator helpers', () => {
         expect(user.metadata.fields.find((f) => f.name === 'profileId')?.references?.table).toBe('profiles');
         expect(user.schema.safeParse({ id: 1, profileId: 2, tags: [1, 2] }).success).toBe(true);
 
-        const explicitMany = t.manyToMany('decorators/Profile', z.array(z.number().int()));
+        const explicitMany = t.manyToMany('decorators/Profile', { field: z.array(z.number().int()) });
         expect(explicitMany.safeParse([1, 2, 3]).success).toBe(true);
     });
 
@@ -67,6 +67,34 @@ describe('t decorator helpers', () => {
 
         const parsed = schema.parse({ score: 1 });
         expect(parsed.score).toBe(1);
+    });
+
+    it('chains scalar field metadata through the field builder', () => {
+        const schema = z.object({
+            score: t
+                .field(z.number())
+                .defaultValue('0')
+                .dbDefault('0')
+                .dbColumn('score_value')
+                .dbIndex()
+                .choices([0, 1, 2])
+                .validators((value) => value)
+                .helpText('Score between 0 and 2')
+                .errorMessages({ invalid_type: 'Score must be numeric' })
+                .build(),
+        });
+
+        const model = Model({
+            namespace: 'decorators',
+            name: 'ScalarConfig',
+            table: 'scalar_configs',
+            schema,
+        });
+
+        expect(model.metadata.fields.find((field) => field.name === 'score_value')).toMatchObject({
+            name: 'score_value',
+            default: '0',
+        });
     });
 
     it('supports shorthand foreignKey and oneToOne forms', () => {

@@ -34,9 +34,9 @@ export const TodoModel = Model({
     schema: TodoReadSchema.extend({
         id: t.primaryKey(z.number().int()),
         title: z.string().min(1),
-        completed: t.default(z.coerce.boolean(), 'false'),
-        createdAt: t.default(z.string(), { now: true }),
-        updatedAt: t.default(z.string(), { now: true }),
+        completed: t.field(z.coerce.boolean()).defaultValue('false').build(),
+        createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
+        updatedAt: t.field(z.string()).defaultValue({ now: true }).build(),
     }),
 });
 `;

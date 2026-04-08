@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { Model } from '../index';
+import { Model, ModelRegistry } from '../index';
 import { InternalFieldType } from '../../domain/internal/InternalFieldType';
 
 describe(Model, () => {
+    beforeEach(() => {
+        ModelRegistry.clear();
+    });
+
     it('creates model with explicit fields', () => {
         const schema = z.object({
             id: z.number().int(),

@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { inferFieldsFromSchema } from '../inferFields';
-import { t } from '../index';
-import { isDate, isZodArray, isZodObject } from '../../domain/internal/zod/index';
+import { inferFieldsFromSchema } from '../inferFieldsFromSchema';
+import { Model, ModelRegistry, t } from '../../index';
+import { isDate, isZodArray, isZodObject } from '../../../domain/internal/zod/index';
 
 describe(inferFieldsFromSchema, () => {
+    beforeEach(() => {
+        ModelRegistry.clear();
+    });
+
     it('maps object and array fields to jsonb columns', () => {
         const fields = inferFieldsFromSchema(
             z.object({
@@ -89,6 +93,94 @@ describe(inferFieldsFromSchema, () => {
                 type: 'timestamptz',
                 notNull: true,
                 default: { now: true },
+            },
+        ]);
+    });
+
+    it('resolves foreign key targets through the registry when no explicit resolver is provided', () => {
+        const UserModel = Model({
+            namespace: 'blog',
+            name: 'User',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+
+        const fields = inferFieldsFromSchema(
+            z.object({
+                authorId: t.foreignKey(UserModel, { field: z.number().int() }),
+            })
+        );
+
+        expect(fields).toEqual([
+            {
+                name: 'authorId',
+                type: 'int',
+                notNull: true,
+                default: undefined,
+                references: {
+                    table: 'users',
+                    column: 'id',
+                    onDelete: undefined,
+                    onUpdate: undefined,
+                },
+            },
+        ]);
+    });
+
+    it('skips many-to-many declarations during storage field inference', () => {
+        const TagModel = Model({
+            namespace: 'blog',
+            name: 'Tag',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+
+        const fields = inferFieldsFromSchema(
+            z.object({
+                id: t.primaryKey(z.number().int()),
+                tags: t.manyToMany(TagModel),
+            })
+        );
+
+        expect(fields).toEqual([
+            {
+                name: 'id',
+                type: 'int',
+                notNull: true,
+                default: undefined,
+                primaryKey: true,
+            },
+        ]);
+    });
+
+    it('falls back to id when a referenced target model does not expose a primary key field', () => {
+        const LegacyUserModel = Model({
+            namespace: 'blog',
+            name: 'LegacyUser',
+            fields: [{ name: 'legacy_user_id', type: 'int' }],
+            schema: z.object({}),
+        });
+
+        const fields = inferFieldsFromSchema(
+            z.object({
+                authorId: t.foreignKey(LegacyUserModel, { field: z.number().int() }),
+            })
+        );
+
+        expect(fields).toEqual([
+            {
+                name: 'authorId',
+                type: 'int',
+                notNull: true,
+                default: undefined,
+                references: {
+                    table: 'legacy_users',
+                    column: 'id',
+                    onDelete: undefined,
+                    onUpdate: undefined,
+                },
             },
         ]);
     });

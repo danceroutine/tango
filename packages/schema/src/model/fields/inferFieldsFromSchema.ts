@@ -1,9 +1,12 @@
 import { z } from 'zod';
-import type { Field, FieldType } from '../domain/index';
-import { InternalFieldType } from '../domain/internal/InternalFieldType';
-import { getFieldMetadata } from './internal/FieldMetadataStore';
-import type { TangoFieldMeta, ZodTypeAny } from './decorators/types';
-import { ModelRegistry } from './registry/ModelRegistry';
+import type { Field, FieldType } from '../../domain/index';
+import { InternalFieldType } from '../../domain/internal/InternalFieldType';
+import { getFieldMetadata } from './FieldMetadataStore';
+import type { ZodTypeAny } from '../decorators/domain/ZodTypeAny';
+import type { ModelRef } from '../decorators/domain/ModelRef';
+import type { TangoFieldMeta } from '../decorators/domain/TangoFieldMeta';
+import { INTERNAL_DECORATED_FIELD_KIND } from '../decorators/domain/DecoratedFieldKind';
+import { ModelRegistry } from '../registry/ModelRegistry';
 import {
     isDate,
     isZodArray,
@@ -15,17 +18,25 @@ import {
     isZodObject,
     isZodOptional,
     isZodString,
-} from '../domain/internal/zod/index';
+} from '../../domain/internal/zod/index';
 
 export type InferFieldsOptions = {
     registry?: ModelRegistry;
+    resolveReferenceTarget?: (target: ModelRef) => { table: string; pk: string };
 };
 
+/**
+ * Infer one storage field from a Zod schema member plus any Tango decorator metadata.
+ *
+ * The registry and optional target resolver are used only when the field carries
+ * reference metadata that must be translated into concrete table/primary-key names.
+ */
 function inferField(
     name: string,
     zodType: z.ZodType,
     meta: TangoFieldMeta | undefined,
-    registry: ModelRegistry
+    registry: ModelRegistry,
+    resolveReferenceTarget?: (target: ModelRef) => { table: string; pk: string }
 ): Field | null {
     let type: FieldType;
     let notNull = true;
@@ -100,22 +111,41 @@ function inferField(
         field.unique = true;
     }
 
-    if (meta.references && meta.relationKind !== 'manyToMany') {
-        const targetModel = registry.resolveRef(meta.references.target);
-        const referencedColumn =
-            meta.references.options?.column ??
-            targetModel.metadata.fields.find((candidate) => candidate.primaryKey)?.name ??
-            'id';
+    // Many-to-many declarations stay on the relation side of the seam. They do
+    // not correspond to a stored column on the current table.
+    if (meta.relationKind === INTERNAL_DECORATED_FIELD_KIND.MANY_TO_MANY) {
+        return null;
+    }
+
+    if (meta.references) {
+        const targetMetadata = resolveReferenceTarget
+            ? resolveReferenceTarget(meta.references.target)
+            : resolveReferenceTargetFromRegistry(meta.references.target, registry, meta.references.options?.column);
 
         field.references = {
-            table: targetModel.metadata.table,
-            column: referencedColumn,
+            table: targetMetadata.table,
+            column: meta.references.options?.column ?? targetMetadata.pk,
             onDelete: meta.references.options?.onDelete,
             onUpdate: meta.references.options?.onUpdate,
         };
     }
 
     return field;
+}
+
+function resolveReferenceTargetFromRegistry(
+    target: ModelRef,
+    registry: ModelRegistry,
+    explicitColumn?: string
+): { table: string; pk: string } {
+    const targetModel = registry.resolveRef(target);
+    const primaryKey =
+        explicitColumn ?? targetModel.metadata.fields.find((candidate) => candidate.primaryKey)?.name ?? 'id';
+
+    return {
+        table: targetModel.metadata.table,
+        pk: primaryKey,
+    };
 }
 
 /**
@@ -127,7 +157,13 @@ export function inferFieldsFromSchema(schema: z.ZodObject<z.ZodRawShape>, option
     const fields: Field[] = [];
 
     for (const [name, zodType] of Object.entries(shape)) {
-        const field = inferField(name, zodType as z.ZodType, getFieldMetadata(zodType as ZodTypeAny), registry);
+        const field = inferField(
+            name,
+            zodType as z.ZodType,
+            getFieldMetadata(zodType as ZodTypeAny),
+            registry,
+            options?.resolveReferenceTarget
+        );
         if (field) {
             fields.push(field);
         }

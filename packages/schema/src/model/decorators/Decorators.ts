@@ -1,6 +1,17 @@
+import { getLogger } from '@danceroutine/tango-core';
 import { z } from 'zod';
-import { setFieldMetadata } from '../internal/FieldMetadataStore';
-import type { ModelRef, ReferentialOptions, TangoFieldMeta, ZodTypeAny } from './types';
+import { setFieldMetadata } from '../fields/FieldMetadataStore';
+import type { ZodTypeAny } from './domain/ZodTypeAny';
+import type { ModelRef } from './domain/ModelRef';
+import type { ReferentialOptions, TangoFieldMeta } from './domain/TangoFieldMeta';
+import type {
+    ForeignKeyDecoratorConfig,
+    ManyToManyDecoratorConfig,
+    OneToOneDecoratorConfig,
+} from './domain/RelationDecoratorConfig';
+import type { RelationDecoratedSchema } from './domain/RelationDecoratedSchema';
+import { INTERNAL_DECORATED_FIELD_KIND } from './domain/DecoratedFieldKind';
+import type { DecoratedFieldKind } from './domain/DecoratedFieldKind';
 
 function isZodType(value: unknown): value is ZodTypeAny {
     return (
@@ -14,6 +25,19 @@ function isZodType(value: unknown): value is ZodTypeAny {
 function decorate<T extends ZodTypeAny>(schema: T, meta: TangoFieldMeta): T {
     setFieldMetadata(schema, meta);
     return schema;
+}
+
+const warnedDecoratorKinds = new Set<DecoratedFieldKind>();
+
+function warnDeprecatedSchemaOverload(kind: DecoratedFieldKind, replacement: string): void {
+    if (warnedDecoratorKinds.has(kind)) {
+        return;
+    }
+
+    warnedDecoratorKinds.add(kind);
+    getLogger('tango.schema.decorators').warn(
+        `Deprecated positional schema overload used for t.${kind}(...). Prefer ${replacement} instead.`
+    );
 }
 
 function maybeDecorator<T extends ZodTypeAny>(
@@ -51,14 +75,17 @@ function notNull<T extends ZodTypeAny>(schema?: T): T | ((input: T) => T) {
     return maybeDecorator(schema, { notNull: true });
 }
 
+function defaultValue<T extends ZodTypeAny>(schema: T, value: string | { now: true } | null): T;
 function defaultValue<T extends ZodTypeAny>(schema: T, value: string | { now: true } | null): T {
     return decorate(schema, { default: value });
 }
 
+function dbDefault<T extends ZodTypeAny>(schema: T, value: string): T;
 function dbDefault<T extends ZodTypeAny>(schema: T, value: string): T {
     return decorate(schema, { dbDefault: value });
 }
 
+function dbColumn<T extends ZodTypeAny>(schema: T, name: string): T;
 function dbColumn<T extends ZodTypeAny>(schema: T, name: string): T {
     return decorate(schema, { dbColumn: name });
 }
@@ -67,99 +94,258 @@ function dbIndex<T extends ZodTypeAny>(schema: T): T {
     return decorate(schema, { dbIndex: true });
 }
 
+function choices<T extends ZodTypeAny>(schema: T, values: readonly unknown[]): T;
 function choices<T extends ZodTypeAny>(schema: T, values: readonly unknown[]): T {
     return decorate(schema, { choices: values });
 }
 
+function validators<T extends ZodTypeAny>(schema: T, ...values: readonly ((value: unknown) => unknown)[]): T;
 function validators<T extends ZodTypeAny>(schema: T, ...values: readonly ((value: unknown) => unknown)[]): T {
     return decorate(schema, { validators: values });
 }
 
+function helpText<T extends ZodTypeAny>(schema: T, text: string): T;
 function helpText<T extends ZodTypeAny>(schema: T, text: string): T {
     return decorate(schema, { helpText: text });
 }
 
+function errorMessages<T extends ZodTypeAny>(schema: T, map: Record<string, string>): T;
 function errorMessages<T extends ZodTypeAny>(schema: T, map: Record<string, string>): T {
     return decorate(schema, { errorMessages: map });
 }
 
-function foreignKey<T extends ZodTypeAny>(target: ModelRef, schema: T, options?: ReferentialOptions): T;
-function foreignKey(target: ModelRef, options?: ReferentialOptions): z.ZodNumber;
+export interface FieldDecoratorBuilder<TField extends ZodTypeAny> {
+    defaultValue(value: string | { now: true } | null): FieldDecoratorBuilder<TField>;
+    dbDefault(value: string): FieldDecoratorBuilder<TField>;
+    dbColumn(name: string): FieldDecoratorBuilder<TField>;
+    dbIndex(): FieldDecoratorBuilder<TField>;
+    choices(values: readonly unknown[]): FieldDecoratorBuilder<TField>;
+    validators(...values: readonly ((value: unknown) => unknown)[]): FieldDecoratorBuilder<TField>;
+    helpText(text: string): FieldDecoratorBuilder<TField>;
+    errorMessages(map: Record<string, string>): FieldDecoratorBuilder<TField>;
+    build(): TField;
+}
+
+class FieldDecoratorBuilderImpl<TField extends ZodTypeAny> implements FieldDecoratorBuilder<TField> {
+    constructor(private readonly schema: TField) {}
+
+    defaultValue(value: string | { now: true } | null): FieldDecoratorBuilder<TField> {
+        decorate(this.schema, { default: value });
+        return this;
+    }
+
+    dbDefault(value: string): FieldDecoratorBuilder<TField> {
+        decorate(this.schema, { dbDefault: value });
+        return this;
+    }
+
+    dbColumn(name: string): FieldDecoratorBuilder<TField> {
+        decorate(this.schema, { dbColumn: name });
+        return this;
+    }
+
+    dbIndex(): FieldDecoratorBuilder<TField> {
+        decorate(this.schema, { dbIndex: true });
+        return this;
+    }
+
+    choices(values: readonly unknown[]): FieldDecoratorBuilder<TField> {
+        decorate(this.schema, { choices: values });
+        return this;
+    }
+
+    validators(...values: readonly ((value: unknown) => unknown)[]): FieldDecoratorBuilder<TField> {
+        decorate(this.schema, { validators: values });
+        return this;
+    }
+
+    helpText(text: string): FieldDecoratorBuilder<TField> {
+        decorate(this.schema, { helpText: text });
+        return this;
+    }
+
+    errorMessages(map: Record<string, string>): FieldDecoratorBuilder<TField> {
+        decorate(this.schema, { errorMessages: map });
+        return this;
+    }
+
+    build(): TField {
+        return this.schema;
+    }
+}
+
+function field<T extends ZodTypeAny>(schema: T): FieldDecoratorBuilder<T> {
+    return new FieldDecoratorBuilderImpl(schema);
+}
+
+function applyRelationMetadata<T extends ZodTypeAny>(
+    schema: T,
+    meta: TangoFieldMeta,
+    config?: { name?: string; relatedName?: string }
+): T {
+    return decorate(schema, {
+        ...meta,
+        forwardName: config?.name,
+        reverseName: config?.relatedName,
+    });
+}
+
+function toReferentialOptions(config?: ReferentialOptions): ReferentialOptions | undefined {
+    if (!config) {
+        return undefined;
+    }
+
+    if (config.column === undefined && config.onDelete === undefined && config.onUpdate === undefined) {
+        return undefined;
+    }
+
+    return {
+        column: config.column,
+        onDelete: config.onDelete,
+        onUpdate: config.onUpdate,
+    };
+}
+
 function foreignKey<T extends ZodTypeAny>(
     target: ModelRef,
-    schemaOrOptions?: T | ReferentialOptions,
+    config: ForeignKeyDecoratorConfig<T> & { field: T }
+): RelationDecoratedSchema<T, 'foreignKey'>;
+function foreignKey(target: ModelRef, config?: ForeignKeyDecoratorConfig): z.ZodNumber;
+/**
+ * @deprecated Use `t.foreignKey(target, { field: schema, ...options })` instead.
+ */
+function foreignKey<T extends ZodTypeAny>(
+    target: ModelRef,
+    schema: T,
+    options?: ReferentialOptions
+): RelationDecoratedSchema<T, 'foreignKey'>;
+function foreignKey<T extends ZodTypeAny>(
+    target: ModelRef,
+    schemaOrOptions?: T | ForeignKeyDecoratorConfig<T>,
     maybeOptions?: ReferentialOptions
-): T | z.ZodNumber {
+): RelationDecoratedSchema<T, 'foreignKey'> | z.ZodNumber {
     if (isZodType(schemaOrOptions)) {
-        return decorate(schemaOrOptions, {
-            relationKind: 'foreignKey',
+        warnDeprecatedSchemaOverload(
+            INTERNAL_DECORATED_FIELD_KIND.FOREIGN_KEY,
+            't.foreignKey(target, { field: schema, ...options })'
+        );
+        return applyRelationMetadata(schemaOrOptions, {
+            relationKind: INTERNAL_DECORATED_FIELD_KIND.FOREIGN_KEY,
             references: {
                 target,
                 options: maybeOptions,
             },
-        });
+        }) as RelationDecoratedSchema<T, 'foreignKey'>;
     }
 
-    const defaultSchema = z.number().int();
-    return decorate(defaultSchema, {
-        relationKind: 'foreignKey',
-        references: {
-            target,
-            options: schemaOrOptions,
+    const config = schemaOrOptions;
+    const schema = config?.field ?? z.number().int();
+    return applyRelationMetadata(
+        schema,
+        {
+            relationKind: INTERNAL_DECORATED_FIELD_KIND.FOREIGN_KEY,
+            references: {
+                target,
+                options: toReferentialOptions(config),
+            },
+            notNull: config?.field ? undefined : true,
         },
-        notNull: true,
-    });
+        config
+    ) as RelationDecoratedSchema<T, 'foreignKey'> | z.ZodNumber;
 }
 
-function oneToOne<T extends ZodTypeAny>(target: ModelRef, schema: T, options?: ReferentialOptions): T;
-function oneToOne(target: ModelRef, options?: ReferentialOptions): z.ZodNumber;
 function oneToOne<T extends ZodTypeAny>(
     target: ModelRef,
-    schemaOrOptions?: T | ReferentialOptions,
+    config: OneToOneDecoratorConfig<T> & { field: T }
+): RelationDecoratedSchema<T, 'oneToOne'>;
+function oneToOne(target: ModelRef, config?: OneToOneDecoratorConfig): z.ZodNumber;
+/**
+ * @deprecated Use `t.oneToOne(target, { field: schema, ...options })` instead.
+ */
+function oneToOne<T extends ZodTypeAny>(
+    target: ModelRef,
+    schema: T,
+    options?: ReferentialOptions
+): RelationDecoratedSchema<T, 'oneToOne'>;
+function oneToOne<T extends ZodTypeAny>(
+    target: ModelRef,
+    schemaOrOptions?: T | OneToOneDecoratorConfig<T>,
     maybeOptions?: ReferentialOptions
-): T | z.ZodNumber {
+): RelationDecoratedSchema<T, 'oneToOne'> | z.ZodNumber {
     if (isZodType(schemaOrOptions)) {
-        return decorate(schemaOrOptions, {
-            relationKind: 'oneToOne',
+        warnDeprecatedSchemaOverload(
+            INTERNAL_DECORATED_FIELD_KIND.ONE_TO_ONE,
+            't.oneToOne(target, { field: schema, ...options })'
+        );
+        return applyRelationMetadata(schemaOrOptions, {
+            relationKind: INTERNAL_DECORATED_FIELD_KIND.ONE_TO_ONE,
             unique: true,
             references: {
                 target,
                 options: maybeOptions,
             },
-        });
+        }) as RelationDecoratedSchema<T, 'oneToOne'>;
     }
 
-    const defaultSchema = z.number().int();
-    return decorate(defaultSchema, {
-        relationKind: 'oneToOne',
-        unique: true,
-        references: {
-            target,
-            options: schemaOrOptions,
+    const config = schemaOrOptions;
+    const schema = config?.field ?? z.number().int();
+    return applyRelationMetadata(
+        schema,
+        {
+            relationKind: INTERNAL_DECORATED_FIELD_KIND.ONE_TO_ONE,
+            unique: true,
+            references: {
+                target,
+                options: toReferentialOptions(config),
+            },
+            notNull: config?.field ? undefined : true,
         },
-        notNull: true,
-    });
+        config
+    ) as RelationDecoratedSchema<T, 'oneToOne'> | z.ZodNumber;
 }
 
-function manyToMany<T extends ZodTypeAny>(target: ModelRef, schema: T): T;
-function manyToMany(target: ModelRef): z.ZodArray<z.ZodNumber>;
-function manyToMany<T extends ZodTypeAny>(target: ModelRef, schema?: T): T | z.ZodArray<z.ZodNumber> {
-    if (schema) {
-        return decorate(schema, {
-            relationKind: 'manyToMany',
+function manyToMany<T extends ZodTypeAny>(
+    target: ModelRef,
+    config: ManyToManyDecoratorConfig<T> & { field: T }
+): RelationDecoratedSchema<T, 'manyToMany'>;
+function manyToMany(target: ModelRef, config?: ManyToManyDecoratorConfig): z.ZodArray<z.ZodNumber>;
+/**
+ * @deprecated Use `t.manyToMany(target, { field: schema, name })` instead.
+ */
+function manyToMany<T extends ZodTypeAny>(target: ModelRef, schema: T): RelationDecoratedSchema<T, 'manyToMany'>;
+function manyToMany<T extends ZodTypeAny>(
+    target: ModelRef,
+    schemaOrConfig?: T | ManyToManyDecoratorConfig<T>
+): RelationDecoratedSchema<T, 'manyToMany'> | z.ZodArray<z.ZodNumber> {
+    if (isZodType(schemaOrConfig)) {
+        warnDeprecatedSchemaOverload(
+            INTERNAL_DECORATED_FIELD_KIND.MANY_TO_MANY,
+            't.manyToMany(target, { field: schema, name })'
+        );
+        return applyRelationMetadata(schemaOrConfig, {
+            relationKind: INTERNAL_DECORATED_FIELD_KIND.MANY_TO_MANY,
             references: {
                 target,
             },
-        });
+        }) as RelationDecoratedSchema<T, 'manyToMany'>;
     }
 
-    const defaultSchema = z.array(z.number().int());
-    return decorate(defaultSchema, {
-        relationKind: 'manyToMany',
-        references: {
-            target,
+    if (schemaOrConfig?.relatedName !== undefined) {
+        throw new Error('t.manyToMany(...) does not support relatedName yet.');
+    }
+
+    const config = schemaOrConfig;
+    const schema = config?.field ?? z.array(z.number().int());
+    return applyRelationMetadata(
+        schema,
+        {
+            relationKind: INTERNAL_DECORATED_FIELD_KIND.MANY_TO_MANY,
+            references: {
+                target,
+            },
         },
-    });
+        config
+    ) as RelationDecoratedSchema<T, 'manyToMany'> | z.ZodArray<z.ZodNumber>;
 }
 
 type UnaryFieldDecorator = {
@@ -168,16 +354,51 @@ type UnaryFieldDecorator = {
 };
 
 type RelationshipDecorator = {
-    <T extends ZodTypeAny>(target: ModelRef, schema: T, options?: ReferentialOptions): T;
-    (target: ModelRef, options?: ReferentialOptions): z.ZodNumber;
+    <T extends ZodTypeAny>(
+        target: ModelRef,
+        config: ForeignKeyDecoratorConfig<T> & { field: T }
+    ): RelationDecoratedSchema<T, 'foreignKey'>;
+    (target: ModelRef, config?: ForeignKeyDecoratorConfig): z.ZodNumber;
+    /**
+     * @deprecated Use `t.foreignKey(target, { field: schema, ...options })` instead.
+     */
+    <T extends ZodTypeAny>(
+        target: ModelRef,
+        schema: T,
+        options?: ReferentialOptions
+    ): RelationDecoratedSchema<T, 'foreignKey'>;
+};
+
+type OneToOneRelationshipDecorator = {
+    <T extends ZodTypeAny>(
+        target: ModelRef,
+        config: OneToOneDecoratorConfig<T> & { field: T }
+    ): RelationDecoratedSchema<T, 'oneToOne'>;
+    (target: ModelRef, config?: OneToOneDecoratorConfig): z.ZodNumber;
+    /**
+     * @deprecated Use `t.oneToOne(target, { field: schema, ...options })` instead.
+     */
+    <T extends ZodTypeAny>(
+        target: ModelRef,
+        schema: T,
+        options?: ReferentialOptions
+    ): RelationDecoratedSchema<T, 'oneToOne'>;
 };
 
 type ManyToManyDecorator = {
-    <T extends ZodTypeAny>(target: ModelRef, schema: T): T;
-    (target: ModelRef): z.ZodArray<z.ZodNumber>;
+    <T extends ZodTypeAny>(
+        target: ModelRef,
+        config: ManyToManyDecoratorConfig<T> & { field: T }
+    ): RelationDecoratedSchema<T, 'manyToMany'>;
+    (target: ModelRef, config?: ManyToManyDecoratorConfig): z.ZodArray<z.ZodNumber>;
+    /**
+     * @deprecated Use `t.manyToMany(target, { field: schema, name })` instead.
+     */
+    <T extends ZodTypeAny>(target: ModelRef, schema: T): RelationDecoratedSchema<T, 'manyToMany'>;
 };
 
 export interface TangoDecorators {
+    field: <T extends ZodTypeAny>(schema: T) => FieldDecoratorBuilder<T>;
     primaryKey: UnaryFieldDecorator;
     unique: UnaryFieldDecorator;
     null: UnaryFieldDecorator;
@@ -191,11 +412,12 @@ export interface TangoDecorators {
     helpText: <T extends ZodTypeAny>(schema: T, text: string) => T;
     errorMessages: <T extends ZodTypeAny>(schema: T, map: Record<string, string>) => T;
     foreignKey: RelationshipDecorator;
-    oneToOne: RelationshipDecorator;
+    oneToOne: OneToOneRelationshipDecorator;
     manyToMany: ManyToManyDecorator;
 }
 
 export const Decorators: TangoDecorators = {
+    field,
     primaryKey: primaryKey as UnaryFieldDecorator,
     unique: unique as UnaryFieldDecorator,
     null: nullValue as UnaryFieldDecorator,
@@ -209,6 +431,6 @@ export const Decorators: TangoDecorators = {
     helpText: helpText,
     errorMessages: errorMessages,
     foreignKey: foreignKey as RelationshipDecorator,
-    oneToOne: oneToOne as RelationshipDecorator,
+    oneToOne: oneToOne as OneToOneRelationshipDecorator,
     manyToMany: manyToMany as ManyToManyDecorator,
 };

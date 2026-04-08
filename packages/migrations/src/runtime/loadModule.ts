@@ -1,6 +1,7 @@
 import { resolve, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createJiti } from 'jiti';
+import { ModelRegistry } from '@danceroutine/tango-schema';
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 
@@ -20,20 +21,27 @@ function isTypeScriptModule(modulePath: string): boolean {
  */
 export async function loadModule(
     modulePath: string,
-    options?: { projectRoot?: string }
+    options?: { projectRoot?: string; registry?: ModelRegistry; moduleCache?: boolean }
 ): Promise<Record<string, unknown>> {
     const projectRoot = options?.projectRoot ?? process.cwd();
     const absolutePath = toAbsolutePath(modulePath, projectRoot);
+    const executeImport = async (): Promise<Record<string, unknown>> => {
+        if (isTypeScriptModule(absolutePath)) {
+            const jiti = createJiti(resolve(projectRoot, 'tango.config.ts'), {
+                interopDefault: true,
+                moduleCache: options?.moduleCache ?? true,
+            });
+            return (await jiti.import<Record<string, unknown>>(absolutePath)) as Record<string, unknown>;
+        }
 
-    if (isTypeScriptModule(absolutePath)) {
-        const jiti = createJiti(resolve(projectRoot, 'tango.config.ts'), {
-            interopDefault: true,
-            moduleCache: true,
-        });
-        return (await jiti.import<Record<string, unknown>>(absolutePath)) as Record<string, unknown>;
+        return (await import(pathToFileURL(absolutePath).href)) as Record<string, unknown>;
+    };
+
+    if (options?.registry) {
+        return ModelRegistry.runWithRegistry(options.registry, executeImport);
     }
 
-    return (await import(pathToFileURL(absolutePath).href)) as Record<string, unknown>;
+    return executeImport();
 }
 
 /**

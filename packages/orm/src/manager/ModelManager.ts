@@ -1,6 +1,7 @@
 import { NotFoundError } from '@danceroutine/tango-core';
-import type { ModelWriteHooks } from '@danceroutine/tango-schema';
-import type { FilterInput, TableMeta } from '../query/domain/index';
+import { ModelRegistry, type ModelWriteHooks } from '@danceroutine/tango-schema';
+import type { FilterInput, RelationMeta, TableMeta } from '../query/domain/index';
+import { InternalRelationKind } from '../query/domain/internal/InternalRelationKind';
 import type { QuerySet } from '../query/index';
 import { QuerySet as QuerySetClass } from '../query/index';
 import type { Dialect, QueryExecutor } from '../query/index';
@@ -20,6 +21,7 @@ type FieldLike = {
 
 type ModelLike<T extends Record<string, unknown>> = {
     metadata: {
+        key?: string;
         name: string;
         table: string;
         fields: FieldLike[];
@@ -36,26 +38,32 @@ type ModelLike<T extends Record<string, unknown>> = {
 export class ModelManager<T extends Record<string, unknown>> implements ManagerLike<T> {
     static readonly BRAND = 'tango.orm.model_manager' as const;
     readonly __tangoBrand: typeof ModelManager.BRAND = ModelManager.BRAND;
-    readonly meta: TableMeta;
     private readonly queryExecutor: QueryExecutor<T>;
     private readonly mutationCompiler: MutationCompiler;
     private readonly model: ModelLike<T>;
+    private readonly client: RuntimeBoundClient;
+    private readonly dialect: Dialect;
 
     constructor(model: ModelLike<T>, runtime: TangoRuntime) {
         this.model = model;
-        this.meta = ModelManager.createTableMeta(model);
-        const client = new RuntimeBoundClient(runtime);
-        const dialect = runtime.getDialect() as Dialect;
-        this.mutationCompiler = new MutationCompiler(dialect);
+        this.client = new RuntimeBoundClient(runtime);
+        this.dialect = runtime.getDialect() as Dialect;
+        this.mutationCompiler = new MutationCompiler(this.dialect);
         this.queryExecutor = {
-            meta: this.meta,
-            client,
-            dialect,
+            get meta() {
+                return ModelManager.createTableMeta(model);
+            },
+            client: this.client,
+            dialect: this.dialect,
             run: async (compiled) => {
-                const result = await client.query<T>(compiled.sql, compiled.params);
+                const result = await this.client.query<T>(compiled.sql, compiled.params);
                 return result.rows;
             },
         };
+    }
+
+    get meta(): TableMeta {
+        return ModelManager.createTableMeta(this.model);
     }
 
     /**
@@ -81,11 +89,45 @@ export class ModelManager<T extends Record<string, unknown>> implements ManagerL
             columns: Object.fromEntries(model.metadata.fields.map((field) => [field.name, field.type])),
         };
 
-        return sqlSafetyAdapter.validate({
+        if (model.metadata.key) {
+            const owner = ModelRegistry.getOwner(model as never);
+            const relations = owner.getResolvedRelationGraph().byModel.get(model.metadata.key);
+            if (relations && relations.size > 0) {
+                rawMeta.relations = Object.fromEntries(
+                    Array.from(relations.entries())
+                        .filter(([, relation]) => relation.kind !== InternalRelationKind.MANY_TO_MANY)
+                        .map(([name, relation]) => {
+                            const isForwardReference = relation.kind === InternalRelationKind.BELONGS_TO;
+                            const sourceKey = isForwardReference ? relation.localFieldName : relation.targetFieldName;
+                            const targetKey = isForwardReference ? relation.targetFieldName : relation.localFieldName;
+
+                            return [
+                                name,
+                                {
+                                    kind: relation.kind as RelationMeta['kind'],
+                                    table: owner.getByKey(relation.targetModelKey)!.metadata.table,
+                                    targetPk: targetKey!,
+                                    localKey: sourceKey,
+                                    foreignKey: relation.localFieldName,
+                                    alias: relation.alias,
+                                },
+                            ];
+                        })
+                );
+            }
+        }
+
+        const validatedMeta = sqlSafetyAdapter.validate({
             kind: 'insert',
             meta: rawMeta,
             writeKeys: Object.keys(rawMeta.columns),
         }).meta;
+
+        if (rawMeta.relations) {
+            validatedMeta.relations = rawMeta.relations;
+        }
+
+        return validatedMeta;
     }
 
     query(): QuerySet<T> {

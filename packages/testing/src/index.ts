@@ -24,3 +24,4 @@ export type { GenericModelFactory } from './factories/index';
 export { assertions } from './assertions/index';
 
 export * from './integration/index';
+export { withGlobalTestApi } from './vitest/index';

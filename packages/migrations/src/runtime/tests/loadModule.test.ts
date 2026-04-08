@@ -2,6 +2,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { withGlobalTestApi } from '@danceroutine/tango-testing';
+import { Model, ModelRegistry, t } from '@danceroutine/tango-schema';
 
 import { loadDefaultExport, loadModule } from '../loadModule';
 
@@ -19,7 +21,7 @@ afterEach(async () => {
     }
 });
 
-describe('loadModule', () => {
+describe(loadModule, () => {
     it('loads JavaScript modules using the provided project root and supports default exports', async () => {
         const directory = await makeTempDir('tango-load-module-js-');
         const filename = join(directory, 'mod.mjs');
@@ -53,5 +55,37 @@ describe('loadModule', () => {
         const defaultExport = await loadDefaultExport('./mod.mjs', { projectRoot: directory });
         expect(defaultExport).toMatchObject({ onlyNamed: true });
         expect(defaultExport).not.toHaveProperty('default');
+    });
+
+    it('loads modules with an explicit registry-bound model construction context', async () => {
+        const directory = await makeTempDir('tango-load-module-registry-');
+        const filename = join(directory, 'mod.ts');
+        await writeFile(
+            filename,
+            [
+                "import { z } from 'zod';",
+                'const { Model, t } = globalThis.__tangoLoadModuleTestApi;',
+                'export const UserModel = Model({',
+                "  namespace: 'load_module',",
+                "  name: 'User',",
+                '  schema: z.object({ id: t.primaryKey(z.number().int()) }),',
+                '});',
+            ].join('\n'),
+            'utf8'
+        );
+        const relativePath = relative(process.cwd(), filename);
+        const registry = new ModelRegistry();
+
+        await withGlobalTestApi('__tangoLoadModuleTestApi', { Model, t }, async () => {
+            const loaded = await loadModule(relativePath, {
+                registry,
+                moduleCache: false,
+                projectRoot: process.cwd(),
+            });
+            const userModel = loaded.UserModel as { metadata: { key: string } };
+
+            expect(registry.getByKey(userModel.metadata.key)).toBe(userModel);
+            expect(ModelRegistry.getOwner(userModel as never)).toBe(registry);
+        });
     });
 });

@@ -1,7 +1,7 @@
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
-        "composite": true,
+        "composite": false,
         "lib": ["dom", "dom.iterable", "esnext"],
         "jsx": "preserve",
         "incremental": true,
@@ -16,6 +16,8 @@
             "@danceroutine/tango-config/*": ["../../packages/config/src/*"],
             "@danceroutine/tango-core": ["../../packages/core/src/index.ts"],
             "@danceroutine/tango-core/*": ["../../packages/core/src/*"],
+            "@danceroutine/tango-adapters-core": ["../../packages/adapters/core/src/index.ts"],
+            "@danceroutine/tango-adapters-core/*": ["../../packages/adapters/core/src/*"],
             "@danceroutine/tango-adapters-next": ["../../packages/adapters/next/src/index.ts"],
             "@danceroutine/tango-adapters-next/*": ["../../packages/adapters/next/src/*"],
             "@danceroutine/tango-migrations": ["../../packages/migrations/src/index.ts"],
@@ -35,25 +37,5 @@
         "resolveJsonModule": true
     },
     "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "tango.config.ts"],
-    "exclude": ["node_modules"],
-    "references": [
-        {
-            "path": "../../packages/core"
-        },
-        {
-            "path": "../../packages/schema"
-        },
-        {
-            "path": "../../packages/orm"
-        },
-        {
-            "path": "../../packages/resources"
-        },
-        {
-            "path": "../../packages/adapters/next"
-        },
-        {
-            "path": "../../packages/config"
-        }
-    ]
+    "exclude": ["node_modules"]
 }

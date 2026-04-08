@@ -14,6 +14,7 @@ import { createDefaultIntrospectorStrategy } from '../strategies/IntrospectorStr
 import { InternalDialect } from '../domain/internal/InternalDialect';
 import { loadConfig } from '@danceroutine/tango-config';
 import { getLogger } from '@danceroutine/tango-core';
+import { ModelRegistry } from '@danceroutine/tango-schema';
 import { loadModule } from '../runtime/loadModule';
 
 const logger = getLogger('tango.migrations');
@@ -149,7 +150,12 @@ async function resolveCommandInputs(argv: {
 }
 
 async function loadModels(modelsPath: string): Promise<ModelMetadataLike[]> {
-    const mod = await importModule(modelsPath);
+    const registry = new ModelRegistry();
+    const mod = await loadModule(modelsPath, {
+        projectRoot: process.cwd(),
+        registry,
+        moduleCache: false,
+    });
     const moduleValue = (mod.default ?? mod) as unknown;
 
     const models: ModelMetadataLike[] = [];

@@ -49,7 +49,7 @@ export const TodoModel = Model({
     schema: TodoReadSchema.extend({
         id: t.primaryKey(z.number().int()),
         title: z.string(),
-        completed: t.default(z.coerce.boolean(), 'false'),
+        completed: t.field(z.coerce.boolean()).defaultValue('false').build(),
     }),
 });
 

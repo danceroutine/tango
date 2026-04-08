@@ -1,7 +1,6 @@
-import type { z } from 'zod';
-import type { DeleteReferentialAction, Model, UpdateReferentialAction } from '../../domain/index';
-
-export type ModelRef = string | Model | (() => Model);
+import type { DeleteReferentialAction, UpdateReferentialAction } from '../../../domain';
+import type { DecoratedFieldKind } from './DecoratedFieldKind';
+import type { ModelRef } from './ModelRef';
 
 export interface ReferentialOptions {
     column?: string;
@@ -25,7 +24,7 @@ export interface TangoFieldMeta {
         target: ModelRef;
         options?: ReferentialOptions;
     };
-    relationKind?: 'foreignKey' | 'oneToOne' | 'manyToMany';
+    relationKind?: DecoratedFieldKind;
+    forwardName?: string;
+    reverseName?: string;
 }
-
-export type ZodTypeAny = z.ZodTypeAny;

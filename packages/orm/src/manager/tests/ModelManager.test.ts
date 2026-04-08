@@ -4,7 +4,7 @@ import { aDBClient, setupTestTangoRuntime } from '@danceroutine/tango-testing';
 import type { TangoRuntime } from '../../runtime/TangoRuntime';
 import { ModelManager } from '../ModelManager';
 import { getTangoRuntime } from '../../runtime/index';
-import { sqlInjectionValueCases } from '../../validation/tests/sqlInjectionCorpus';
+import { sqlInjectionRejectCases, sqlInjectionValueCases } from '../../validation/tests/sqlInjectionCorpus';
 import { expectPayloadIsParameterized } from '../../validation/tests/expectPayloadIsParameterized';
 
 type UserRecord = {
@@ -155,38 +155,55 @@ describe(ModelManager, () => {
     });
 
     it('throws when the model does not expose a primary key field', () => {
-        expect(
-            () =>
-                new ModelManager(
-                    {
-                        metadata: {
-                            name: 'Broken',
-                            table: 'broken',
-                            fields: [{ name: 'email', type: 'text' }],
-                        },
-                        schema: UserModel.schema,
-                    },
-                    getTangoRuntime()
-                )
-        ).toThrow(/primary key/i);
+        const manager = new ModelManager(
+            {
+                metadata: {
+                    name: 'Broken',
+                    table: 'broken',
+                    fields: [{ name: 'email', type: 'text' }],
+                },
+                schema: UserModel.schema,
+            },
+            getTangoRuntime()
+        );
+
+        expect(() => manager.meta).toThrow(/primary key/i);
     });
 
     it('rejects unsafe SQL identifiers derived from model metadata', () => {
-        expect(
-            () =>
-                new ModelManager(
-                    {
-                        metadata: {
-                            name: 'User',
-                            table: 'users; DROP TABLE users;',
-                            fields: [{ name: 'id', type: 'int', primaryKey: true }],
-                        },
-                        schema: UserModel.schema,
-                    },
-                    getTangoRuntime()
-                )
-        ).toThrow(/invalid sql table name/i);
+        const manager = new ModelManager(
+            {
+                metadata: {
+                    name: 'User',
+                    table: 'users; DROP TABLE users;',
+                    fields: [{ name: 'id', type: 'int', primaryKey: true }],
+                },
+                schema: UserModel.schema,
+            },
+            getTangoRuntime()
+        );
+
+        expect(() => manager.meta).toThrow(/invalid sql table name/i);
     });
+
+    it.each(sqlInjectionRejectCases.filter((testCase) => testCase.applicablePosition === 'identifier'))(
+        '$id rejects identifier corpus payloads in model metadata',
+        (testCase) => {
+            const manager = new ModelManager(
+                {
+                    metadata: {
+                        name: 'User',
+                        table: testCase.payload,
+                        fields: [{ name: 'id', type: 'int', primaryKey: true }],
+                    },
+                    schema: UserModel.schema,
+                },
+                getTangoRuntime()
+            );
+
+            expect(() => manager.meta).toThrow();
+        }
+    );
 
     it('rejects empty create and update payloads', async () => {
         const manager = new ModelManager(UserModel, getTangoRuntime());

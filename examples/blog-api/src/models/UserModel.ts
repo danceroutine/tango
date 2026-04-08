@@ -55,6 +55,6 @@ export const UserModel = Model({
         id: t.primaryKey(z.number().int()),
         email: t.unique(z.string().email()),
         username: t.unique(z.string().min(3)),
-        createdAt: t.default(z.string(), { now: true }),
+        createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
     }),
 });

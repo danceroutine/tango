@@ -50,9 +50,9 @@ export const PostModel = Model({
     schema: PostReadSchema.extend({
         id: t.primaryKey(z.number().int()),
         slug: t.unique(z.string()),
-        published: t.default(z.coerce.boolean(), 'false'),
-        createdAt: t.default(z.string(), { now: true }),
-        updatedAt: t.default(z.string(), { now: true }),
+        published: t.field(z.coerce.boolean()).defaultValue('false').build(),
+        createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
+        updatedAt: t.field(z.string()).defaultValue({ now: true }).build(),
     }),
     hooks: {
         async beforeCreate({ data }) {

@@ -22,16 +22,17 @@ import { z } from 'zod';
 
 export const PostSchema = z.object({
     id: t.primaryKey(z.number().int()),
-    authorId: t.foreignKey('blog/User', z.number().int(), {
+    authorId: t.foreignKey('blog/User', {
+        field: z.number().int(),
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE',
     }),
     title: z.string(),
     slug: z.string(),
     content: z.string(),
-    published: t.default(z.coerce.boolean(), 'false'),
-    createdAt: t.default(z.string(), { now: true }),
-    updatedAt: t.default(z.string(), { now: true }),
+    published: t.field(z.coerce.boolean()).defaultValue('false').build(),
+    createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
+    updatedAt: t.field(z.string()).defaultValue({ now: true }).build(),
 });
 
 export const PostModel = Model({
@@ -79,13 +80,13 @@ These helpers extend the capabilities offered by Zod to inject database-facing m
 
 When you declare a relationship in a Tango model, you are describing part of the stored record contract. The relationship tells Tango which records may point at one another, how that link should be represented in SQL, and which connections the ORM can safely reason about later. A blog post belongs to one author. A user may have one profile. A tagging system may connect one post to many tags and one tag to many posts. Those relationships belong in the model because they change the shape of the stored data.
 
-A foreign key begins with a field that stores the reference itself. In the blog example, `authorId: t.foreignKey('blog/User', z.number().int())` says that the field is an integer and that the integer points at the `blog/User` model. When Tango prepares that model for database and query work, it resolves the stable model identity into concrete metadata such as the target table, the referenced column, and any delete or update behavior configured through `onDelete` or `onUpdate`. The migration system can then emit a real foreign-key constraint, and the database can enforce that every `authorId` points at a row that actually exists.
+A foreign key begins with a field that stores the reference itself. In the blog example, `authorId: t.foreignKey('blog/User', { field: z.number().int() })` says that the field is an integer and that the integer points at the `blog/User` model. When Tango prepares that model for database and query work, it resolves the stable model identity into concrete metadata such as the target table, the referenced column, and any delete or update behavior configured through `onDelete` or `onUpdate`. The migration system can then emit a real foreign-key constraint, and the database can enforce that every `authorId` points at a row that actually exists.
 
 A one-to-one relationship follows the same path, but with one extra guarantee. `t.oneToOne(...)` still resolves to a database reference, and it also marks the column as unique. At the SQL level, that combination means each row may point at one parent row, and no two rows may point at the same parent through that column. This is the usual fit for data such as a user profile, where the relationship should behave like an extension of the main record instead of a repeating child table.
 
 Many-to-many relationships need a different shape, because a SQL database cannot represent them with one foreign-key column on one table. Tango lets you declare a many-to-many relationship in model schema metadata with `t.manyToMany(...)`, which records the target model and keeps the relationship visible in the model contract. In a relational database, the actual implementation still needs a join table. Today, the normal Tango pattern is to model that join table explicitly, for example with a `PostTag` model that stores `postId` and `tagId` as foreign keys. That gives migrations a concrete table to create, gives the database concrete constraints to enforce, and gives the ORM a concrete relation graph to query.
 
-The ORM capabilities build on those declarations. Column-level helpers such as `t.foreignKey(...)` and `t.oneToOne(...)` describe how the relation is stored. Model-level relation metadata such as `relations: (r) => ({ author: r.belongsTo('blog/User', 'authorId'), posts: r.hasMany('blog/Post', 'authorId'), profile: r.hasOne('blog/Profile', 'userId') })` gives those stored links navigable names and directions. Once both pieces are in place, query code can follow declared relations instead of re-deriving join logic from raw table names and column pairs in each query.
+The ORM capabilities build on those declarations. Field helpers such as `t.foreignKey(...)` and `t.oneToOne(...)` describe how the relation is stored and can publish relation names through `name` and `relatedName`. Model-level `relations: (r) => ...` metadata remains available for compatibility and ambiguity resolution, but straightforward storage-backed relations can now stay on the field that owns the reference. Once the relation graph is resolved, query code can follow declared relations instead of re-deriving join logic from raw table names and column pairs in each query.
 
 For example, once `PostModel` declares that `authorId` belongs to `blog/User`, ORM code can ask for posts together with their authors through the relation name rather than through hand-written join details:
 
@@ -94,9 +95,6 @@ export const PostModel = Model({
     namespace: 'blog',
     name: 'Post',
     schema: PostSchema,
-    relations: (r) => ({
-        author: r.belongsTo('blog/User', 'authorId'),
-    }),
 });
 
 const recentPosts = await PostModel.objects
@@ -107,7 +105,7 @@ const recentPosts = await PostModel.objects
     .fetch();
 ```
 
-Today, `selectRelated('author')` tells the ORM which related model to join through the declared relation metadata. The returned row still keeps the base post shape, so nested relation hydration such as `post.author.email` is not part of the ORM contract yet.
+Today, `selectRelated('author')` tells the ORM which related model to join through the resolved relation metadata. In this example, Tango derives `author` from the `authorId` field. The returned row still keeps the base post shape, so nested relation hydration such as `post.author.email` is not part of the ORM contract yet.
 
 Relation changes therefore affect several layers at once. Changing a relation changes the schema that migrations apply, the constraints that the database enforces, and the paths that ORM queries can use when they walk from one model to another.
 
