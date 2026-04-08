@@ -2,6 +2,12 @@
 
 This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
 
+## 1.2.0 - 2026-04-08
+
+- Add decorator-owned relation resolution and field metadata APIs.
+
+Schema now supports object-form relation decorator configs, decorator-level relation naming, resolved relation graph finalization, and the fluent `t.field(...).build()` scalar metadata builder. ORM model metadata now consumes the resolved relation graph for relation metadata and aliases. Testing adds `withGlobalTestApi` for module-loading test helpers. Migrations now load model modules through a registry-aware loader, and codegen templates emit the new fluent scalar metadata form. Affected packages: `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-codegen`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`.
+
 ## 1.1.3 - 2026-04-07
 
 - Fixed type narrowing on select() to align with database projection Affected packages: `@danceroutine/tango-orm`, `@danceroutine/tango-testing`.

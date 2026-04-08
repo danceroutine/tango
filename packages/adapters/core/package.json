@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-adapters-core",
-    "version": "1.1.3",
+    "version": "1.2.0",
     "description": "Core types and utilities for Tango adapters",
     "type": "module",
     "main": "./dist/index.js",
