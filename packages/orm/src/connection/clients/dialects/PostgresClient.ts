@@ -1,17 +1,18 @@
-import type pg from 'pg';
 import type { DBClient } from '../DBClient';
 
+export interface PostgresPoolClientLike {
+    query(sql: string, params?: readonly unknown[]): Promise<{ rows: unknown[] }>;
+    release(): void;
+}
+
 /**
- * `DBClient` implementation backed by a PostgreSQL pool client.
+ * Transaction-capable client backed by a PostgreSQL pool client.
  */
 export class PostgresClient implements DBClient {
     static readonly BRAND = 'tango.orm.postgres_client' as const;
     readonly __tangoBrand: typeof PostgresClient.BRAND = PostgresClient.BRAND;
 
-    constructor(
-        private pool: pg.Pool,
-        private client: pg.PoolClient
-    ) {}
+    constructor(private client: PostgresPoolClientLike) {}
 
     /**
      * Narrow an unknown value to `PostgresClient`.
@@ -54,10 +55,30 @@ export class PostgresClient implements DBClient {
     }
 
     /**
-     * Release client resources and close the associated pool.
+     * Create a savepoint inside the active transaction.
+     */
+    async createSavepoint(name: string): Promise<void> {
+        await this.client.query(`SAVEPOINT ${name}`);
+    }
+
+    /**
+     * Release a previously-created savepoint.
+     */
+    async releaseSavepoint(name: string): Promise<void> {
+        await this.client.query(`RELEASE SAVEPOINT ${name}`);
+    }
+
+    /**
+     * Roll back the active transaction to a savepoint.
+     */
+    async rollbackToSavepoint(name: string): Promise<void> {
+        await this.client.query(`ROLLBACK TO SAVEPOINT ${name}`);
+    }
+
+    /**
+     * Release the leased PostgreSQL client back to its owning pool.
      */
     async close(): Promise<void> {
         this.client.release();
-        await this.pool.end();
     }
 }

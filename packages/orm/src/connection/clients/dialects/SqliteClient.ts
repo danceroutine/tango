@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3';
 import type { DBClient } from '../DBClient';
 
 /**
- * `DBClient` implementation backed by a synchronous `better-sqlite3` handle.
+ * Transaction-capable client backed by a synchronous `better-sqlite3` handle.
  */
 export class SqliteClient implements DBClient {
     static readonly BRAND = 'tango.orm.sqlite_client' as const;
@@ -75,6 +75,27 @@ export class SqliteClient implements DBClient {
             this.db.prepare('ROLLBACK').run();
             this.inTransaction = false;
         }
+    }
+
+    /**
+     * Create a savepoint inside the active transaction.
+     */
+    async createSavepoint(name: string): Promise<void> {
+        this.db.prepare(`SAVEPOINT ${name}`).run();
+    }
+
+    /**
+     * Release a previously-created savepoint.
+     */
+    async releaseSavepoint(name: string): Promise<void> {
+        this.db.prepare(`RELEASE SAVEPOINT ${name}`).run();
+    }
+
+    /**
+     * Roll back the active transaction to a savepoint.
+     */
+    async rollbackToSavepoint(name: string): Promise<void> {
+        this.db.prepare(`ROLLBACK TO SAVEPOINT ${name}`).run();
     }
 
     /**

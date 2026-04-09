@@ -36,4 +36,5 @@ export type {
 } from './query/domain/index';
 
 export { getTangoRuntime, initializeTangoRuntime, resetTangoRuntime, TangoRuntime } from './runtime/index';
-export { UnitOfWork } from './transaction/index';
+export { atomic, UnitOfWork } from './transaction/index';
+export type { AtomicTransaction, OnCommitOptions, SavepointOptions, SavepointResult } from './transaction/index';

@@ -26,7 +26,9 @@ The ORM layer already includes model managers through `Model.objects`, immutable
 
 The ORM surface is designed for application code that wants a Django-shaped querying model without giving up TypeScript-native contracts. Collection filtering, ordering, slicing, existence checks, row shaping through `fetch(...)`, and manager-backed persistence are all part of the current story.
 
-The current unsupported ORM boundary includes nested relation traversal such as `author__profile`, related-row projection, many-to-many hydration, and a supported transaction workflow for application code.
+The current supported ORM contract also includes `transaction.atomic(async (tx) => ...)`, nested savepoints, and post-commit callback registration through `tx.onCommit(...)`.
+
+The remaining unsupported ORM boundary includes nested relation traversal such as `author__profile`, related-row projection, many-to-many hydration, request-wide transaction wrappers, and multi-database routing for transaction work.
 
 ### Database dialects
 
@@ -98,7 +100,7 @@ MariaDB is the SQL dialect currently called out on the roadmap, but it is not pa
 
 Several unsupported areas already have explicit follow-up work planned.
 
-At the ORM level, the roadmap includes deeper relation traversal, many-to-many hydration, related-row projection, and a supported transaction API for multi-step write workflows.
+At the ORM level, the roadmap includes deeper relation traversal, many-to-many hydration, related-row projection, and transaction ergonomics beyond the core `atomic(...)` API such as request-scoped wrappers and broader multi-database routing.
 
 At the platform level, the roadmap also includes MariaDB support, GraphQL support, custom Tango environments beyond `development`, `test`, and `production`, non-linear migration dependency chains for larger teams, agentic development support for AI-assisted workflows, and longer-term exploration of NoSQL support.
 

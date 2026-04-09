@@ -102,6 +102,28 @@ The supported hook names are:
 
 The `beforeCreate(...)` and `beforeUpdate(...)` hooks may return normalized values that Tango should persist. `beforeBulkCreate(...)` may return a replacement set of rows for Tango to persist. The `after*` hooks run after the write has completed.
 
+When a write hook runs inside `transaction.atomic(...)`, its args also receive an optional `transaction` handle with one narrow capability: `transaction?.onCommit(...)`.
+
+```ts
+const UserModel = Model({
+    namespace: 'blog',
+    name: 'User',
+    schema: z.object({
+        id: t.primaryKey(z.number().int()),
+        email: z.string().email(),
+    }),
+    hooks: {
+        afterCreate({ record, transaction }) {
+            transaction?.onCommit(() => {
+                invalidateUserCache(record.id);
+            });
+        },
+    },
+});
+```
+
+Hook code only needs a callback registrar, so the hook args expose that narrow `onCommit(...)` contract and nothing broader. Outside an active `atomic(...)` block, the `transaction` field is `undefined`.
+
 ## `RelationBuilder`
 
 Use `RelationBuilder` inside `relations: (builder) => ({ ... })` when your model needs named relation metadata at the model level. This is the place to describe how one model points at another in application-facing terms, such as `author`, `comments`, or `profile`.

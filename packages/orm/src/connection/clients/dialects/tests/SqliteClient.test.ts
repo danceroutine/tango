@@ -34,12 +34,18 @@ describe(SqliteClient, () => {
         const beginStmt = createStmt();
         const commitStmt = createStmt();
         const rollbackStmt = createStmt();
+        const savepointStmt = createStmt();
+        const releaseSavepointStmt = createStmt();
+        const rollbackSavepointStmt = createStmt();
         const updateStmt = createStmt();
         const deleteStmt = createStmt();
         const prepare = vi.fn((sql: string) => {
             if (sql === 'BEGIN') return beginStmt;
             if (sql === 'COMMIT') return commitStmt;
             if (sql === 'ROLLBACK') return rollbackStmt;
+            if (sql === 'SAVEPOINT sp1') return savepointStmt;
+            if (sql === 'RELEASE SAVEPOINT sp1') return releaseSavepointStmt;
+            if (sql === 'ROLLBACK TO SAVEPOINT sp1') return rollbackSavepointStmt;
             if (sql.startsWith('UPDATE')) return updateStmt;
             return deleteStmt;
         });
@@ -55,6 +61,9 @@ describe(SqliteClient, () => {
 
         await client.begin();
         await client.begin();
+        await client.createSavepoint('sp1');
+        await client.releaseSavepoint('sp1');
+        await client.rollbackToSavepoint('sp1');
         await client.commit();
         await client.commit();
         await client.begin();
@@ -63,6 +72,9 @@ describe(SqliteClient, () => {
         await client.close();
 
         expect(beginStmt.run).toHaveBeenCalledTimes(2);
+        expect(savepointStmt.run).toHaveBeenCalledOnce();
+        expect(releaseSavepointStmt.run).toHaveBeenCalledOnce();
+        expect(rollbackSavepointStmt.run).toHaveBeenCalledOnce();
         expect(commitStmt.run).toHaveBeenCalledTimes(1);
         expect(rollbackStmt.run).toHaveBeenCalledTimes(1);
         expect(close).toHaveBeenCalledOnce();

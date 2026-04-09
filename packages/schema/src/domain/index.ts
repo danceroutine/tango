@@ -13,7 +13,9 @@ export type { ModelMetadata } from './ModelMetadata';
 export type { Model, ModelAugmentations, ModelKeyOf, PersistedModelOutput } from './Model';
 export type {
     ModelHookModel,
+    ModelWriteHookOnCommitOptions,
     ModelWriteHookManager,
+    ModelWriteHookTransaction,
     ModelWriteHooks,
     BeforeCreateHookArgs,
     AfterCreateHookArgs,

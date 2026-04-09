@@ -5,6 +5,14 @@ export interface ModelWriteHookManager<TModel extends Record<string, unknown>> {
     bulkCreate(inputs: Partial<TModel>[]): Promise<TModel[]>;
 }
 
+export interface ModelWriteHookOnCommitOptions {
+    robust?: boolean;
+}
+
+export interface ModelWriteHookTransaction {
+    onCommit(callback: () => void, options?: ModelWriteHookOnCommitOptions): void;
+}
+
 /**
  * Structural model contract passed into write lifecycle hooks.
  */
@@ -22,12 +30,14 @@ export interface BeforeCreateHookArgs<TModel extends Record<string, unknown>> {
     data: Partial<TModel>;
     model: ModelHookModel<TModel>;
     manager: ModelWriteHookManager<TModel>;
+    transaction?: ModelWriteHookTransaction;
 }
 
 export interface AfterCreateHookArgs<TModel extends Record<string, unknown>> {
     record: TModel;
     model: ModelHookModel<TModel>;
     manager: ModelWriteHookManager<TModel>;
+    transaction?: ModelWriteHookTransaction;
 }
 
 export interface BeforeUpdateHookArgs<TModel extends Record<string, unknown>> {
@@ -36,6 +46,7 @@ export interface BeforeUpdateHookArgs<TModel extends Record<string, unknown>> {
     current: TModel;
     model: ModelHookModel<TModel>;
     manager: ModelWriteHookManager<TModel>;
+    transaction?: ModelWriteHookTransaction;
 }
 
 export interface AfterUpdateHookArgs<TModel extends Record<string, unknown>> {
@@ -45,6 +56,7 @@ export interface AfterUpdateHookArgs<TModel extends Record<string, unknown>> {
     record: TModel;
     model: ModelHookModel<TModel>;
     manager: ModelWriteHookManager<TModel>;
+    transaction?: ModelWriteHookTransaction;
 }
 
 export interface BeforeDeleteHookArgs<TModel extends Record<string, unknown>> {
@@ -52,6 +64,7 @@ export interface BeforeDeleteHookArgs<TModel extends Record<string, unknown>> {
     current: TModel;
     model: ModelHookModel<TModel>;
     manager: ModelWriteHookManager<TModel>;
+    transaction?: ModelWriteHookTransaction;
 }
 
 export interface AfterDeleteHookArgs<TModel extends Record<string, unknown>> {
@@ -59,18 +72,21 @@ export interface AfterDeleteHookArgs<TModel extends Record<string, unknown>> {
     previous: TModel;
     model: ModelHookModel<TModel>;
     manager: ModelWriteHookManager<TModel>;
+    transaction?: ModelWriteHookTransaction;
 }
 
 export interface BeforeBulkCreateHookArgs<TModel extends Record<string, unknown>> {
     rows: Partial<TModel>[];
     model: ModelHookModel<TModel>;
     manager: ModelWriteHookManager<TModel>;
+    transaction?: ModelWriteHookTransaction;
 }
 
 export interface AfterBulkCreateHookArgs<TModel extends Record<string, unknown>> {
     records: TModel[];
     model: ModelHookModel<TModel>;
     manager: ModelWriteHookManager<TModel>;
+    transaction?: ModelWriteHookTransaction;
 }
 
 /**
