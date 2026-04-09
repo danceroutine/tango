@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-cli",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Unified Tango command line interface for migrations and code generation",
     "type": "module",
     "main": "./dist/index.js",

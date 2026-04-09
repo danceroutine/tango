@@ -2,6 +2,14 @@
 
 This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
 
+## 1.4.0 - 2026-04-09
+
+- Add a supported ORM transaction API centered on `transaction.atomic(async (tx) => ...)`, nested savepoints, and `tx.onCommit(...)`.
+
+Extend schema write-hook args with a narrow transaction callback contract so hooks can register post-commit work without depending on ORM internals.
+
+Add testing fixtures and client contract updates needed to exercise the new runtime-backed transaction workflow. Affected packages: `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-testing`.
+
 ## 1.3.0 - 2026-04-08
 
 - Add typed relation hydration for Tango querysets.
