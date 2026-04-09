@@ -12,6 +12,9 @@ type DBClientOverrides = {
     commit?: () => Promise<void>;
     rollback?: () => Promise<void>;
     close?: () => Promise<void>;
+    createSavepoint?: (name: string) => Promise<void>;
+    releaseSavepoint?: (name: string) => Promise<void>;
+    rollbackToSavepoint?: (name: string) => Promise<void>;
 };
 
 /**
@@ -27,12 +30,20 @@ export function aDBClient(overrides: DBClientOverrides = {}): DBClient {
     const commitImpl = overrides.commit ?? (async () => {});
     const rollbackImpl = overrides.rollback ?? (async () => {});
     const closeImpl = overrides.close ?? (async () => {});
+    const createSavepointImpl = overrides.createSavepoint ?? (async (_name: string) => {});
+    const releaseSavepointImpl = overrides.releaseSavepoint ?? (async (_name: string) => {});
+    const rollbackToSavepointImpl = overrides.rollbackToSavepoint ?? (async (_name: string) => {});
 
-    return {
+    const client: DBClient = {
         query: vi.fn((sql: string, params?: readonly unknown[]) => queryImpl(sql, params)) as DBClient['query'],
         begin: vi.fn(() => beginImpl()),
         commit: vi.fn(() => commitImpl()),
         rollback: vi.fn(() => rollbackImpl()),
         close: vi.fn(() => closeImpl()),
+        createSavepoint: vi.fn((name: string) => createSavepointImpl(name)),
+        releaseSavepoint: vi.fn((name: string) => releaseSavepointImpl(name)),
+        rollbackToSavepoint: vi.fn((name: string) => rollbackToSavepointImpl(name)),
     };
+
+    return client;
 }

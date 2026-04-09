@@ -52,6 +52,6 @@ export class PostgresAdapter implements Adapter {
         });
 
         const client = await pool.connect();
-        return new PostgresClient(pool, client);
+        return new PostgresClient(client);
     }
 }

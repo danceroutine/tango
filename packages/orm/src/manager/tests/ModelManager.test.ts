@@ -1,9 +1,12 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotFoundError } from '@danceroutine/tango-core';
-import { aDBClient, setupTestTangoRuntime } from '@danceroutine/tango-testing';
-import type { TangoRuntime } from '../../runtime/TangoRuntime';
+import { aDBClient, aTangoRuntime, setupTestTangoRuntime } from '@danceroutine/tango-testing';
 import { ModelManager } from '../ModelManager';
 import { getTangoRuntime } from '../../runtime/index';
+import { atomic } from '../../transaction';
 import { sqlInjectionRejectCases, sqlInjectionValueCases } from '../../validation/tests/sqlInjectionCorpus';
 import { expectPayloadIsParameterized } from '../../validation/tests/expectPayloadIsParameterized';
 
@@ -117,10 +120,8 @@ describe(ModelManager, () => {
                 rows: [{ id: 1, email: 'user@example.com', active: true }] as T[],
             }),
         });
-        const runtime = {
-            getDialect: () => 'postgres',
-            getClient: vi.fn(async () => client),
-        } as unknown as TangoRuntime;
+        const runtime = aTangoRuntime({ adapter: 'postgres' });
+        vi.spyOn(runtime, 'query').mockImplementation((sql, params) => client.query(sql, params));
         const manager = new ModelManager(UserModel, runtime);
 
         await manager.create({ email: 'user@example.com', active: true });
@@ -311,16 +312,50 @@ describe(ModelManager, () => {
         );
     });
 
+    it('passes the active transaction handle into hooks only while running inside atomic(...)', async () => {
+        const tempDir = await mkdtemp(join(tmpdir(), 'tango-orm-hooks-'));
+
+        try {
+            await setupTestTangoRuntime({ sqliteFilename: join(tempDir, 'hooks.sqlite') });
+
+            const seenTransactions: unknown[] = [];
+            const manager = new ModelManager(
+                {
+                    ...UserModel,
+                    hooks: {
+                        afterCreate: vi.fn(({ transaction }) => {
+                            seenTransactions.push(transaction);
+                        }),
+                    },
+                },
+                getTangoRuntime()
+            );
+            const client = await getTangoRuntime().getClient();
+            await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+            await manager.create({ id: 1, email: 'outside@example.com', active: true });
+
+            await atomic(async () => {
+                await manager.create({ id: 2, email: 'inside@example.com', active: true });
+            });
+
+            expect(seenTransactions[0]).toBeUndefined();
+            expect(seenTransactions[1]).toBeDefined();
+            expect(typeof (seenTransactions[1] as { onCommit?: unknown }).onCommit).toBe('function');
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
     it.each(sqlInjectionValueCases)('$id keeps $category payloads bound during create', async (testCase) => {
         const client = aDBClient({
             query: async <T = unknown>(_sql: string, _params?: readonly unknown[]) => ({
                 rows: [{ id: 'token', email: testCase.payload }] as T[],
             }),
         });
-        const manager = new ModelManager(TokenModel, {
-            getDialect: () => 'postgres',
-            getClient: async () => client,
-        } as TangoRuntime);
+        const runtime = aTangoRuntime({ adapter: 'postgres' });
+        vi.spyOn(runtime, 'query').mockImplementation((sql, params) => client.query(sql, params));
+        const manager = new ModelManager(TokenModel, runtime);
 
         await manager.create({ id: 'token', email: testCase.payload });
 
@@ -334,10 +369,9 @@ describe(ModelManager, () => {
                 rows: [{ id: 'token', email: testCase.payload }] as T[],
             }),
         });
-        const manager = new ModelManager(TokenModel, {
-            getDialect: () => 'postgres',
-            getClient: async () => client,
-        } as TangoRuntime);
+        const runtime = aTangoRuntime({ adapter: 'postgres' });
+        vi.spyOn(runtime, 'query').mockImplementation((sql, params) => client.query(sql, params));
+        const manager = new ModelManager(TokenModel, runtime);
 
         await manager.update('token', { email: testCase.payload });
 
@@ -351,10 +385,9 @@ describe(ModelManager, () => {
                 rows: [{ id: testCase.payload, email: 'bound@example.com' }] as T[],
             }),
         });
-        const manager = new ModelManager(TokenModel, {
-            getDialect: () => 'postgres',
-            getClient: async () => client,
-        } as TangoRuntime);
+        const runtime = aTangoRuntime({ adapter: 'postgres' });
+        vi.spyOn(runtime, 'query').mockImplementation((sql, params) => client.query(sql, params));
+        const manager = new ModelManager(TokenModel, runtime);
 
         await manager.delete(testCase.payload);
 
@@ -368,10 +401,9 @@ describe(ModelManager, () => {
                 rows: [{ id: 'token', email: testCase.payload }] as T[],
             }),
         });
-        const manager = new ModelManager(TokenModel, {
-            getDialect: () => 'postgres',
-            getClient: async () => client,
-        } as TangoRuntime);
+        const runtime = aTangoRuntime({ adapter: 'postgres' });
+        vi.spyOn(runtime, 'query').mockImplementation((sql, params) => client.query(sql, params));
+        const manager = new ModelManager(TokenModel, runtime);
 
         await manager.bulkCreate([{ id: 'token', email: testCase.payload }]);
 

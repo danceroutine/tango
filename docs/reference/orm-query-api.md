@@ -131,6 +131,128 @@ VALUES (?, ?), (?, ?)
 RETURNING *
 ```
 
+## Transactions
+
+Some application workflows need several ORM writes to commit or roll back as one unit. `transaction.atomic(...)` defines that boundary.
+
+```ts
+import { transaction } from '@danceroutine/tango-orm';
+
+await transaction.atomic(async (tx) => {
+    const user = await UserModel.objects.create({
+        email: 'author@example.com',
+    });
+
+    await ProfileModel.objects.create({
+        userId: user.id,
+    });
+
+    tx.onCommit(() => {
+        invalidateUserCache(user.id);
+    });
+});
+```
+
+Outside `atomic(...)`, Tango uses the normal autocommit path. Inside `atomic(...)`, manager writes, querysets, and write hooks use the active transaction lease for the current async call chain.
+
+At the persistence layer, the outer block follows the usual SQL transaction shape:
+
+```sql
+BEGIN;
+-- manager-backed writes
+COMMIT;
+```
+
+If the callback throws, Tango rolls the transaction back and rejects the `atomic(...)` call with that failure.
+
+### Nested `atomic()` blocks
+
+Nested `atomic()` blocks create savepoints instead of opening unrelated transactions.
+
+```ts
+await transaction.atomic(async () => {
+    await AuditLogModel.objects.create({ event: 'outer-start' });
+
+    await transaction.atomic(async () => {
+        await DraftModel.objects.create({ title: 'temporary' });
+    });
+});
+```
+
+At the persistence layer, Tango uses a savepoint on the already-leased transaction client:
+
+```sql
+BEGIN;
+SAVEPOINT tango_sp_0;
+-- nested manager-backed writes
+RELEASE SAVEPOINT tango_sp_0;
+COMMIT;
+```
+
+A nested failure rolls work back only to that savepoint. If the error keeps propagating, the outer `atomic(...)` call fails as well.
+
+`tx.savepoint(...)` provides the same nested-savepoint behavior without requiring a local `try`/`catch` when the outer transaction should continue:
+
+```ts
+await transaction.atomic(async (tx) => {
+    const result = await tx.savepoint(async () => {
+        await DraftModel.objects.create({ title: 'temporary' });
+        throw new Error('discard this draft');
+    });
+
+    if (!result.ok) {
+        await AuditLogModel.objects.create({ event: 'draft-discarded' });
+    }
+});
+```
+
+By default, `tx.savepoint(...)` returns `{ ok: true, value }` on success and `{ ok: false, error }` on rollback. Pass `{ throwOnError: true }` when the nested savepoint should rethrow instead of returning a result object.
+
+### `tx.onCommit(callback, options?)`
+
+Some side effects should run only after the outermost commit succeeds. `tx.onCommit(...)` registers that work with the current transaction frame.
+
+```ts
+await transaction.atomic(async (tx) => {
+    const post = await PostModel.objects.create({
+        title: 'Queued publish',
+        slug: 'queued-publish',
+    });
+
+    tx.onCommit(() => {
+        publishPostEvent(post.id);
+    });
+});
+```
+
+The callback queue belongs to the current transaction frame:
+
+- callbacks run only after the outermost commit succeeds
+- callbacks registered in a nested block are discarded if that savepoint rolls back
+- successful nested blocks merge their callbacks into the parent in registration order
+
+`robust: false` is the default. In that mode, the first callback failure stops later callbacks and rejects `atomic(...)` after the database has already committed. With `robust: true`, Tango logs the callback failure and continues with later callbacks.
+
+### Why Tango uses `tx.onCommit(...)`
+
+Django exposes a package-level `transaction.on_commit(...)` helper because Python code often leans on ambient transaction context. Tango keeps ordinary ORM reads and writes ambient inside `atomic(...)`, but it keeps post-commit registration explicit.
+
+That split matters because the two concerns are different. Querysets, manager writes, and hooks should quietly join the active transaction once the boundary exists. Post-commit callbacks are different: they introduce new work that is tied to the commit outcome, so Tango makes that registration happen through the `tx` value that established the boundary. In practice, helper code that only reads or writes through the ORM needs no extra argument, while helper code that must enqueue commit-aware side effects can accept the narrow `AtomicTransaction` contract directly.
+
+### Backend notes
+
+The transaction contract stays the same across supported SQL backends. The runtime notes below are split by dialect because connection management and operational limits still vary.
+
+#### PostgreSQL
+
+PostgreSQL uses one shared pool for ordinary autocommit work and leases one dedicated `PoolClient` for each outer `atomic()` block.
+
+#### SQLite
+
+SQLite supports `transaction.atomic(...)` only on file-backed databases in this milestone. `:memory:` SQLite still works for ordinary autocommit queries, but `atomic(...)` rejects because the transaction workflow needs a second handle to the same database file.
+
+Concurrent outer SQLite transactions still follow normal SQLite file-locking semantics, so overlapping write transactions are not guaranteed to succeed together.
+
 ## `QuerySet<TModel, TBaseResult = TModel, TSourceModel = unknown, THydrated = Record<never, never>>`
 
 `QuerySet` represents a database query against one model. Each refinement returns a new queryset, leaving the earlier one unchanged. A queryset refinement only describes work. An execution method is a terminal call that sends SQL to the database and returns a promise, such as `fetch(...)`, `fetchOne(...)`, `count()`, or `exists()`.

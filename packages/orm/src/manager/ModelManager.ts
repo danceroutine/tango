@@ -7,6 +7,7 @@ import { QuerySet as QuerySetClass } from '../query/index';
 import type { Dialect, QueryExecutor } from '../query/index';
 import type { TangoRuntime } from '../runtime/TangoRuntime';
 import { OrmSqlSafetyAdapter } from '../validation';
+import { TransactionEngine } from '../transaction/internal/context';
 import type { ManagerLike } from './ManagerLike';
 import { MutationCompiler } from './internal/MutationCompiler';
 import { RuntimeBoundClient } from './internal/RuntimeBoundClient';
@@ -45,9 +46,11 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
     private readonly model: ModelLike<TModelRow>;
     private readonly client: RuntimeBoundClient;
     private readonly dialect: Dialect;
+    private readonly runtime: TangoRuntime;
 
     constructor(model: ModelLike<TModelRow>, runtime: TangoRuntime) {
         this.model = model;
+        this.runtime = runtime;
         this.client = new RuntimeBoundClient(runtime);
         this.dialect = runtime.getDialect() as Dialect;
         this.mutationCompiler = new MutationCompiler(this.dialect);
@@ -186,6 +189,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
             record: created,
             model: this.model,
             manager: this,
+            transaction: this.getHookTransaction(),
         });
         return created;
     }
@@ -217,6 +221,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
             record: updated,
             model: this.model,
             manager: this,
+            transaction: this.getHookTransaction(),
         });
         return updated;
     }
@@ -228,6 +233,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
             current,
             model: this.model,
             manager: this,
+            transaction: this.getHookTransaction(),
         });
         const validatedPlan = sqlSafetyAdapter.validate({
             kind: 'delete',
@@ -240,6 +246,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
             previous: current,
             model: this.model,
             manager: this,
+            transaction: this.getHookTransaction(),
         });
     }
 
@@ -254,6 +261,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
                 rows: perRowPrepared,
                 model: this.model,
                 manager: this,
+                transaction: this.getHookTransaction(),
             })) ?? perRowPrepared;
         const preparedKeys = Object.keys(batchPrepared[0] ?? {});
         if (preparedKeys.length === 0) {
@@ -274,6 +282,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
                     record,
                     model: this.model,
                     manager: this,
+                    transaction: this.getHookTransaction(),
                 })
             )
         );
@@ -281,6 +290,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
             records: result.rows,
             model: this.model,
             manager: this,
+            transaction: this.getHookTransaction(),
         });
         return result.rows;
     }
@@ -291,6 +301,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
                 data,
                 model: this.model,
                 manager: this,
+                transaction: this.getHookTransaction(),
             })) ?? data
         );
     }
@@ -307,7 +318,12 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
                 current,
                 model: this.model,
                 manager: this,
+                transaction: this.getHookTransaction(),
             })) ?? patch
         );
+    }
+
+    private getHookTransaction() {
+        return TransactionEngine.forRuntime(this.runtime).getActiveTransaction();
     }
 }

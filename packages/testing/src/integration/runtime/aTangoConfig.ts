@@ -2,6 +2,7 @@ import { defineConfig, type TangoConfig } from '@danceroutine/tango-config';
 
 export type TestTangoConfigOptions = {
     adapter?: 'sqlite' | 'postgres';
+    sqliteFilename?: string;
 };
 
 /**
@@ -9,6 +10,7 @@ export type TestTangoConfigOptions = {
  */
 export function aTangoConfig(options: TestTangoConfigOptions = {}): TangoConfig {
     const adapter = options.adapter ?? 'sqlite';
+    const sqliteFilename = options.sqliteFilename ?? ':memory:';
 
     return defineConfig({
         current: 'test',
@@ -17,7 +19,7 @@ export function aTangoConfig(options: TestTangoConfigOptions = {}): TangoConfig 
                 name: 'development',
                 db:
                     adapter === 'sqlite'
-                        ? { adapter: 'sqlite', filename: ':memory:', maxConnections: 1 }
+                        ? { adapter: 'sqlite', filename: sqliteFilename, maxConnections: 1 }
                         : {
                               adapter: 'postgres',
                               url: 'postgres://postgres:postgres@localhost:5432/tango',
@@ -29,7 +31,7 @@ export function aTangoConfig(options: TestTangoConfigOptions = {}): TangoConfig 
                 name: 'test',
                 db:
                     adapter === 'sqlite'
-                        ? { adapter: 'sqlite', filename: ':memory:', maxConnections: 1 }
+                        ? { adapter: 'sqlite', filename: sqliteFilename, maxConnections: 1 }
                         : {
                               adapter: 'postgres',
                               url: 'postgres://postgres:postgres@localhost:5432/tango_test',
@@ -41,7 +43,7 @@ export function aTangoConfig(options: TestTangoConfigOptions = {}): TangoConfig 
                 name: 'production',
                 db:
                     adapter === 'sqlite'
-                        ? { adapter: 'sqlite', filename: ':memory:', maxConnections: 1 }
+                        ? { adapter: 'sqlite', filename: sqliteFilename, maxConnections: 1 }
                         : {
                               adapter: 'postgres',
                               url: 'postgres://postgres:postgres@localhost:5432/tango',

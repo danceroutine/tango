@@ -13,6 +13,9 @@ describe('@danceroutine/tango-testing', () => {
             expect(client.commit).toBeInstanceOf(Function);
             expect(client.rollback).toBeInstanceOf(Function);
             expect(client.close).toBeInstanceOf(Function);
+            expect(client.createSavepoint).toBeInstanceOf(Function);
+            expect(client.releaseSavepoint).toBeInstanceOf(Function);
+            expect(client.rollbackToSavepoint).toBeInstanceOf(Function);
         });
 
         it('query returns empty rows by default', async () => {
@@ -29,6 +32,9 @@ describe('@danceroutine/tango-testing', () => {
             await expect(client.commit()).resolves.toBeUndefined();
             await expect(client.rollback()).resolves.toBeUndefined();
             await expect(client.close()).resolves.toBeUndefined();
+            await expect(client.createSavepoint('sp')).resolves.toBeUndefined();
+            await expect(client.releaseSavepoint('sp')).resolves.toBeUndefined();
+            await expect(client.rollbackToSavepoint('sp')).resolves.toBeUndefined();
         });
     });
 

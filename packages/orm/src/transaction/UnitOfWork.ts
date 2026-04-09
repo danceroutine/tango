@@ -1,4 +1,5 @@
 import type { DBClient } from '../connection/clients/DBClient';
+import { TransactionEngine } from './internal/context';
 
 /**
  * Unit of Work pattern implementation for managing database transactions.
@@ -16,6 +17,9 @@ import type { DBClient } from '../connection/clients/DBClient';
  *   throw error;
  * }
  * ```
+ *
+ * @deprecated Use `transaction.atomic(async (tx) => { ... })` for application
+ * transaction workflows. `UnitOfWork` remains exported only for compatibility.
  */
 export class UnitOfWork {
     static readonly BRAND = 'tango.orm.unit_of_work' as const;
@@ -42,6 +46,7 @@ export class UnitOfWork {
      * Convenience factory that constructs and begins a unit of work.
      */
     static async start(client: DBClient): Promise<UnitOfWork> {
+        TransactionEngine.assertNoActiveAtomicTransaction();
         const uow = new UnitOfWork(client);
         await uow.begin();
         return uow;
@@ -51,6 +56,7 @@ export class UnitOfWork {
      * Begin a transaction if one is not already active.
      */
     async begin(): Promise<void> {
+        TransactionEngine.assertNoActiveAtomicTransaction();
         if (!this.isActive) {
             await this.client.begin();
             this.isActive = true;

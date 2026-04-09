@@ -12,11 +12,11 @@ Tango supports one-level relation hydration for `belongsTo`, `hasOne`, and `hasM
 
 Future relation work should extend that foundation to nested traversal such as `author__profile`, related-row projection, many-to-many hydration, and ambient or generated typing that removes explicit target-model generics from reverse relation calls.
 
-### ORM transaction support
+### Transaction ergonomics beyond `atomic(...)`
 
-The ORM currently focuses on ordinary manager-driven reads and writes.
+The core ORM transaction boundary is now `transaction.atomic(async (tx) => ...)`, including nested savepoints and post-commit work through `tx.onCommit(...)`.
 
-Transaction support for application code is still missing from the supported ORM surface. A future transaction API needs to define how multi-step write workflows open a transaction boundary, how that boundary is scoped to the active runtime and database client, and how application code should use it without bypassing the normal model manager path.
+The base transaction contract is in place now, so the remaining work is mostly about fit and ergonomics. The main follow-up questions are request-scoped wrappers in host adapters, broader multi-database routing, and better SQLite ergonomics beyond the current file-backed transaction boundary.
 
 ### Agentic Development Support
 

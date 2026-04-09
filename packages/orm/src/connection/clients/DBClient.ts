@@ -10,6 +10,12 @@ export interface DBClient {
     commit(): Promise<void>;
     /** Roll back current transaction. */
     rollback(): Promise<void>;
+    /** Create a savepoint inside the current transaction. */
+    createSavepoint(name: string): Promise<void>;
+    /** Release a previously-created savepoint. */
+    releaseSavepoint(name: string): Promise<void>;
+    /** Roll back current transaction state to a savepoint. */
+    rollbackToSavepoint(name: string): Promise<void>;
     /** Close underlying connection resources. */
     close(): Promise<void>;
 }
