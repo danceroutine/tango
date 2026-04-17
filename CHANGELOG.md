@@ -2,6 +2,10 @@
 
 This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
 
+## 1.5.0 - 2026-04-17
+
+- Add generated relation typing, deep relation hydration, and the supporting tooling and package contract updates. Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-resources`, `@danceroutine/tango-codegen`, `@danceroutine/tango-openapi`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`, `@danceroutine/tango-adapters-express`.
+
 ## 1.4.0 - 2026-04-09
 
 - Add a supported ORM transaction API centered on `transaction.atomic(async (tx) => ...)`, nested savepoints, and `tx.onCommit(...)`.

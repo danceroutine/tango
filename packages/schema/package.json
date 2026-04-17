@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-schema",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "Model factory, Zod helpers, and metadata utilities for Tango",
     "type": "module",
     "main": "./dist/index.js",
