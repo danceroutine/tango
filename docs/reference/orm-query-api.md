@@ -308,6 +308,7 @@ const postCards = await PostModel.objects
     .fetch();
 
 const [first] = postCards;
+first?.id;
 first?.title;
 ```
 
@@ -328,7 +329,10 @@ Use `selectRelated(...)` when the requested path stays single-valued from hop to
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts.at(0)?.author?.profile?.displayName;
+const firstPost = posts.at(0);
+firstPost?.id;
+firstPost?.author?.email;
+firstPost?.author?.profile?.displayName;
 ```
 
 `selectRelated(...)` accepts nested paths such as `author__profile`, but it rejects any path that crosses a collection edge. A path like `posts__author` belongs in `prefetchRelated(...)`, not `selectRelated(...)`.
@@ -366,8 +370,14 @@ In contrast, use `prefetchRelated(...)` when the requested path includes a colle
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users.at(0)?.posts.at(0)?.author?.email;
-users.at(0)?.posts.at(0)?.comments.at(0)?.body;
+const firstUser = users.at(0);
+const firstPost = firstUser?.posts.at(0);
+const firstComment = firstPost?.comments.at(0);
+
+firstUser?.id;
+firstPost?.title;
+firstPost?.author?.email;
+firstComment?.body;
 ```
 
 `prefetchRelated(...)` runs the base query first, then runs batched follow-up queries for the planned collection edges. A user record with no matching posts still receives `posts: []`, and a post record with no matching comments receives `comments: []`.
@@ -410,6 +420,7 @@ const postCards = withAuthor.select(['id', 'title'] as const);
 const page = await postCards.fetch();
 
 const [first] = page;
+first?.id;
 first?.title;
 first?.author?.email;
 ```
