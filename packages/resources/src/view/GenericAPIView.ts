@@ -167,7 +167,7 @@ export abstract class GenericAPIView<
             const [result, totalCount] = await Promise.all([resultPromise, totalCountPromise]);
             const serializer = this.getSerializer();
             const response = paginator.toResponse(
-                result.results.map((row) => serializer.toRepresentation(row)) as SerializerOutput<TSerializer>[],
+                result.toArray().map((row) => serializer.toRepresentation(row)) as SerializerOutput<TSerializer>[],
                 { totalCount }
             ) as OffsetPaginatedResponse<SerializerOutput<TSerializer>>;
 

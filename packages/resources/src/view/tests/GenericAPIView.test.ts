@@ -229,7 +229,7 @@ describe(GenericAPIView, () => {
 
     it('applies configured filters and supports custom paginator factories', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ results: [], nextCursor: null }));
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ items: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
         currentUserModel = {
@@ -262,7 +262,7 @@ describe(GenericAPIView, () => {
 
     it('coerces boolean query params from model metadata during list filters', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ results: [], nextCursor: null }));
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ items: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
         currentUserModel = {
@@ -295,7 +295,7 @@ describe(GenericAPIView, () => {
 
     it('coerces numeric query params from model metadata during list filters', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ results: [], nextCursor: null }));
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ items: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
         currentUserModel = {
@@ -328,7 +328,7 @@ describe(GenericAPIView, () => {
 
     it('skips empty filter results and ignores invalid ordering tokens', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ results: [], nextCursor: null }));
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ items: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
         currentUserModel = {

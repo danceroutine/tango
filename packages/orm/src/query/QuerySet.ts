@@ -340,7 +340,10 @@ export class QuerySet<
             : typeof shape === 'function'
               ? await limited.fetch(shape)
               : await limited.fetch(shape);
-        return result.results[0] ?? null;
+        for (const row of result) {
+            return row;
+        }
+        return null;
     }
 
     /**

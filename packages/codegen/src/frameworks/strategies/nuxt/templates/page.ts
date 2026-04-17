@@ -16,9 +16,9 @@ const todos = await TodoModel.objects.query().orderBy('-createdAt').limit(10).fe
 <template>
     <main style="font-family: system-ui; margin: 2rem auto; max-width: 60ch;">
         <h1>Tango + Nuxt</h1>
-        <p>Showing {{ todos.results.length }} todos through Tango's runtime-backed model manager.</p>
+        <p>Showing {{ todos.toArray().length }} todos through Tango's runtime-backed model manager.</p>
         <ul>
-            <li v-for="todo in todos.results" :key="todo.id">{{ todo.title }}</li>
+            <li v-for="todo in todos.toArray()" :key="todo.id">{{ todo.title }}</li>
         </ul>
     </main>
 </template>
