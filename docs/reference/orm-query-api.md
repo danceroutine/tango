@@ -328,9 +328,7 @@ Use `selectRelated(...)` when the requested path stays single-valued from hop to
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-for (const post of posts) {
-    post.author?.profile?.displayName;
-}
+posts[0]?.author?.profile?.displayName;
 ```
 
 `selectRelated(...)` accepts nested paths such as `author__profile`, but it rejects any path that crosses a collection edge. A path like `posts__author` belongs in `prefetchRelated(...)`, not `selectRelated(...)`.
@@ -368,12 +366,8 @@ In contrast, use `prefetchRelated(...)` when the requested path includes a colle
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-for (const user of users) {
-    for (const post of user.posts) {
-        post.author?.email;
-        post.comments[0]?.body;
-    }
-}
+users[0]?.posts[0]?.author?.email;
+users[0]?.posts[0]?.comments[0]?.body;
 ```
 
 `prefetchRelated(...)` runs the base query first, then runs batched follow-up queries for the planned collection edges. A user record with no matching posts still receives `posts: []`, and a post record with no matching comments receives `comments: []`.
@@ -424,7 +418,7 @@ The result contains the selected `PostModel` fields and the hydrated `author` mo
 
 ### `fetch(shape?)`
 
-Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that implements `Iterable<Out>`, so you can use `for...of`, array spread, or destructuring such as `const [first] = page`. For compatibility, `QueryResult` still exposes a deprecated `results` getter.
+Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that implements `Iterable<Out>` and also exposes `length` and `map` like an array read surface. You can use `for...of`, array spread, destructuring such as `const [first] = page`, or index the first row with `page[0]` when the result is non-empty. For compatibility, `QueryResult` still exposes a deprecated `results` getter.
 
 `toArray()` returns a shallow copy when you want an ordinary array value:
 
@@ -432,10 +426,6 @@ Use `fetch(shape?)` when application code wants all records for the current quer
 const page = await PostModel.objects.query().filter({ published: true }).fetch();
 const rows = page.toArray();
 rows.map((post) => post.id);
-```
-
-```ts
-const page = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetch();
 ```
 
 At the queryset level, `nextCursor` is currently `null`. Cursor pagination belongs to resource paginators rather than the queryset contract itself.

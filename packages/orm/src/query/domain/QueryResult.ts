@@ -20,6 +20,14 @@ export class QueryResult<T> implements Iterable<T> {
         return this.items[Symbol.iterator]();
     }
 
+    get length(): number {
+        return this.items.length;
+    }
+
+    map<U>(callbackfn: (value: T, index: number, array: readonly T[]) => U, thisArg?: unknown): U[] {
+        return this.items.map(callbackfn, thisArg);
+    }
+
     toArray(): T[] {
         return [...this.items];
     }
@@ -29,13 +37,13 @@ export class QueryResult<T> implements Iterable<T> {
     }
 
     /**
-     * @deprecated Iterate the `QueryResult` directly or call `toArray()` instead.
+     * @deprecated Use iteration, `length`, `map`, or `toArray()` instead.
      */
     get results(): readonly T[] {
         if (!didWarnDeprecatedResults) {
             didWarnDeprecatedResults = true;
             getLogger('tango.orm.query_result').warn(
-                '`QueryResult.results` is deprecated. Iterate the QueryResult directly or call `toArray()` instead.'
+                '`QueryResult.results` is deprecated. Use iteration, `length`, `map`, or `toArray()` instead.'
             );
         }
         return this.items;

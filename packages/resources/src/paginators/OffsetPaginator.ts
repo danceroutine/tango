@@ -191,7 +191,7 @@ export class OffsetPaginator<T extends Record<string, unknown>> implements Pagin
 
         const totalCount = await this.count();
 
-        return new OffsetPage(results.items, page, this.perPage, totalCount);
+        return new OffsetPage([...results], page, this.perPage, totalCount);
     }
 
     /**

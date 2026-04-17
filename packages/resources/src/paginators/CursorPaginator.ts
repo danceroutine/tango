@@ -182,7 +182,7 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
         const appliedCursor = cursor ?? this.cursor;
         this.cursor = appliedCursor;
         const fetched = await this.apply(this.queryset).fetch();
-        const results = [...fetched.items];
+        const results = [...fetched];
         const hasMore = results.length > this.limit;
 
         if (hasMore) {
