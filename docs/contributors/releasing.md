@@ -67,6 +67,8 @@ The workflow performs these steps:
 
 The stable versioning command is `pnpm changeset:version`, which runs `scripts/release/version-with-root-changelog.ts`. That script executes `changeset version`, refreshes the lockfile, and prepends the new entry to the root `CHANGELOG.md`.
 
+Each pending changeset summary is copied into the new release entry as authored Markdown rather than being rewritten into a synthetic bullet format. That means maintainers should write the changeset summary in the changelog shape they want to preserve, whether that is a concise paragraph, a short bullet list, or a compact illustrative code block for a major feature.
+
 The release job pins Node 24 so trusted publishing can use the bundled npm 11 toolchain without a custom bootstrap layer in the workflow.
 
 If `pnpm changeset:version` produces no diff, the stable workflow becomes a no-op for publishing. That usually means there were no pending releasable changesets on `main`.

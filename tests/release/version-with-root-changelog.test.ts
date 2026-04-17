@@ -131,7 +131,7 @@ No stable releases have been published yet.
         );
 
         expect(content).toContain('## 0.1.0 - 2026-03-14');
-        expect(content).toContain('Ship the first core primitive. Affected packages: `@danceroutine/tango-core`.');
+        expect(content).toContain('Ship the first core primitive.');
         expect(content).not.toContain('No stable releases have been published yet.');
     });
 
@@ -143,7 +143,7 @@ This file is generated from stable release changesets during Tango stable releas
 
 ## 0.1.0 - 2026-01-01
 
-- First stable release. Affected packages: \`@danceroutine/tango-core\`.
+First stable release.
 `,
             {
                 version: '0.2.0',
@@ -164,6 +164,44 @@ This file is generated from stable release changesets during Tango stable releas
         );
 
         expect(content.indexOf('## 0.2.0 - 2026-03-14')).toBeLessThan(content.indexOf('## 0.1.0 - 2026-01-01'));
+    });
+
+    it('preserves authored markdown summaries verbatim', () => {
+        const content = prependReleaseEntry(
+            `# Changelog
+
+This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
+
+No stable releases have been published yet.
+`,
+            {
+                version: '0.2.0',
+                date: '2026-03-14',
+                notes: [
+                    {
+                        filename: 'gamma.md',
+                        packages: ['@danceroutine/tango-core'],
+                        summary: `Core querying now supports richer relation hydration.
+
+- Add nested eager-loading support.
+
+Previously:
+
+\`\`\`ts
+const posts = await PostModel.objects.query().fetch();
+\`\`\`
+`,
+                        bumpTypes: { '@danceroutine/tango-core': 'minor' },
+                    },
+                ],
+            },
+            ['@danceroutine/tango-core']
+        );
+
+        expect(content).toContain('Core querying now supports richer relation hydration.');
+        expect(content).toContain('- Add nested eager-loading support.');
+        expect(content).toContain('```ts');
+        expect(content).not.toContain('Affected packages:');
     });
 });
 
@@ -211,9 +249,8 @@ describe(runReleaseVersioning, () => {
         expect(schemaPackage.version).toBe('0.2.0');
         expect(lockfile).toContain('lockfileVersion: 9.0');
         expect(changelog).toContain('## 0.2.0 - 2026-03-14');
-        expect(changelog).toContain(
-            'Add first stable schema primitives. Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-schema`.'
-        );
+        expect(changelog).toContain('Add first stable schema primitives.');
+        expect(changelog).not.toContain('Affected packages:');
     });
 
     it('collects pending changesets from disk in filename order', async () => {

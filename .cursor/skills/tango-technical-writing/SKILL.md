@@ -1,6 +1,6 @@
 ---
 name: tango-technical-writing
-description: Use this skill when writing or revising Tango documentation, package READMEs, or public-facing docstrings so the prose stays natural, pedagogical, audience-aware, and contract-accurate.
+description: Use this skill when writing or revising Tango documentation, changelogs, package READMEs, or public-facing docstrings so the prose stays natural, pedagogical, audience-aware, and contract-accurate.
 ---
 
 # Tango Technical Writing
@@ -10,6 +10,7 @@ description: Use this skill when writing or revising Tango documentation, packag
 Use this skill for:
 
 - `docs/**/*.md`
+- `CHANGELOG.md` and changelog-oriented release summaries
 - package `README.md`
 - public-facing JSDoc and docstrings
 
@@ -18,8 +19,11 @@ Do not use this skill for contributor-only code changes that do not touch techni
 ## Operating Rules
 
 1. State `Executing tango-technical-writing` before doing any other work.
-2. Treat `references/principles.md` and `references/anti-patterns.md` as the style and review source of truth when they are available.
-3. If those reference files are unavailable, continue using the embedded rules in this skill and note reduced certainty.
+2. Treat this skill’s companion reference docs as the style and review source of truth when they are available:
+   - `references/principles.md`
+   - `references/anti-patterns.md`
+   These paths are relative to the skill directory (they are not expected to live at the repository root).
+3. If those reference files cannot be located (for example, the skill was copied without its `references/` directory), continue using the embedded rules in this skill and note reduced certainty.
 4. Optimize first for reader clarity and contract accuracy, then for style polish.
 5. Verify behavior against current code or the current public contract before making claims about behavior, guarantees, names, or responsibilities.
 6. Perform every review pass against the current full draft text, not against memory or a summary of the draft.
@@ -108,6 +112,7 @@ Choose the primary document type:
 
 - end-user docs
 - contributor docs
+- changelog or release notes
 - package README
 - reference page
 - docstring
@@ -250,6 +255,91 @@ Optimize for:
 - release workflow
 - implementation constraints
 - repository details only when they reduce maintainer ambiguity
+
+#### Changelog and release notes
+
+Treat changelog writing as upgrade-oriented release communication.
+
+The target reader is:
+
+- a maintainer deciding whether to upgrade now
+- an application developer scanning for new capabilities, fixes, or contract changes
+- a contributor reconstructing the release arc after the fact
+
+Optimize for:
+
+- user-visible capability changes
+- observable behavior changes
+- public API and contract changes
+- upgrade-relevant release framing
+- scan speed
+
+Do not optimize for:
+
+- implementation archaeology
+- internal refactor narration
+- package-by-package bookkeeping presented as prose
+- marketing voice
+
+When writing an individual changelog note:
+
+- explain the change to a reader with zero context
+- lead with the new capability, behavior change, or fix
+- keep one note about one release-facing change
+- prefer outcome language over implementation language
+- use exact API names only when they help the reader recognize the feature
+- mention internal mechanics only when they explain observable behavior, compatibility, or upgrade risk
+
+When shaping a full release:
+
+- write a short release thesis when the release has a coherent feature arc
+- use the thesis to explain what ties the release together
+- keep the tone explanatory rather than promotional
+- order notes so they support the release thesis instead of reading like unrelated scraps
+
+Default release-thesis guidance:
+
+- patch releases usually do not need a thesis unless one clear upgrade concern dominates the release
+- minor releases should usually include a short 1 to 3 sentence thesis
+- larger feature releases may include a thesis plus grouped bullets by theme
+
+For Tango's current lockstep release model, omit package-by-package impact lists from changelog prose.
+
+If a future release workflow needs package-specific release notes:
+
+- keep package detail secondary to the release-facing explanation
+- do not let package metadata carry the meaning of the note
+
+Use illustrative fenced examples only when they materially improve changelog comprehension.
+
+Examples are appropriate when:
+
+- the release adds major functionality
+- the release changes a public API or contract in a way that is easiest to show in code
+- the upgrade benefit can be shown in a compact diff or side-by-side comparison
+
+Examples are usually not appropriate when:
+
+- the release is a patch with small bug fixes
+- the change is docs-only or internal-only
+- the benefit cannot be shown honestly in a short snippet
+
+When using illustrative examples:
+
+- treat them as evidence, not decoration
+- prefer one example per release, or one per major release theme
+- show the public API delta, not internal setup
+- keep the `Previously` and `Now` blocks on the same task or workflow so the contrast is immediate
+- keep snippets short enough to scan quickly
+- verify that every snippet is contract-accurate for the release being described
+- prefer `Previously` and `Now`, or `Without this release` and `With this release`, when a literal `Before` and `After` would misrepresent the older API
+- use short comments when they make the upgrade win legible at a glance
+- for transaction or consistency releases, place comments at the point where a thrown exception or eager side effect would leave the workflow partially applied
+- for typing releases, add comments that show the relevant inferred result shape or the property access that now succeeds or fails
+- do not add decorative comments that merely restate the code
+- if a `Previously` block does not make the missing capability, missing type information, or failure mode obvious, rewrite it until the contrast is explicit
+
+If changelog content is generated from terse source notes, keep individual source notes concise and place release storytelling, grouped framing, and fenced examples in a release-level summary surface rather than forcing them into raw bullet text.
 
 #### Package READMEs
 
