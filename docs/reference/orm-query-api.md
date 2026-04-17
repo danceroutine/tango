@@ -328,7 +328,7 @@ Use `selectRelated(...)` when the requested path stays single-valued from hop to
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts[0]?.author?.profile?.displayName;
+posts.at(0)?.author?.profile?.displayName;
 ```
 
 `selectRelated(...)` accepts nested paths such as `author__profile`, but it rejects any path that crosses a collection edge. A path like `posts__author` belongs in `prefetchRelated(...)`, not `selectRelated(...)`.
@@ -366,8 +366,8 @@ In contrast, use `prefetchRelated(...)` when the requested path includes a colle
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users[0]?.posts[0]?.author?.email;
-users[0]?.posts[0]?.comments[0]?.body;
+users.at(0)?.posts.at(0)?.author?.email;
+users.at(0)?.posts.at(0)?.comments.at(0)?.body;
 ```
 
 `prefetchRelated(...)` runs the base query first, then runs batched follow-up queries for the planned collection edges. A user record with no matching posts still receives `posts: []`, and a post record with no matching comments receives `comments: []`.
@@ -418,7 +418,7 @@ The result contains the selected `PostModel` fields and the hydrated `author` mo
 
 ### `fetch(shape?)`
 
-Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that implements `Iterable<Out>` and also exposes `length` and `map` like an array read surface. You can use `for...of`, array spread, destructuring such as `const [first] = page`, or index the first row with `page[0]` when the result is non-empty. For compatibility, `QueryResult` still exposes a deprecated `results` getter.
+Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that implements `Iterable<Out>` and also exposes `length`, `map`, and `at` like an array read surface. You can use `for...of`, array spread, destructuring such as `const [first] = page`, or read a row with `page.at(0)` when the result is non-empty. For compatibility, `QueryResult` still exposes a deprecated `results` getter.
 
 `toArray()` returns a shallow copy when you want an ordinary array value:
 

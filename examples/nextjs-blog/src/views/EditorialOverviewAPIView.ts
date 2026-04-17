@@ -44,8 +44,8 @@ export class EditorialOverviewAPIView extends APIView {
 
         return TangoResponse.json(
             EditorialOverviewResponseSchema.parse({
-                authorsWithRecentPosts: [...authorsWithRecentPosts],
-                recentPostsWithDiscussion: [...recentPostsWithDiscussion],
+                authorsWithRecentPosts: authorsWithRecentPosts.toArray(),
+                recentPostsWithDiscussion: recentPostsWithDiscussion.toArray(),
             })
         );
     }

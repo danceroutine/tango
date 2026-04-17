@@ -1,6 +1,6 @@
 import type { TangoQueryParams } from '@danceroutine/tango-core';
 import type { PaginatedResponse } from './PaginatedResponse';
-import type { QuerySet } from '@danceroutine/tango-orm';
+import type { QueryResult, QuerySet } from '@danceroutine/tango-orm';
 
 export interface Page<T> {
     results: T[];
@@ -22,5 +22,8 @@ export interface Paginator<
         queryset: QuerySet<TModel, TBaseResult, TSourceModel, THydrated>
     ): QuerySet<TModel, TBaseResult, TSourceModel, THydrated>;
     needsTotalCount(): boolean;
-    toResponse(results: TResult[], context?: { totalCount?: number; params?: TangoQueryParams }): TResponse;
+    toResponse(
+        results: TResult[] | QueryResult<TResult>,
+        context?: { totalCount?: number; params?: TangoQueryParams }
+    ): TResponse;
 }

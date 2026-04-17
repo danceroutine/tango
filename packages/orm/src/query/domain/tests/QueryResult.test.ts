@@ -8,6 +8,13 @@ describe(QueryResult, () => {
         expect(r.map((row) => row.id)).toEqual([1, 2]);
     });
 
+    it('supports at for indexed access', () => {
+        const r = new QueryResult(['a', 'b']);
+        expect(r.at(0)).toBe('a');
+        expect(r.at(-1)).toBe('b');
+        expect(r.at(2)).toBeUndefined();
+    });
+
     it('remains iterable', () => {
         const r = new QueryResult([{ a: 1 }, { a: 2 }]);
         expect([...r]).toEqual([{ a: 1 }, { a: 2 }]);

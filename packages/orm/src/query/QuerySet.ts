@@ -3,7 +3,6 @@ import type { Dialect } from './domain/Dialect';
 import type { QuerySetState } from './domain/QuerySetState';
 import type { TableMeta } from './domain/TableMeta';
 import type { QNode } from './domain/QNode';
-import type { QueryResult } from './domain/QueryResult';
 import type { OrderToken } from './domain/OrderToken';
 import type { FilterInput } from './domain/FilterInput';
 import type { CompiledQuery } from './domain/CompiledQuery';

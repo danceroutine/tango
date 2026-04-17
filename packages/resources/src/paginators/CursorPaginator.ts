@@ -1,5 +1,6 @@
 import { TangoQueryParams } from '@danceroutine/tango-core';
-import type { FilterInput, QuerySet } from '@danceroutine/tango-orm';
+import type { FilterInput, QueryResult, QuerySet } from '@danceroutine/tango-orm';
+import { resolveQueryResultRows } from '../pagination/resolveQueryResultRows';
 import type { Paginator, Page } from '../pagination/Paginator';
 import type { CursorPaginatedResponse } from '../pagination/PaginatedResponse';
 import { CursorPaginationInput } from '../pagination/CursorPaginationInput';
@@ -134,10 +135,10 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
     }
 
     toResponse<TResult>(
-        results: TResult[],
+        results: TResult[] | QueryResult<TResult>,
         _context?: { totalCount?: number; params?: TangoQueryParams }
     ): CursorPaginatedResponse<TResult> {
-        const response: CursorPaginatedResponse<TResult> = { results };
+        const response: CursorPaginatedResponse<TResult> = { results: resolveQueryResultRows(results) };
         if (this.nextCursor) {
             response.next = this.buildPageLink(this.nextCursor);
         }
@@ -150,7 +151,10 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
     /**
      * Backward-compatible alias for `toResponse`.
      */
-    getPaginatedResponse<TResult>(results: TResult[], _totalCount?: number): CursorPaginatedResponse<TResult> {
+    getPaginatedResponse<TResult>(
+        results: TResult[] | QueryResult<TResult>,
+        _totalCount?: number
+    ): CursorPaginatedResponse<TResult> {
         return this.toResponse(results);
     }
 
@@ -182,7 +186,7 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
         const appliedCursor = cursor ?? this.cursor;
         this.cursor = appliedCursor;
         const fetched = await this.apply(this.queryset).fetch();
-        const results = [...fetched];
+        const results = resolveQueryResultRows(fetched);
         const hasMore = results.length > this.limit;
 
         if (hasMore) {

@@ -15,3 +15,4 @@ export type {
     OffsetPaginatedResponse,
     PaginatedResponse,
 } from './PaginatedResponse';
+export { resolveQueryResultRows } from './resolveQueryResultRows';

@@ -13,7 +13,6 @@ export type { OrderSpec } from './OrderSpec';
 export type { OrderToken } from './OrderToken';
 export type { QNode } from './QNode';
 export { QueryResult } from './QueryResult';
-export type { QueryResult } from './QueryResult';
 export type { QuerySetState } from './QuerySetState';
 export type { RelationMeta } from './RelationMeta';
 export type {

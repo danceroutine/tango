@@ -7,12 +7,7 @@ export class QueryResult<T> implements Iterable<T> {
     readonly items: readonly T[];
 
     constructor(items: readonly T[], options?: { nextCursor?: string | null }) {
-        Object.defineProperty(this, 'items', {
-            value: items,
-            enumerable: false,
-            writable: false,
-            configurable: false,
-        });
+        this.items = items;
         this.nextCursor = options?.nextCursor ?? null;
     }
 
@@ -26,6 +21,10 @@ export class QueryResult<T> implements Iterable<T> {
 
     map<U>(callbackfn: (value: T, index: number, array: readonly T[]) => U, thisArg?: unknown): U[] {
         return this.items.map(callbackfn, thisArg);
+    }
+
+    at(index: number): T | undefined {
+        return this.items.at(index);
     }
 
     toArray(): T[] {

@@ -5,7 +5,7 @@ describe(aQueryResult, () => {
     it('returns default query-result shape', () => {
         const result = aQueryResult();
         expect(result.toJSON()).toEqual({ results: [], nextCursor: null });
-        expect([...result]).toEqual([]);
+        expect(result.length).toBe(0);
     });
 
     it('applies provided overrides', () => {
@@ -14,6 +14,8 @@ describe(aQueryResult, () => {
             results: [1, 2],
             nextCursor: 'abc',
         });
-        expect([...result]).toEqual([1, 2]);
+        expect(result.length).toBe(2);
+        expect(result.at(0)).toBe(1);
+        expect(result.at(1)).toBe(2);
     });
 });
