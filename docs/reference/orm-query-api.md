@@ -307,7 +307,7 @@ const postCards = await PostModel.objects
     .select(['id', 'title'] as const)
     .fetch();
 
-const [first] = postCards.toArray();
+const [first] = postCards;
 first?.title;
 ```
 
@@ -415,7 +415,7 @@ const postCards = withAuthor.select(['id', 'title'] as const);
 
 const page = await postCards.fetch();
 
-const [first] = page.toArray();
+const [first] = page;
 first?.title;
 first?.author?.email;
 ```
@@ -424,7 +424,7 @@ The result contains the selected `PostModel` fields and the hydrated `author` mo
 
 ### `fetch(shape?)`
 
-Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that you can iterate directly or convert to an array with `toArray()`. For compatibility, `QueryResult` still exposes a deprecated `results` getter.
+Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that implements `Iterable<Out>`, so you can use `for...of`, array spread, or destructuring such as `const [first] = page`. Call `toArray()` when you need a real array instance (for example, `.map` without spreading). For compatibility, `QueryResult` still exposes a deprecated `results` getter.
 
 ```ts
 const page = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetch();

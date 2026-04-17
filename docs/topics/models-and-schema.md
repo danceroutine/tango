@@ -112,7 +112,7 @@ const recentPosts = await PostModel.objects
     .orderBy('-createdAt')
     .fetch();
 
-const [firstPost] = recentPosts.toArray();
+const [firstPost] = recentPosts;
 firstPost?.author?.email;
 ```
 

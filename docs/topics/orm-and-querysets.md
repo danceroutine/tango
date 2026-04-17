@@ -206,7 +206,7 @@ Use `selectRelated(...)` when the path stays single-valued from hop to hop. In t
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-const [firstPost] = posts.toArray();
+const [firstPost] = posts;
 firstPost?.author?.profile?.displayName;
 ```
 
@@ -217,7 +217,7 @@ In contrast, use `prefetchRelated(...)` when the path includes a collection edge
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-const [firstUser] = users.toArray();
+const [firstUser] = users;
 firstUser?.posts[0]?.author?.email;
 firstUser?.posts[0]?.comments[0]?.body;
 ```
@@ -233,7 +233,7 @@ const postCards = await PostModel.objects
     .select(['id', 'title'] as const)
     .fetch();
 
-const [firstCard] = postCards.toArray();
+const [firstCard] = postCards;
 firstCard?.author?.email;
 ```
 
