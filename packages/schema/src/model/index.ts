@@ -34,4 +34,17 @@ export { Meta, m } from './meta/index';
 export type { ModelConstraint, ModelMetaFragment } from './meta/index';
 export { Constraints, Indexes, c, i } from './constraints/index';
 export type { ConstraintDefinition } from './constraints/index';
-export { ModelRegistry } from './registry/index';
+export {
+    ModelRegistry,
+    createSchemaModuleAliases,
+    resolveSchemaModuleEntrypoint,
+    GENERATED_RELATION_REGISTRY_DIRNAME,
+    GENERATED_RELATION_REGISTRY_METADATA_FILENAME,
+    GENERATED_RELATION_REGISTRY_METADATA_VERSION,
+    GENERATED_RELATION_REGISTRY_TYPES_FILENAME,
+    ResolvedRelationGraphArtifactFactory,
+    type GeneratedRelationRegistryArtifact,
+    type ResolvedRelationGraphSnapshot,
+    type ResolvedRelationGraphSnapshotModel,
+    type ResolvedRelationGraphSnapshotRelation,
+} from './registry/index';

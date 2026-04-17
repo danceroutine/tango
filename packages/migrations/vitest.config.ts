@@ -6,6 +6,14 @@ export default defineConfig({
         alias: {
             '@danceroutine/tango-config': fileURLToPath(new URL('../config/src/index.ts', import.meta.url)),
             '@danceroutine/tango-config/': fileURLToPath(new URL('../config/src/', import.meta.url)),
+            '@danceroutine/tango-codegen': fileURLToPath(new URL('../codegen/src/index.ts', import.meta.url)),
+            '@danceroutine/tango-codegen/commands': fileURLToPath(
+                new URL('../codegen/src/commands/index.ts', import.meta.url)
+            ),
+            '@danceroutine/tango-codegen/generators': fileURLToPath(
+                new URL('../codegen/src/generators/index.ts', import.meta.url)
+            ),
+            '@danceroutine/tango-codegen/': fileURLToPath(new URL('../codegen/src/', import.meta.url)),
             '@danceroutine/tango-core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
             '@danceroutine/tango-core/sql': fileURLToPath(new URL('../core/src/sql/index.ts', import.meta.url)),
             '@danceroutine/tango-core/': fileURLToPath(new URL('../core/src/', import.meta.url)),

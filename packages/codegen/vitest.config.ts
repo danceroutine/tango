@@ -4,8 +4,31 @@ import { fileURLToPath } from 'node:url';
 export default defineConfig({
     resolve: {
         alias: {
+            '@danceroutine/tango-config': fileURLToPath(new URL('../config/src/index.ts', import.meta.url)),
+            '@danceroutine/tango-config/': fileURLToPath(new URL('../config/src/', import.meta.url)),
             '@danceroutine/tango-core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
             '@danceroutine/tango-core/': fileURLToPath(new URL('../core/src/', import.meta.url)),
+            '@danceroutine/tango-migrations': fileURLToPath(new URL('../migrations/src/index.ts', import.meta.url)),
+            '@danceroutine/tango-migrations/': fileURLToPath(new URL('../migrations/src/', import.meta.url)),
+            '@danceroutine/tango-orm/connection': fileURLToPath(
+                new URL('../orm/src/connection/index.ts', import.meta.url)
+            ),
+            '@danceroutine/tango-orm/query': fileURLToPath(new URL('../orm/src/query/index.ts', import.meta.url)),
+            '@danceroutine/tango-orm': fileURLToPath(new URL('../orm/src/index.ts', import.meta.url)),
+            '@danceroutine/tango-orm/': fileURLToPath(new URL('../orm/src/', import.meta.url)),
+            '@danceroutine/tango-resources/context': fileURLToPath(
+                new URL('../resources/src/context/index.ts', import.meta.url)
+            ),
+            '@danceroutine/tango-resources': fileURLToPath(new URL('../resources/src/index.ts', import.meta.url)),
+            '@danceroutine/tango-resources/': fileURLToPath(new URL('../resources/src/', import.meta.url)),
+            '@danceroutine/tango-schema': fileURLToPath(new URL('../schema/src/index.ts', import.meta.url)),
+            '@danceroutine/tango-schema/model': fileURLToPath(new URL('../schema/src/model/index.ts', import.meta.url)),
+            '@danceroutine/tango-schema/domain': fileURLToPath(
+                new URL('../schema/src/domain/index.ts', import.meta.url)
+            ),
+            '@danceroutine/tango-schema/': fileURLToPath(new URL('../schema/src/', import.meta.url)),
+            '@danceroutine/tango-testing': fileURLToPath(new URL('../testing/src/index.ts', import.meta.url)),
+            '@danceroutine/tango-testing/': fileURLToPath(new URL('../testing/src/', import.meta.url)),
         },
     },
     test: {

@@ -8,17 +8,13 @@ import { getTangoRuntime } from '../runtime/defaultRuntime';
 const managerCache = new WeakMap<object, { runtime: TangoRuntime; manager: ModelManager<Record<string, unknown>> }>();
 let hasRegisteredModelObjects = false;
 
-type AugmentableSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>> = {
-    metadata: {
-        key?: string;
-        name: string;
-        table: string;
-        fields: Array<{ name: string; type: string; primaryKey?: boolean }>;
-    };
+type AugmentableSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>> = Pick<
+    SchemaModel<TSchema>,
+    'metadata' | 'hooks'
+> & {
     schema: {
         parse(input: unknown): PersistedModelOutput<TSchema>;
     };
-    hooks?: SchemaModel<TSchema>['hooks'];
 };
 
 function defineObjectsProperty<TSchema extends z.ZodObject<z.ZodRawShape>, TKey extends string>(

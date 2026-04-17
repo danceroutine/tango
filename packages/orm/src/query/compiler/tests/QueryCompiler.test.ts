@@ -1,15 +1,18 @@
 import { describe, it, expect } from 'vitest';
+import { aRelationMeta } from '@danceroutine/tango-testing';
 import { QueryCompiler } from '../QueryCompiler';
 import { Q } from '../..';
 import type { QNode } from '../../domain/QNode';
 import type { TableMeta } from '../../domain/TableMeta';
-import type { CompiledPrefetchHydration } from '../../domain/CompiledQuery';
+import type { CompiledHydrationNode } from '../../domain/CompiledQuery';
+import type { QueryHydrationPlanNode } from '../../planning';
 import {
     sqlInjectionRejectCases,
     sqlInjectionValueCases,
     type SqlInjectionCase,
 } from '../../../validation/tests/sqlInjectionCorpus';
 import { expectPayloadIsParameterized } from '../../../validation/tests/expectPayloadIsParameterized';
+import { InternalRelationKind } from '../../domain/internal/InternalRelationKind';
 
 type UserModel = {
     id: number;
@@ -31,6 +34,28 @@ const mockMeta: TableMeta = {
         isActive: 'bool',
     },
 };
+
+function compiledPrefetchNode(overrides: Partial<CompiledHydrationNode> = {}): CompiledHydrationNode {
+    return {
+        nodeId: 'posts',
+        relationName: 'posts',
+        relationPath: 'posts',
+        ownerModelKey: 'tests/User',
+        targetModelKey: 'tests/Post',
+        loadMode: 'prefetch',
+        cardinality: 'many',
+        sourceKey: 'id',
+        ownerSourceAccessor: 'id',
+        targetKey: 'author_id',
+        targetTable: 'posts',
+        targetPrimaryKey: 'id',
+        targetColumns: { id: 'int', author_id: 'int', title: 'text' },
+        provenance: ['posts'],
+        joinChildren: [],
+        prefetchChildren: [],
+        ...overrides,
+    };
+}
 
 function buildRejectQueryState(testCase: SqlInjectionCase): {
     meta: TableMeta;
@@ -61,14 +86,14 @@ function buildRejectQueryState(testCase: SqlInjectionCase): {
                 meta: {
                     ...mockMeta,
                     relations: {
-                        organization: {
-                            kind: 'belongsTo',
+                        organization: aRelationMeta({
+                            kind: InternalRelationKind.BELONGS_TO,
                             table: testCase.payload,
                             sourceKey: 'organization_id',
                             targetKey: 'id',
                             targetColumns: { id: 'int' },
                             alias: 'organizations',
-                        },
+                        }),
                     },
                 },
                 state: {
@@ -405,22 +430,22 @@ describe(QueryCompiler, () => {
             {
                 ...mockMeta,
                 relations: {
-                    organization: {
-                        kind: 'belongsTo',
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
                         table: 'organizations',
                         alias: 'org',
                         sourceKey: 'organization_id',
                         targetKey: 'id',
                         targetColumns: { id: 'int', name: 'text' },
-                    },
-                    posts: {
-                        kind: 'hasMany',
+                    }),
+                    posts: aRelationMeta({
+                        kind: InternalRelationKind.HAS_MANY,
                         table: 'posts',
                         alias: 'posts',
                         sourceKey: 'id',
                         targetKey: 'author_id',
                         targetColumns: { id: 'int', author_id: 'int' },
-                    },
+                    }),
                 },
             },
             'postgres'
@@ -435,7 +460,7 @@ describe(QueryCompiler, () => {
         });
 
         expect(result.sql).toContain(
-            'SELECT users.id, org.id AS __tango_hydrate_org_id, org.name AS __tango_hydrate_org_name FROM users LEFT JOIN organizations org ON org.id = users.organization_id'
+            'SELECT users.id, __tango_join_organization.id AS __tango_hydrate_organization_id, __tango_join_organization.name AS __tango_hydrate_organization_name FROM users LEFT JOIN organizations __tango_join_organization ON __tango_join_organization.id = users.organization_id'
         );
         expect(result.sql).toContain('WHERE');
         expect(result.sql).toContain('NOT');
@@ -447,22 +472,22 @@ describe(QueryCompiler, () => {
             {
                 ...mockMeta,
                 relations: {
-                    posts: {
-                        kind: 'hasMany',
+                    posts: aRelationMeta({
+                        kind: InternalRelationKind.HAS_MANY,
                         table: 'posts',
                         alias: 'posts',
                         sourceKey: 'id',
                         targetKey: 'author_id',
                         targetColumns: { id: 'int', author_id: 'int' },
-                    },
-                    organization: {
-                        kind: 'belongsTo',
+                    }),
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
                         table: 'organizations',
                         alias: 'org',
                         sourceKey: 'organization_id',
                         targetKey: 'id',
                         targetColumns: { id: 'int' },
-                    },
+                    }),
                 },
             },
             'postgres'
@@ -477,34 +502,143 @@ describe(QueryCompiler, () => {
             {
                 ...mockMeta,
                 relations: {
-                    posts: {
-                        kind: 'hasMany',
+                    posts: aRelationMeta({
+                        kind: InternalRelationKind.HAS_MANY,
                         table: 'posts',
                         alias: 'posts',
                         sourceKey: 'id',
                         targetKey: 'author_id',
                         targetColumns: { id: 'int', author_id: 'int', title: 'text' },
-                    },
+                    }),
                 },
             },
             'postgres'
         );
-        const prefetch: CompiledPrefetchHydration = {
-            relationName: 'posts',
-            sourceKey: 'id',
-            table: 'posts',
-            targetKey: 'author_id',
-            targetColumns: { id: 'int', author_id: 'int', title: 'text' },
-        };
-
-        const result = compiler.compilePrefetch(prefetch, [1, 2]);
+        const result = compiler.compilePrefetch(compiledPrefetchNode(), [1, 2]);
 
         expect(result).toEqual({
-            sql: 'SELECT id, author_id, title FROM posts WHERE author_id IN ($1, $2) ORDER BY author_id ASC',
+            sql: 'SELECT __tango_prefetch_base_posts.id AS id, __tango_prefetch_base_posts.author_id AS author_id, __tango_prefetch_base_posts.title AS title FROM posts __tango_prefetch_base_posts WHERE __tango_prefetch_base_posts.author_id IN ($1, $2) ORDER BY __tango_prefetch_base_posts.author_id ASC, __tango_prefetch_base_posts.id ASC',
             params: [1, 2],
             targetKey: 'author_id',
             targetColumns: { id: 'int', author_id: 'int', title: 'text' },
         });
+    });
+
+    it('compiles nested join descendants for selectRelated paths', () => {
+        const compiler = new QueryCompiler(
+            {
+                table: 'users',
+                pk: 'id',
+                columns: { id: 'int', organization_id: 'int' },
+                relations: {
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
+                        table: 'organizations',
+                        alias: 'organization',
+                        sourceKey: 'organization_id',
+                        targetKey: 'id',
+                        targetColumns: { id: 'int', owner_id: 'int' },
+                        targetMeta: {
+                            table: 'organizations',
+                            pk: 'id',
+                            columns: { id: 'int', owner_id: 'int' },
+                            relations: {
+                                owner: aRelationMeta({
+                                    kind: InternalRelationKind.BELONGS_TO,
+                                    table: 'owners',
+                                    alias: 'owner',
+                                    sourceKey: 'owner_id',
+                                    targetKey: 'id',
+                                    targetColumns: { id: 'int', name: 'text' },
+                                }),
+                            },
+                        },
+                    }),
+                },
+            },
+            'postgres'
+        );
+
+        const result = compiler.compile({ selectRelated: ['organization__owner'] });
+
+        expect(result.sql).toContain('LEFT JOIN organizations __tango_join_organization');
+        expect(result.sql).toContain('LEFT JOIN owners __tango_join_organization_owner');
+        expect(result.sql).toContain('__tango_hydrate_organization_owner_name');
+    });
+
+    it('compiles mixed join and nested prefetch descendants from one normalized path graph', () => {
+        const compiler = new QueryCompiler(
+            {
+                table: 'users',
+                pk: 'id',
+                columns: { id: 'int', organization_id: 'int' },
+                relations: {
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
+                        table: 'organizations',
+                        alias: 'organization',
+                        sourceKey: 'organization_id',
+                        targetKey: 'id',
+                        targetColumns: { id: 'int' },
+                        targetMeta: {
+                            table: 'organizations',
+                            pk: 'id',
+                            columns: { id: 'int' },
+                            relations: {
+                                posts: aRelationMeta({
+                                    kind: InternalRelationKind.HAS_MANY,
+                                    table: 'posts',
+                                    alias: 'posts',
+                                    sourceKey: 'id',
+                                    targetKey: 'organization_id',
+                                    targetColumns: { id: 'int', organization_id: 'int', author_id: 'int' },
+                                    targetMeta: {
+                                        table: 'posts',
+                                        pk: 'id',
+                                        columns: { id: 'int', organization_id: 'int', author_id: 'int' },
+                                        relations: {
+                                            author: aRelationMeta({
+                                                kind: InternalRelationKind.BELONGS_TO,
+                                                table: 'authors',
+                                                alias: 'author',
+                                                sourceKey: 'author_id',
+                                                targetKey: 'id',
+                                                targetColumns: { id: 'int', team_id: 'int' },
+                                                targetMeta: {
+                                                    table: 'authors',
+                                                    pk: 'id',
+                                                    columns: { id: 'int', team_id: 'int' },
+                                                    relations: {
+                                                        team: aRelationMeta({
+                                                            kind: InternalRelationKind.BELONGS_TO,
+                                                            table: 'teams',
+                                                            alias: 'team',
+                                                            sourceKey: 'team_id',
+                                                            targetKey: 'id',
+                                                            targetColumns: { id: 'int', name: 'text' },
+                                                        }),
+                                                    },
+                                                },
+                                            }),
+                                        },
+                                    },
+                                }),
+                            },
+                        },
+                    }),
+                },
+            },
+            'postgres'
+        );
+
+        const compiled = compiler.compile({ prefetchRelated: ['organization__posts__author__team'] });
+        const organization = compiled.hydrationPlan!.joinNodes[0]!;
+        const posts = organization.prefetchChildren[0]!;
+        const prefetch = compiler.compilePrefetch(posts, [1]);
+
+        expect(organization.prefetchChildren).toHaveLength(1);
+        expect(prefetch.sql).toContain('LEFT JOIN authors __tango_join_organization_posts_author');
+        expect(prefetch.sql).toContain('LEFT JOIN teams __tango_join_organization_posts_author_team');
     });
 
     it('rejects prefetch follow-up queries when compiled metadata no longer matches validated relation metadata', () => {
@@ -512,14 +646,14 @@ describe(QueryCompiler, () => {
             {
                 ...mockMeta,
                 relations: {
-                    posts: {
-                        kind: 'hasMany',
+                    posts: aRelationMeta({
+                        kind: InternalRelationKind.HAS_MANY,
                         table: 'posts',
                         alias: 'posts',
                         sourceKey: 'id',
                         targetKey: 'author_id',
                         targetColumns: { id: 'int', author_id: 'int' },
-                    },
+                    }),
                 },
             },
             'sqlite'
@@ -527,16 +661,201 @@ describe(QueryCompiler, () => {
 
         expect(() =>
             compiler.compilePrefetch(
-                {
-                    relationName: 'posts',
-                    sourceKey: 'id',
-                    table: 'posts; DROP TABLE users;',
-                    targetKey: 'author_id',
+                compiledPrefetchNode({
+                    targetTable: 'posts; DROP TABLE users;',
                     targetColumns: { id: 'int', author_id: 'int' },
-                },
+                }),
                 [1]
             )
         ).toThrow(/failed validation/i);
+    });
+
+    it('rejects nested prefetch join metadata when a compiled child node is mutated', () => {
+        const compiler = new QueryCompiler(mockMeta, 'postgres');
+
+        expect(() =>
+            compiler.compilePrefetch(
+                compiledPrefetchNode({
+                    joinChildren: [
+                        compiledPrefetchNode({
+                            relationName: 'author',
+                            relationPath: 'posts__author',
+                            loadMode: 'join',
+                            cardinality: 'single',
+                            sourceKey: 'author_id',
+                            targetKey: 'id',
+                            targetTable: 'authors',
+                            targetModelKey: 'tests/Author',
+                            targetColumns: { id: 'int', name: 'text' },
+                            join: {
+                                alias: '__tango_join_posts_author; DROP TABLE users;',
+                                columns: {
+                                    id: '__tango_hydrate_posts_author_id',
+                                    name: '__tango_hydrate_posts_author_name',
+                                },
+                            },
+                        }),
+                    ],
+                }),
+                [1]
+            )
+        ).toThrow(/failed validation/i);
+    });
+
+    it('rejects compiled hydration nodes that no longer carry target metadata', () => {
+        const compiler = new QueryCompiler(mockMeta, 'postgres') as unknown as {
+            compileHydrationNode: (
+                node: QueryHydrationPlanNode,
+                context: {
+                    rootTable: string;
+                    ownerMeta: TableMeta;
+                    ownerAlias: string;
+                    collectRootJoins: boolean;
+                    hiddenRootAliases: string[];
+                    joinCollection: { selects: string[]; joins: string[] };
+                }
+            ) => unknown;
+        };
+
+        expect(() =>
+            compiler.compileHydrationNode(
+                {
+                    nodeId: 'organization',
+                    relationName: 'organization',
+                    relationPath: 'organization',
+                    ownerModelKey: 'tests/User',
+                    relationEdge: {
+                        ...aRelationMeta({
+                            kind: InternalRelationKind.BELONGS_TO,
+                            table: 'organizations',
+                            alias: 'organization',
+                            sourceKey: 'organization_id',
+                            targetKey: 'id',
+                            targetColumns: { id: 'int' },
+                        }),
+                        targetMeta: undefined,
+                    },
+                    targetModelKey: 'tests/Organization',
+                    loadMode: 'join',
+                    cardinality: 'single',
+                    provenance: ['organization'],
+                    joinChildren: [],
+                    prefetchChildren: [],
+                },
+                {
+                    rootTable: 'users',
+                    ownerMeta: {
+                        ...mockMeta,
+                        relations: {
+                            organization: aRelationMeta({
+                                kind: InternalRelationKind.BELONGS_TO,
+                                table: 'organizations',
+                                alias: 'organization',
+                                sourceKey: 'organization_id',
+                                targetKey: 'id',
+                                targetColumns: { id: 'int' },
+                            }),
+                        },
+                    },
+                    ownerAlias: 'users',
+                    collectRootJoins: true,
+                    hiddenRootAliases: [],
+                    joinCollection: { selects: [], joins: [] },
+                }
+            )
+        ).toThrow(/missing target metadata/i);
+    });
+
+    it('ignores nested join SQL collection for nodes without join descriptors', () => {
+        const compiler = new QueryCompiler(mockMeta, 'postgres') as unknown as {
+            collectNestedJoinSql: (
+                node: CompiledHydrationNode,
+                ownerAlias: string,
+                collection: { selects: string[]; joins: string[] }
+            ) => void;
+        };
+        const collection = { selects: [], joins: [] };
+
+        compiler.collectNestedJoinSql(compiledPrefetchNode(), 'users', collection);
+
+        expect(collection).toEqual({ selects: [], joins: [] });
+    });
+
+    it('rejects nested prefetch joins whose owner column is not present on the parent target', () => {
+        const compiler = new QueryCompiler(mockMeta, 'postgres');
+
+        expect(() =>
+            compiler.compilePrefetch(
+                compiledPrefetchNode({
+                    joinChildren: [
+                        compiledPrefetchNode({
+                            relationName: 'author',
+                            relationPath: 'posts__author',
+                            loadMode: 'join',
+                            cardinality: 'single',
+                            sourceKey: 'missing_owner_column',
+                            targetKey: 'id',
+                            targetTable: 'authors',
+                            targetColumns: { id: 'int', name: 'text' },
+                            join: {
+                                alias: '__tango_join_posts_author',
+                                columns: {
+                                    id: '__tango_hydrate_posts_author_id',
+                                    name: '__tango_hydrate_posts_author_name',
+                                },
+                            },
+                        }),
+                    ],
+                }),
+                [1]
+            )
+        ).toThrow(/unknown owner column/i);
+    });
+
+    it('rejects nested prefetch joins whose projected columns are not present on the target', () => {
+        const compiler = new QueryCompiler(mockMeta, 'postgres');
+
+        expect(() =>
+            compiler.compilePrefetch(
+                compiledPrefetchNode({
+                    joinChildren: [
+                        compiledPrefetchNode({
+                            relationName: 'author',
+                            relationPath: 'posts__author',
+                            loadMode: 'join',
+                            cardinality: 'single',
+                            sourceKey: 'author_id',
+                            targetKey: 'id',
+                            targetTable: 'authors',
+                            targetColumns: { id: 'int', name: 'text' },
+                            join: {
+                                alias: '__tango_join_posts_author',
+                                columns: {
+                                    missing: '__tango_hydrate_posts_author_missing',
+                                },
+                            },
+                        }),
+                    ],
+                }),
+                [1]
+            )
+        ).toThrow(/unknown nested join column/i);
+    });
+
+    it('surfaces non-Error validation failures from compiled prefetch metadata', () => {
+        const compiler = new QueryCompiler(mockMeta, 'postgres') as unknown as {
+            validatePrefetchTarget: (node: CompiledHydrationNode) => unknown;
+        };
+
+        expect(() =>
+            compiler.validatePrefetchTarget(
+                Object.defineProperty(compiledPrefetchNode(), 'targetTable', {
+                    get() {
+                        throw 'boom';
+                    },
+                })
+            )
+        ).toThrow(/boom/);
     });
 
     it('ignores empty excludes that produce no SQL', () => {
@@ -656,14 +975,14 @@ describe(QueryCompiler, () => {
             {
                 ...mockMeta,
                 relations: {
-                    organization: {
-                        kind: 'belongsTo',
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
                         table: 'organizations',
                         alias: 'org',
                         sourceKey: 'missing_column',
                         targetKey: 'id',
                         targetColumns: { id: 'int' },
-                    },
+                    }),
                 },
             },
             'postgres'
@@ -677,14 +996,14 @@ describe(QueryCompiler, () => {
             {
                 ...mockMeta,
                 relations: {
-                    organization: {
-                        kind: 'belongsTo',
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
                         table: 'organizations',
                         alias: 'org',
                         sourceKey: 'organization_id',
                         targetKey: 'missing',
                         targetColumns: { id: 'int' },
-                    },
+                    }),
                 },
             },
             'postgres'
@@ -699,17 +1018,17 @@ describe(QueryCompiler, () => {
                 ...mockMeta,
                 columns: {
                     ...mockMeta.columns,
-                    __tango_hydrate_org_id: 'text',
+                    __tango_hydrate_organization_id: 'text',
                 },
                 relations: {
-                    organization: {
-                        kind: 'belongsTo',
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
                         table: 'organizations',
                         alias: 'org',
                         sourceKey: 'organization_id',
                         targetKey: 'id',
                         targetColumns: { id: 'int' },
-                    },
+                    }),
                 },
             },
             'postgres'

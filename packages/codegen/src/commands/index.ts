@@ -3,3 +3,5 @@
  */
 
 export { registerCodegenCommands } from './registerCodegenCommands';
+export { loadProjectModule } from './loadProjectModule';
+export { runGenerateRelationsCommand, withGenerateRelationsCommand } from './runGenerateRelationsCommand';

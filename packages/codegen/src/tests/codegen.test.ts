@@ -11,9 +11,13 @@ describe('codegen exports', () => {
     it('exposes the public codegen API surface', () => {
         expect(typeof codegen.generateMigrationFromModels).toBe('function');
         expect(typeof codegen.generateModelInterface).toBe('function');
+        expect(typeof codegen.generateRelationRegistryArtifacts).toBe('function');
+        expect(typeof codegen.writeRelationRegistryArtifacts).toBe('function');
         expect(typeof codegen.generateViewSet).toBe('function');
         expect(typeof generators.migration.generateMigrationFromModels).toBe('function');
         expect(typeof generators.model.generateModelInterface).toBe('function');
+        expect(typeof generators.relations.generateRelationRegistryArtifacts).toBe('function');
+        expect(typeof generators.relations.writeRelationRegistryArtifacts).toBe('function');
         expect(typeof generators.viewset.generateViewSet).toBe('function');
         expect(typeof migration.generateMigrationFromModels).toBe('function');
         expect(typeof model.generateModelInterface).toBe('function');

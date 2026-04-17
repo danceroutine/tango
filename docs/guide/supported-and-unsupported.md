@@ -22,13 +22,13 @@ That model metadata is not isolated to one package. The same contract feeds migr
 
 ### ORM and data access
 
-The ORM layer already includes model managers through `Model.objects`, immutable `QuerySet` composition, boolean query composition through `Q`, field projection through `select(...)`, fetched-record type narrowing for projected fields, and direct relation hydration through `selectRelated(...)` and `prefetchRelated(...)` for `belongsTo`, `hasOne`, and `hasMany` relations.
+The ORM layer already includes model managers through `Model.objects`, immutable `QuerySet` composition, boolean query composition through `Q`, field projection through `select(...)`, fetched-record type narrowing for projected fields, and nested relation hydration through `selectRelated(...)` and `prefetchRelated(...)` for `belongsTo`, `hasOne`, and `hasMany` relations.
 
-The ORM surface is designed for application code that wants a Django-shaped querying model without giving up TypeScript-native contracts. Collection filtering, ordering, slicing, existence checks, row shaping through `fetch(...)`, and manager-backed persistence are all part of the current story.
+The ORM surface is designed for application code that wants a Django-shaped querying model without giving up TypeScript-native contracts. Collection filtering, ordering, slicing, existence checks, row shaping through `fetch(...)`, manager-backed persistence, generated nested path typing, and finite cyclic traversal at runtime are all part of the current story.
 
 The current supported ORM contract also includes `transaction.atomic(async (tx) => ...)`, nested savepoints, and post-commit callback registration through `tx.onCommit(...)`.
 
-The remaining unsupported ORM boundary includes nested relation traversal such as `author__profile`, related-row projection, many-to-many hydration, request-wide transaction wrappers, and multi-database routing for transaction work.
+The remaining unsupported ORM boundary includes related-row projection, many-to-many hydration, request-wide transaction wrappers, and multi-database routing for transaction work.
 
 ### Database dialects
 
@@ -100,7 +100,7 @@ MariaDB is the SQL dialect currently called out on the roadmap, but it is not pa
 
 Several unsupported areas already have explicit follow-up work planned.
 
-At the ORM level, the roadmap includes deeper relation traversal, many-to-many hydration, related-row projection, and transaction ergonomics beyond the core `atomic(...)` API such as request-scoped wrappers and broader multi-database routing.
+At the ORM level, the roadmap includes related-row projection, many-to-many hydration, and transaction ergonomics beyond the core `atomic(...)` API such as request-scoped wrappers and broader multi-database routing.
 
 At the platform level, the roadmap also includes MariaDB support, GraphQL support, custom Tango environments beyond `development`, `test`, and `production`, non-linear migration dependency chains for larger teams, agentic development support for AI-assisted workflows, and longer-term exploration of NoSQL support.
 

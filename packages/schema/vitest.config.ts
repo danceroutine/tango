@@ -21,6 +21,7 @@ export default defineConfig({
                 '**/*.config.{js,ts,mjs,cjs}',
                 '**/*.d.ts',
                 '**/index.ts',
+                'src/model/registry/ResolvedRelationGraphSnapshot.ts',
                 '**/__tests__/**',
                 '**/*.test.{ts,tsx,js,jsx}',
                 '**/*.spec.{ts,tsx,js,jsx}',

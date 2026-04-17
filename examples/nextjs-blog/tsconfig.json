@@ -12,6 +12,8 @@
         ],
         "paths": {
             "@/*": ["./src/*"],
+            "@danceroutine/tango-codegen": ["../../packages/codegen/src/index.ts"],
+            "@danceroutine/tango-codegen/*": ["../../packages/codegen/src/*"],
             "@danceroutine/tango-config": ["../../packages/config/src/index.ts"],
             "@danceroutine/tango-config/*": ["../../packages/config/src/*"],
             "@danceroutine/tango-core": ["../../packages/core/src/index.ts"],
@@ -36,6 +38,6 @@
         "esModuleInterop": true,
         "resolveJsonModule": true
     },
-    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "tango.config.ts"],
+    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "tango.config.ts", ".tango/**/*.d.ts"],
     "exclude": ["node_modules"]
 }

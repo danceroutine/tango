@@ -7,7 +7,7 @@ import {
     type OpenAPISpec,
 } from '@danceroutine/tango-openapi';
 import { PostViewSet } from '@/viewsets/PostViewSet';
-import { PostDetailAPIView, StatusAPIView } from '@/views';
+import { EditorialOverviewAPIView, EditorialOverviewResponseSchema, PostDetailAPIView, StatusAPIView } from '@/views';
 
 export function createOpenAPISpec(): OpenAPISpec {
     return generateOpenAPISpec({
@@ -19,6 +19,16 @@ export function createOpenAPISpec(): OpenAPISpec {
             describeGenericAPIView({
                 resource: new PostDetailAPIView(),
                 detailPath: '/api/posts-generic/{id}',
+            }),
+            describeAPIView({
+                path: '/api/editorial/overview',
+                resource: new EditorialOverviewAPIView(),
+                methods: {
+                    GET: {
+                        summary: 'Editorial overview with nested relation hydration',
+                        responseSchema: EditorialOverviewResponseSchema,
+                    },
+                },
             }),
             describeAPIView({
                 path: '/api/status',

@@ -322,15 +322,17 @@ Widened field arrays still narrow the SQL projection, but the fetched record typ
 
 ### `selectRelated(...relations)`
 
-Use `selectRelated(...)` when each model record should include one related model. It follows single-valued relation metadata, such as a post's `author`, through a SQL join and attaches the hydrated model to the returned result. Missing related records become `null`.
+Use `selectRelated(...)` when the requested path stays single-valued from hop to hop. It follows single-valued relation metadata through SQL joins and attaches the hydrated models to the returned result. Missing related records become `null` at the point where the path stops matching.
 
 ```ts
-const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author').fetch();
+const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts.results[0].author?.email;
+posts.results[0].author?.profile?.displayName;
 ```
 
-Tango can provide strict type safety for forward relations from the model schema because `PostModel` declares the field that points at `UserModel`:
+`selectRelated(...)` accepts nested paths such as `author__profile`, but it rejects any path that crosses a collection edge. A path like `posts__author` belongs in `prefetchRelated(...)`, not `selectRelated(...)`.
+
+Tango still provides strict type safety for forward relations from the model schema, and the generated relation registry extends that typing to nested path unions:
 
 ```ts
 const PostSchema = z.object({
@@ -341,27 +343,33 @@ const PostSchema = z.object({
 });
 ```
 
-When this query reaches the persistence layer, Tango uses a left join and aliases the related model's columns so it can assemble `author` after the database returns results:
+When Tango compiles that queryset, it uses left joins and column aliases so the returned rows contain enough information to hydrate `author` and `profile` after the query runs:
 
 ```sql
-SELECT posts.*, author.id AS author__id, author.email AS author__email
+SELECT posts.*,
+       author.id AS author__id,
+       author.email AS author__email,
+       profile.id AS author__profile__id,
+       profile.display_name AS author__profile__display_name
 FROM posts
 LEFT JOIN users author ON author.id = posts.authorId
+LEFT JOIN profiles profile ON profile.user_id = author.id
 WHERE posts.published = ?
 ORDER BY posts.id ASC
 ```
 
 ### `prefetchRelated(...relations)`
 
-In contrast, use `prefetchRelated(...)` when each model record should include a collection relation. In the sample blog models, the reverse side of `Post.author` is `User.posts`, which is declared on `PostModel`. The call site supplies the target model generic so TypeScript can inspect the model that owns the relationship field and recover the reverse relation type.
+In contrast, use `prefetchRelated(...)` when the requested path includes a collection edge. Prefetch paths may continue beyond that edge, so one branch can still hydrate deeper single-valued or collection-valued descendants.
 
 ```ts
-const users = await UserModel.objects.query().prefetchRelated<typeof PostModel>('posts').fetch();
+const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users.results[0].posts.map((post) => post.title);
+users.results[0].posts[0]?.author?.email;
+users.results[0].posts[0]?.comments[0]?.body;
 ```
 
-`prefetchRelated(...)` runs the base query first, then runs one follow-up query per prefetched relation. In the example above, a user record with no matching posts receives `posts: []`.
+`prefetchRelated(...)` runs the base query first, then runs batched follow-up queries for the planned collection edges. A user record with no matching posts still receives `posts: []`, and a post record with no matching comments receives `comments: []`.
 
 ```sql
 SELECT users.*
@@ -372,9 +380,20 @@ SELECT id, authorId, title, published
 FROM posts
 WHERE authorId IN (?, ?, ?)
 ORDER BY authorId ASC;
+
+SELECT id, postId, body
+FROM comments
+WHERE postId IN (?, ?, ?)
+ORDER BY postId ASC;
 ```
 
-The relation hydration contract covers direct relations and full related models. Nested traversal such as `author__profile`, related-model field projection, and many-to-many hydration are separate queryset capabilities.
+Generated relation typing is the supported path for reverse and nested path ergonomics. In the common case, reverse calls no longer need an explicit target-model generic. That generic still remains as a compatibility fallback when generated typing is absent or stale:
+
+```ts
+const users = await UserModel.objects.query().prefetchRelated<typeof PostModel>('posts').fetch();
+```
+
+Finite cyclic paths are also valid at runtime. Tango can execute a path such as `manager__manager`, while generated typing intentionally stops at a bounded cyclic expansion horizon. That horizon keeps recursive path unions from growing without bound in TypeScript, which avoids disproportionate compile-time and editor cost for deeply self-referential model graphs. Deeper recursive paths therefore fall back to weaker typing instead of becoming runtime-invalid.
 
 ### Projection and hydrated relations
 
@@ -430,7 +449,7 @@ Use `count()` when application code needs the number of matching records rather 
 const total = await PostModel.objects.query().filter({ published: true }).count();
 ```
 
-`count()` executes a scalar query from the current queryset state. It does not assemble hydrated objects or run prefetch follow-up queries.
+`count()` executes a scalar query from the current queryset state. It strips eager-loading directives before compilation, so it does not validate, assemble, or prefetch hydrated relation work.
 
 ```sql
 SELECT COUNT(*) AS count
@@ -449,7 +468,7 @@ Use `exists()` when application code only needs to know whether at least one rec
 const hasDrafts = await PostModel.objects.query().filter({ published: false }).exists();
 ```
 
-`exists()` follows the scalar execution path and returns a boolean. Like `count()`, it does not assemble hydrated objects or run prefetch follow-up queries.
+`exists()` follows the scalar execution path and returns a boolean. Like `count()`, it strips eager-loading directives before compilation and does not assemble hydrated objects or run prefetch follow-up queries.
 
 ### Shaping fetched results
 

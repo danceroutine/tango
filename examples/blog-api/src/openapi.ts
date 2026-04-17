@@ -7,7 +7,12 @@ import {
     type OpenAPISpec,
 } from '@danceroutine/tango-openapi';
 import { CommentViewSet, PostViewSet, UserViewSet } from './viewsets/index';
-import { HealthAPIView, UserListCreateAPIView } from './views/index';
+import {
+    EditorialOverviewAPIView,
+    EditorialOverviewResponseSchema,
+    HealthAPIView,
+    UserListCreateAPIView,
+} from './views/index';
 
 export function createOpenAPISpec(): OpenAPISpec {
     return generateOpenAPISpec({
@@ -32,6 +37,16 @@ export function createOpenAPISpec(): OpenAPISpec {
                             status: z.literal('ok'),
                             source: z.literal('api-view'),
                         }),
+                    },
+                },
+            }),
+            describeAPIView({
+                path: '/api/editorial/overview',
+                resource: new EditorialOverviewAPIView(),
+                methods: {
+                    GET: {
+                        summary: 'Editorial overview with nested relation hydration',
+                        responseSchema: EditorialOverviewResponseSchema,
                     },
                 },
             }),

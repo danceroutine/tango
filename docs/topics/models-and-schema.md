@@ -115,11 +115,9 @@ const recentPosts = await PostModel.objects
 recentPosts.results[0].author?.email;
 ```
 
-`selectRelated('author')` follows the resolved relation metadata, loads the related `UserModel`, and attaches it as `author`. Reverse collection relations use `prefetchRelated(...)`; for example, `UserModel.objects.query().prefetchRelated<typeof PostModel>('posts')` loads each user's `PostModel` records as `posts`.
+`selectRelated('author')` follows the resolved relation metadata, loads the related `UserModel`, and attaches it as `author`. The same relation graph now also supports nested traversal such as `selectRelated('author__profile')` and mixed collection traversal such as `prefetchRelated('posts__author')`.
 
-::: warning
-Relation hydration covers direct relations. Nested traversal such as `author__profile` remains future query work.
-:::
+Generated relation typing is the supported path for those nested and reverse relation names. In the common case, application code no longer needs explicit target-model generics for reverse hydration calls once the app-local relation registry is current.
 
 Relation changes therefore affect several layers at once. Changing a relation changes the schema that migrations apply, the constraints that the database enforces, and the paths that ORM queries can use when they walk from one model to another.
 

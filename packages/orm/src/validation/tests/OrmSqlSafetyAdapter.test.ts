@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { SqlSafetyEngine, validateSqlIdentifier } from '@danceroutine/tango-core';
+import { aRelationMeta } from '@danceroutine/tango-testing';
 import type { TableMeta } from '../../query/domain/TableMeta';
 import { OrmSqlSafetyAdapter } from '../OrmSqlSafetyAdapter';
+import type { SelectSqlValidationPlan } from '../SqlValidationPlan';
+import { InternalRelationKind } from '../../query/domain/internal/InternalRelationKind';
 import { sqlInjectionRejectCases, type SqlInjectionCase } from './sqlInjectionCorpus';
 
 const sqlSafetyAdapter = new OrmSqlSafetyAdapter();
@@ -16,18 +19,18 @@ const sqlSafetyTestMeta: TableMeta = {
         name: 'text',
     },
     relations: {
-        organization: {
-            kind: 'belongsTo',
+        organization: aRelationMeta({
+            kind: InternalRelationKind.BELONGS_TO,
             table: 'organizations',
             sourceKey: 'organization_id',
             targetKey: 'id',
             targetColumns: { id: 'text', name: 'text' },
             alias: 'organizations',
-        },
+        }),
     },
 };
 
-function buildRejectValidationPlan(testCase: SqlInjectionCase) {
+function buildRejectValidationPlan(testCase: SqlInjectionCase): SelectSqlValidationPlan {
     switch (testCase.applicablePosition) {
         case 'identifier':
             return {
@@ -49,14 +52,14 @@ function buildRejectValidationPlan(testCase: SqlInjectionCase) {
                 meta: {
                     ...sqlSafetyTestMeta,
                     relations: {
-                        organization: {
-                            kind: 'belongsTo' as const,
+                        organization: aRelationMeta({
+                            kind: InternalRelationKind.BELONGS_TO,
                             table: testCase.payload,
                             sourceKey: 'organization_id',
                             targetKey: 'id',
                             targetColumns: { id: 'text', name: 'text' },
                             alias: 'organizations',
-                        },
+                        }),
                     },
                 },
                 relationNames: ['organization'],
@@ -240,14 +243,14 @@ describe(OrmSqlSafetyAdapter, () => {
                 meta: {
                     ...sqlSafetyTestMeta,
                     relations: {
-                        organization: {
-                            kind: 'belongsTo',
+                        organization: aRelationMeta({
+                            kind: InternalRelationKind.BELONGS_TO,
                             table: 'organizations',
                             alias: 'organizations',
                             sourceKey: 'missing_local_key',
                             targetKey: 'id',
                             targetColumns: { id: 'text' },
-                        },
+                        }),
                     },
                 },
                 relationNames: ['organization'],
@@ -280,14 +283,14 @@ describe(OrmSqlSafetyAdapter, () => {
             meta: {
                 ...sqlSafetyTestMeta,
                 relations: {
-                    memberships: {
-                        kind: 'hasMany',
+                    memberships: aRelationMeta({
+                        kind: InternalRelationKind.HAS_MANY,
                         table: 'memberships',
                         alias: 'memberships',
                         sourceKey: 'id',
                         targetKey: 'user_id',
                         targetColumns: { id: 'text', user_id: 'text' },
-                    },
+                    }),
                 },
             },
             relationNames: ['memberships'],

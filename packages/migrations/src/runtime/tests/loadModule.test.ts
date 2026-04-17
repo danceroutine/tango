@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withGlobalTestApi } from '@danceroutine/tango-testing';
 import { Model, ModelRegistry, t } from '@danceroutine/tango-schema';
 
@@ -16,6 +16,10 @@ async function makeTempDir(prefix: string): Promise<string> {
 }
 
 afterEach(async () => {
+    vi.restoreAllMocks();
+    vi.doUnmock('jiti');
+    vi.resetModules();
+
     for (const directory of createdDirs.splice(0)) {
         await rm(directory, { recursive: true, force: true });
     }
@@ -87,5 +91,23 @@ describe(loadModule, () => {
             expect(registry.getByKey(userModel.metadata.key)).toBe(userModel);
             expect(ModelRegistry.getOwner(userModel as never)).toBe(registry);
         });
+    });
+
+    it('configures jiti without schema-specific aliases', async () => {
+        const createJiti = vi.fn((..._args: unknown[]) => ({
+            import: vi.fn(async () => ({ default: { ok: true } })),
+        }));
+        vi.doMock('jiti', () => ({ createJiti }));
+
+        const directory = await makeTempDir('tango-load-module-alias-');
+        const { loadModule: importLoadModule } = await import('../loadModule');
+        const loaded = await importLoadModule('./mod.ts', { projectRoot: directory, moduleCache: false });
+
+        expect(loaded).toEqual({ default: { ok: true } });
+        const options = createJiti.mock.calls.at(0)?.[1] as Record<string, unknown> | undefined;
+        expect(options).toMatchObject({
+            moduleCache: false,
+        });
+        expect(options).not.toHaveProperty('alias');
     });
 });

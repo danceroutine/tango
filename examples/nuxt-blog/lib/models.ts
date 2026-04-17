@@ -1,11 +1,34 @@
 import { z } from 'zod';
 import { registerModelObjects } from '@danceroutine/tango-orm/runtime';
-import { Model, t, type BeforeCreateHookArgs, type BeforeUpdateHookArgs } from '@danceroutine/tango-schema';
-import { slugify } from '~~/lib/slugify';
+import { Model, t } from '@danceroutine/tango-schema';
+import { slugify } from './slugify';
 
-// Nuxt/Nitro can tree-shake side-effect-only runtime imports from source-linked packages.
-// Registering model objects here keeps `PostModel.objects` available in SSR pages and handlers.
 registerModelObjects();
+
+export const UserReadSchema = z.object({
+    id: z.number(),
+    email: z.string().email(),
+    username: z.string().min(3),
+    createdAt: z.string(),
+});
+
+export const UserCreateSchema = z.object({
+    email: z.string().email(),
+    username: z.string().min(3),
+});
+
+export type User = z.output<typeof UserReadSchema>;
+
+export const UserModel = Model({
+    namespace: 'nuxt-blog',
+    name: 'User',
+    schema: UserReadSchema.extend({
+        id: t.primaryKey(z.number().int()),
+        email: t.unique(z.string().email()),
+        username: t.unique(z.string().min(3)),
+        createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
+    }),
+});
 
 export const PostReadSchema = z.object({
     id: z.number(),
@@ -13,6 +36,7 @@ export const PostReadSchema = z.object({
     slug: z.string(),
     content: z.string(),
     excerpt: z.string().nullable().optional(),
+    authorId: z.number().nullable(),
     published: z.coerce.boolean(),
     createdAt: z.string(),
     updatedAt: z.string(),
@@ -23,6 +47,7 @@ export const PostCreateSchema = z.object({
     slug: z.string().optional(),
     content: z.string().min(1),
     excerpt: z.string().optional(),
+    authorId: z.number(),
     published: z.boolean().optional().default(false),
 });
 
@@ -34,12 +59,19 @@ export const PostModel = Model({
     schema: PostReadSchema.extend({
         id: t.primaryKey(z.number().int()),
         slug: t.unique(z.string()),
+        authorId: t.foreignKey(t.modelRef<typeof UserModel>('nuxt-blog/User'), {
+            field: z.number().int(),
+            name: 'author',
+            relatedName: 'posts',
+            onDelete: 'CASCADE',
+            onUpdate: 'CASCADE',
+        }),
         published: t.field(z.coerce.boolean()).defaultValue('false').build(),
         createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
         updatedAt: t.field(z.string()).defaultValue({ now: true }).build(),
     }),
     hooks: {
-        async beforeCreate({ data }: BeforeCreateHookArgs<Post>) {
+        async beforeCreate({ data }) {
             const now = new Date().toISOString();
             return {
                 ...data,
@@ -48,11 +80,50 @@ export const PostModel = Model({
                 updatedAt: now,
             };
         },
-        async beforeUpdate({ patch }: BeforeUpdateHookArgs<Post>) {
+        async beforeUpdate({ patch }) {
             return {
                 ...patch,
                 updatedAt: new Date().toISOString(),
             };
         },
     },
+});
+
+export const CommentReadSchema = z.object({
+    id: z.number(),
+    content: z.string().min(1),
+    postId: z.number(),
+    authorId: z.number(),
+    createdAt: z.string(),
+});
+
+export const CommentCreateSchema = z.object({
+    content: z.string().min(1),
+    postId: z.number(),
+    authorId: z.number(),
+});
+
+export type Comment = z.output<typeof CommentReadSchema>;
+
+export const CommentModel = Model({
+    namespace: 'nuxt-blog',
+    name: 'Comment',
+    schema: CommentReadSchema.extend({
+        id: t.primaryKey(z.number().int()),
+        postId: t.foreignKey(t.modelRef<typeof PostModel>('nuxt-blog/Post'), {
+            field: z.number().int(),
+            name: 'post',
+            relatedName: 'comments',
+            onDelete: 'CASCADE',
+            onUpdate: 'CASCADE',
+        }),
+        authorId: t.foreignKey(t.modelRef<typeof UserModel>('nuxt-blog/User'), {
+            field: z.number().int(),
+            name: 'author',
+            relatedName: 'comments',
+            onDelete: 'CASCADE',
+            onUpdate: 'CASCADE',
+        }),
+        createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
+    }),
 });

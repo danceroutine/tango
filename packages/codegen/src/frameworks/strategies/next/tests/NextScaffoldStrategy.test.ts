@@ -40,6 +40,7 @@ describe(NextScaffoldStrategy, () => {
 
             const strategy = new NextScaffoldStrategy();
             const templates = strategy.getTemplates();
+            const packageJson = renderTemplate(templates, 'package.json', context);
             const tsconfig = renderTemplate(templates, 'tsconfig.json', context);
             const layout = renderTemplate(templates, 'src/app/layout.tsx', context);
             const route = renderTemplate(templates, 'src/app/api/health/route.ts', context);
@@ -50,6 +51,7 @@ describe(NextScaffoldStrategy, () => {
             const readme = renderTemplate(templates, 'README.md', context);
             const migrationsKeep = renderTemplate(templates, 'migrations/.gitkeep', context);
 
+            expect(packageJson).toContain('"codegen:relations"');
             expect(tsconfig).toContain('"migrations/**/*.ts"');
             expect(layout).toContain('RootLayout');
             expect(route).toContain('Response.json');
@@ -62,6 +64,7 @@ describe(NextScaffoldStrategy, () => {
             expect(viewsetSource).toContain('serializer: TodoSerializer');
             expect(readme).toContain('First-time setup');
             expect(readme).toContain('make:migrations --name initial');
+            expect(readme).toContain('codegen:relations');
             expect(migrationsKeep).toBe('');
         });
 

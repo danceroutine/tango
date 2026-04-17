@@ -132,7 +132,10 @@ export class OffsetPaginator<T extends Record<string, unknown>> implements Pagin
         return true;
     }
 
-    toResponse<TResult>(results: TResult[], context?: { totalCount?: number }): OffsetPaginatedResponse<TResult> {
+    toResponse<TResult>(
+        results: TResult[],
+        context?: { totalCount?: number; params?: TangoQueryParams }
+    ): OffsetPaginatedResponse<TResult> {
         const totalCount = context?.totalCount;
         const response: OffsetPaginatedResponse<TResult> = { results };
 
@@ -140,12 +143,12 @@ export class OffsetPaginator<T extends Record<string, unknown>> implements Pagin
             response.count = totalCount;
 
             if (this.offset + this.limit < totalCount) {
-                response.next = `?limit=${this.limit}&offset=${this.offset + this.limit}`;
+                response.next = this.buildPageLink(this.offset + this.limit, context?.params);
             }
 
             if (this.offset > 0) {
                 const prevOffset = Math.max(0, this.offset - this.limit);
-                response.previous = `?limit=${this.limit}&offset=${prevOffset}`;
+                response.previous = this.buildPageLink(prevOffset, context?.params);
             }
         }
 
@@ -155,14 +158,20 @@ export class OffsetPaginator<T extends Record<string, unknown>> implements Pagin
     /**
      * Backward-compatible alias for `toResponse`.
      */
-    getPaginatedResponse<TResult>(results: TResult[], totalCount?: number): OffsetPaginatedResponse<TResult> {
-        return this.toResponse(results, { totalCount });
+    getPaginatedResponse<TResult>(
+        results: TResult[],
+        totalCount?: number,
+        params?: TangoQueryParams
+    ): OffsetPaginatedResponse<TResult> {
+        return this.toResponse(results, { totalCount, params });
     }
 
     /**
      * Apply current limit/offset to a queryset.
      */
-    apply(queryset: QuerySet<T>): QuerySet<T> {
+    apply<TBaseResult extends Record<string, unknown>, TSourceModel, THydrated extends Record<string, unknown>>(
+        queryset: QuerySet<T, TBaseResult, TSourceModel, THydrated>
+    ): QuerySet<T, TBaseResult, TSourceModel, THydrated> {
         return queryset.limit(this.limit).offset(this.offset);
     }
 
@@ -190,5 +199,19 @@ export class OffsetPaginator<T extends Record<string, unknown>> implements Pagin
      */
     async count(): Promise<number> {
         return this.queryset.count();
+    }
+
+    private buildPageLink(offset: number, params?: TangoQueryParams): string {
+        if (!params) {
+            return `?limit=${this.limit}&offset=${offset}`;
+        }
+
+        return params
+            .withValues({
+                limit: this.limit,
+                offset,
+                page: null,
+            })
+            .toRelativeURL();
     }
 }

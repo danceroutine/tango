@@ -18,7 +18,9 @@ export interface Paginator<
     TResponse extends PaginatedResponse<TResult> = PaginatedResponse<TResult>,
 > {
     parse(params: TangoQueryParams): void;
-    apply(queryset: QuerySet<TModel>): QuerySet<TModel>;
+    apply<TBaseResult extends Record<string, unknown>, TSourceModel, THydrated extends Record<string, unknown>>(
+        queryset: QuerySet<TModel, TBaseResult, TSourceModel, THydrated>
+    ): QuerySet<TModel, TBaseResult, TSourceModel, THydrated>;
     needsTotalCount(): boolean;
-    toResponse(results: TResult[], context?: { totalCount?: number }): TResponse;
+    toResponse(results: TResult[], context?: { totalCount?: number; params?: TangoQueryParams }): TResponse;
 }

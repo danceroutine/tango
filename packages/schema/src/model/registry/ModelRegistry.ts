@@ -1,4 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { getLogger } from '@danceroutine/tango-core';
 import type { Field, Model } from '../../domain/index';
 import type { ZodTypeAny } from '../decorators/domain/ZodTypeAny';
 import { isTypedModelRef, type ModelRef } from '../decorators/domain/ModelRef';
@@ -8,15 +11,30 @@ import type { FinalizedStorageArtifacts, FinalizedStorageModel } from '../fields
 import { InternalSchemaModel } from '../internal/InternalSchemaModel';
 import type { ResolvedRelationGraph } from '../relations/ResolvedRelationGraph';
 import { ResolvedRelationGraphBuilder } from '../relations/ResolvedRelationGraphBuilder';
+import {
+    GENERATED_RELATION_REGISTRY_DIRNAME,
+    GENERATED_RELATION_REGISTRY_METADATA_FILENAME,
+    GENERATED_RELATION_REGISTRY_METADATA_VERSION,
+    type GeneratedRelationRegistryArtifact,
+} from './GeneratedRelationRegistryArtifact';
+import { ResolvedRelationGraphArtifactFactory } from './ResolvedRelationGraphArtifactFactory';
+import type { ResolvedRelationGraphSnapshot } from './ResolvedRelationGraphSnapshot';
 
 const DEFAULT_IDENTIFIER_NAME = 'id';
-const activeRegistryStorage = new AsyncLocalStorage<ModelRegistry>();
+const ACTIVE_REGISTRY_STORAGE_KEY = Symbol.for('tango.schema.activeRegistryStorage');
+
+type ModelRegistryRuntimeGlobal = typeof globalThis & {
+    [ACTIVE_REGISTRY_STORAGE_KEY]?: AsyncLocalStorage<ModelRegistry>;
+};
 
 /**
  * Registry that resolves Tango models by stable identity.
  *
- * The global registry is convenient for application bootstrapping, while
- * dedicated instances are useful in tests and tooling.
+ * The default shared registry is convenient for application bootstrapping
+ * within one schema package instance, while dedicated instances are useful in
+ * tests and tooling. Explicit active-registry binding stays process-shared so
+ * tooling can construct models across separate schema package copies without
+ * relying on the ambient default registry.
  */
 export class ModelRegistry {
     private static globalRegistry?: ModelRegistry;
@@ -24,29 +42,32 @@ export class ModelRegistry {
     private version = 0;
     private storageCache?: FinalizedStorageArtifacts;
     private relationGraphCache?: ResolvedRelationGraph;
+    private lastRelationRegistryDriftCheckVersion?: number;
 
     /**
-     * Return the shared process-wide registry used by `Model(...)`.
+     * Return the shared default registry used by `Model(...)` for this schema
+     * package instance.
      */
     static global(): ModelRegistry {
-        if (!ModelRegistry.globalRegistry) {
-            ModelRegistry.globalRegistry = new ModelRegistry();
-        }
+        ModelRegistry.globalRegistry ??= new ModelRegistry();
         return ModelRegistry.globalRegistry;
     }
 
     /**
      * Return the registry currently bound to model construction work.
+     *
+     * This explicit binding is process-shared so code that imports separate
+     * schema package copies can still participate in one construction flow.
      */
     static active(): ModelRegistry {
-        return activeRegistryStorage.getStore() ?? ModelRegistry.global();
+        return ModelRegistry.activeRegistryStorage().getStore() ?? ModelRegistry.global();
     }
 
     /**
      * Run work with a specific registry bound as the active construction target.
      */
     static async runWithRegistry<T>(registry: ModelRegistry, work: () => Promise<T> | T): Promise<T> {
-        return await activeRegistryStorage.run(registry, work);
+        return await ModelRegistry.activeRegistryStorage().run(registry, work);
     }
 
     /**
@@ -94,8 +115,22 @@ export class ModelRegistry {
     /**
      * Return the owning registry for a model.
      */
-    static getOwner(model: Model): ModelRegistry {
-        return InternalSchemaModel.getRegistryOwner(model);
+    static getOwner(model: { metadata: { key?: string } } & object): ModelRegistry {
+        return InternalSchemaModel.getRegistryOwner(model as Model);
+    }
+
+    private static runtimeGlobal(): ModelRegistryRuntimeGlobal {
+        return globalThis as ModelRegistryRuntimeGlobal;
+    }
+
+    private static activeRegistryStorage(): AsyncLocalStorage<ModelRegistry> {
+        const runtimeGlobal = ModelRegistry.runtimeGlobal();
+
+        if (!runtimeGlobal[ACTIVE_REGISTRY_STORAGE_KEY]) {
+            runtimeGlobal[ACTIVE_REGISTRY_STORAGE_KEY] = new AsyncLocalStorage<ModelRegistry>();
+        }
+
+        return runtimeGlobal[ACTIVE_REGISTRY_STORAGE_KEY];
     }
 
     /**
@@ -242,7 +277,22 @@ export class ModelRegistry {
             resolveRef: (ref) => this.resolveRef(ref),
         });
         this.relationGraphCache = finalized;
+        this.warnOnGeneratedRelationRegistryDrift(finalized);
         return finalized;
+    }
+
+    /**
+     * Return a canonical snapshot of the resolved relation graph.
+     */
+    getResolvedRelationGraphSnapshot(): ResolvedRelationGraphSnapshot {
+        return ResolvedRelationGraphArtifactFactory.createSnapshot(this.getResolvedRelationGraph());
+    }
+
+    /**
+     * Return a deterministic fingerprint for the resolved relation graph.
+     */
+    getResolvedRelationGraphFingerprint(): string {
+        return ResolvedRelationGraphArtifactFactory.createFingerprint(this.getResolvedRelationGraph());
     }
 
     /**
@@ -264,6 +314,7 @@ export class ModelRegistry {
         this.version += 1;
         this.storageCache = undefined;
         this.relationGraphCache = undefined;
+        this.lastRelationRegistryDriftCheckVersion = undefined;
     }
 
     private freezeFields(fields: readonly Field[]): readonly Field[] {
@@ -297,5 +348,97 @@ export class ModelRegistry {
         }
 
         return Array.from(mergedFields.values());
+    }
+
+    private warnOnGeneratedRelationRegistryDrift(graph: ResolvedRelationGraph): void {
+        if (
+            this.lastRelationRegistryDriftCheckVersion === this.version ||
+            !this.shouldCheckGeneratedRelationRegistry()
+        ) {
+            return;
+        }
+        this.lastRelationRegistryDriftCheckVersion = this.version;
+
+        const expected = this.readGeneratedRelationRegistryArtifact();
+        if (!expected) {
+            return;
+        }
+
+        // Compare against the same canonical snapshot shape that code
+        // generation writes so drift checks operate on one shared contract.
+        const liveSnapshot = ResolvedRelationGraphArtifactFactory.createSnapshot(graph);
+        if (this.isPartialRegistrySnapshot(liveSnapshot, expected.snapshot)) {
+            return;
+        }
+
+        const liveFingerprint = ResolvedRelationGraphArtifactFactory.createFingerprint(liveSnapshot);
+        if (liveFingerprint === expected.fingerprint) {
+            return;
+        }
+
+        getLogger('tango.schema.registry').warn(
+            `Generated relation registry drift detected. Run 'tango codegen relations' to refresh ${GENERATED_RELATION_REGISTRY_DIRNAME}/${GENERATED_RELATION_REGISTRY_METADATA_FILENAME}.`
+        );
+    }
+
+    private shouldCheckGeneratedRelationRegistry(): boolean {
+        return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+    }
+
+    private readGeneratedRelationRegistryArtifact(): GeneratedRelationRegistryArtifact | undefined {
+        const metadataPath = resolve(
+            process.cwd(),
+            GENERATED_RELATION_REGISTRY_DIRNAME,
+            GENERATED_RELATION_REGISTRY_METADATA_FILENAME
+        );
+        if (!existsSync(metadataPath)) {
+            return undefined;
+        }
+
+        try {
+            const parsed = JSON.parse(readFileSync(metadataPath, 'utf8')) as Partial<GeneratedRelationRegistryArtifact>;
+            if (
+                parsed.version !== GENERATED_RELATION_REGISTRY_METADATA_VERSION ||
+                typeof parsed.fingerprint !== 'string' ||
+                !parsed.snapshot ||
+                !Array.isArray(parsed.snapshot.models)
+            ) {
+                getLogger('tango.schema.registry').warn(
+                    `Ignoring malformed generated relation registry metadata at '${metadataPath}'.`
+                );
+                return undefined;
+            }
+
+            return parsed as GeneratedRelationRegistryArtifact;
+        } catch (error) {
+            getLogger('tango.schema.registry').warn(
+                `Unable to read generated relation registry metadata at '${metadataPath}'.`,
+                error
+            );
+            return undefined;
+        }
+    }
+
+    private isPartialRegistrySnapshot(
+        liveSnapshot: ResolvedRelationGraphSnapshot,
+        expectedSnapshot: ResolvedRelationGraphSnapshot
+    ): boolean {
+        const expectedModels = new Map(expectedSnapshot.models.map((model) => [model.key, model]));
+        if (liveSnapshot.models.some((model) => !expectedModels.has(model.key))) {
+            return false;
+        }
+
+        if (liveSnapshot.models.length >= expectedSnapshot.models.length) {
+            return false;
+        }
+
+        for (const model of liveSnapshot.models) {
+            const expectedModel = expectedModels.get(model.key)!;
+            if (JSON.stringify(model.relations) !== JSON.stringify(expectedModel.relations)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

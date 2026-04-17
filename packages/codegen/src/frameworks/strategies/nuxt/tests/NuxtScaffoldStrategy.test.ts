@@ -53,6 +53,7 @@ describe(NuxtScaffoldStrategy, () => {
             const migrationsKeep = renderTemplate(templates, 'migrations/.gitkeep', context);
 
             expect(packageJson).toContain('"nuxt"');
+            expect(packageJson).toContain('"codegen:relations"');
             expect(packageJson).toContain('"start": "NUXT_TELEMETRY_DISABLED=1 nuxt preview"');
             expect(nuxtConfig).toContain("route: '/api/todos/**:tango'");
             expect(page).toContain('<script setup lang="ts">');
@@ -63,6 +64,7 @@ describe(NuxtScaffoldStrategy, () => {
             expect(serializerSource).toContain("from '~~/lib/models'");
             expect(viewsetSource).toContain("from '~~/serializers'");
             expect(readme).toContain('tango new --framework nuxt');
+            expect(readme).toContain('codegen:relations');
             expect(readme).toContain('server/tango/todos.ts');
             expect(migrationsKeep).toBe('');
         });

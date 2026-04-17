@@ -1,0 +1,131 @@
+{
+    "version": 1,
+    "fingerprint": "96b4614a0ca6ff9ba1f480f091fc8ffaa0d2f5151eb536be79465b53e16e3b42",
+    "snapshot": {
+        "models": [
+            {
+                "key": "blog/Comment",
+                "relations": [
+                    {
+                        "edgeId": "blog/Comment:authorId:foreignKey",
+                        "sourceModelKey": "blog/Comment",
+                        "targetModelKey": "blog/User",
+                        "name": "author",
+                        "inverseEdgeId": "blog/Comment:authorId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "user_author",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "blog/Comment:postId:foreignKey",
+                        "sourceModelKey": "blog/Comment",
+                        "targetModelKey": "blog/Post",
+                        "name": "post",
+                        "inverseEdgeId": "blog/Comment:postId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "postId",
+                        "targetFieldName": "id",
+                        "alias": "post_post",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            },
+            {
+                "key": "blog/Post",
+                "relations": [
+                    {
+                        "edgeId": "blog/Post:authorId:foreignKey",
+                        "sourceModelKey": "blog/Post",
+                        "targetModelKey": "blog/User",
+                        "name": "author",
+                        "inverseEdgeId": "blog/Post:authorId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "user_author",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "blog/Comment:postId:foreignKey:inverse",
+                        "sourceModelKey": "blog/Post",
+                        "targetModelKey": "blog/Comment",
+                        "name": "comments",
+                        "inverseEdgeId": "blog/Comment:postId:foreignKey",
+                        "kind": "hasMany",
+                        "storageStrategy": "reverse_reference",
+                        "cardinality": "many",
+                        "localFieldName": "postId",
+                        "targetFieldName": "id",
+                        "alias": "comment_comments",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            },
+            {
+                "key": "blog/User",
+                "relations": [
+                    {
+                        "edgeId": "blog/Comment:authorId:foreignKey:inverse",
+                        "sourceModelKey": "blog/User",
+                        "targetModelKey": "blog/Comment",
+                        "name": "comments",
+                        "inverseEdgeId": "blog/Comment:authorId:foreignKey",
+                        "kind": "hasMany",
+                        "storageStrategy": "reverse_reference",
+                        "cardinality": "many",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "comment_comments",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "blog/Post:authorId:foreignKey:inverse",
+                        "sourceModelKey": "blog/User",
+                        "targetModelKey": "blog/Post",
+                        "name": "posts",
+                        "inverseEdgeId": "blog/Post:authorId:foreignKey",
+                        "kind": "hasMany",
+                        "storageStrategy": "reverse_reference",
+                        "cardinality": "many",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "post_posts",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

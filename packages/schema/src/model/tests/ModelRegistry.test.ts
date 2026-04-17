@@ -1,10 +1,25 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetLoggerFactory, setLoggerFactory } from '@danceroutine/tango-core';
 import { z } from 'zod';
-import { Model, ModelRegistry, t } from '../index';
+import {
+    GENERATED_RELATION_REGISTRY_DIRNAME,
+    GENERATED_RELATION_REGISTRY_METADATA_FILENAME,
+    GENERATED_RELATION_REGISTRY_METADATA_VERSION,
+    Model,
+    ModelRegistry,
+    t,
+} from '../index';
 
 describe(ModelRegistry, () => {
     beforeEach(() => {
         ModelRegistry.clear();
+    });
+
+    afterEach(() => {
+        resetLoggerFactory();
     });
 
     it('stores and resolves models through the shared registry', () => {
@@ -158,6 +173,25 @@ describe(ModelRegistry, () => {
         expect(secondRegistry.getByKey('ctx/Second')).toBe(secondModel);
         expect(firstRegistry.getByKey('ctx/Second')).toBeUndefined();
         expect(secondRegistry.getByKey('ctx/First')).toBeUndefined();
+    });
+
+    it('shares the active registry context across separate schema module copies', async () => {
+        const registry = new ModelRegistry();
+
+        vi.resetModules();
+        const { Model: OtherModel, ModelRegistry: OtherModelRegistry, t: otherT } = await import('../index');
+        const user = await OtherModelRegistry.runWithRegistry(registry as never, () =>
+            OtherModel({
+                namespace: 'ctx',
+                name: 'SharedUser',
+                table: 'ctx_shared_users',
+                schema: z.object({ id: otherT.primaryKey(z.number().int()) }),
+            })
+        );
+
+        expect(registry.getByKey('ctx/SharedUser')).toBe(user);
+        expect(ModelRegistry.getOwner(user)).toBe(registry);
+        expect(ModelRegistry.getByKey('ctx/SharedUser')).toBeUndefined();
     });
 
     it('rejects registration into a registry that does not own the model', () => {
@@ -787,5 +821,556 @@ describe(ModelRegistry, () => {
                 schema: z.object({ id: t.primaryKey(z.number().int()) }),
             })
         ).toThrow("Model 'blog/User' is already registered in this registry.");
+    });
+
+    it('creates a stable resolved relation graph snapshot and fingerprint', () => {
+        const registry = new ModelRegistry();
+
+        Model({
+            registry,
+            namespace: 'blog',
+            name: 'User',
+            table: 'users',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+
+        Model({
+            registry,
+            namespace: 'blog',
+            name: 'Post',
+            table: 'posts',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                authorId: t.foreignKey('blog/User', {
+                    field: z.number().int(),
+                    relatedName: 'posts',
+                }),
+                editorId: t.foreignKey('blog/User', {
+                    field: z.number().int(),
+                    relatedName: 'edited_posts',
+                    name: 'editor',
+                }),
+            }),
+        });
+
+        expect(registry.getResolvedRelationGraphSnapshot()).toEqual({
+            models: [
+                {
+                    key: 'blog/Post',
+                    relations: [
+                        expect.objectContaining({
+                            name: 'author',
+                            sourceModelKey: 'blog/Post',
+                            targetModelKey: 'blog/User',
+                            cardinality: 'single',
+                        }),
+                        expect.objectContaining({
+                            name: 'editor',
+                            sourceModelKey: 'blog/Post',
+                            targetModelKey: 'blog/User',
+                            cardinality: 'single',
+                        }),
+                    ],
+                },
+                {
+                    key: 'blog/User',
+                    relations: [
+                        expect.objectContaining({
+                            name: 'edited_posts',
+                            sourceModelKey: 'blog/User',
+                            targetModelKey: 'blog/Post',
+                            cardinality: 'many',
+                        }),
+                        expect.objectContaining({
+                            name: 'posts',
+                            sourceModelKey: 'blog/User',
+                            targetModelKey: 'blog/Post',
+                            cardinality: 'many',
+                        }),
+                    ],
+                },
+            ],
+        });
+        expect(registry.getResolvedRelationGraphFingerprint()).toBe(registry.getResolvedRelationGraphFingerprint());
+    });
+
+    it('warns on generated relation registry drift only after the registry matches the expected model set', async () => {
+        const root = await mkdtemp(join(tmpdir(), 'tango-schema-registry-'));
+        const cwdBefore = process.cwd();
+        const nodeEnvBefore = process.env.NODE_ENV;
+        const warnings: string[] = [];
+        process.chdir(root);
+        process.env.NODE_ENV = 'development';
+        setLoggerFactory({
+            error: () => {},
+            warn: (message) => warnings.push(message),
+            info: () => {},
+            debug: () => {},
+        });
+
+        try {
+            const expectedRegistry = new ModelRegistry();
+            Model({
+                registry: expectedRegistry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+            Model({
+                registry: expectedRegistry,
+                namespace: 'blog',
+                name: 'Post',
+                table: 'posts',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    authorId: t.foreignKey('blog/User', {
+                        field: z.number().int(),
+                        relatedName: 'posts',
+                    }),
+                }),
+            });
+
+            await mkdir(join(root, GENERATED_RELATION_REGISTRY_DIRNAME), { recursive: true });
+            await writeFile(
+                join(root, GENERATED_RELATION_REGISTRY_DIRNAME, GENERATED_RELATION_REGISTRY_METADATA_FILENAME),
+                JSON.stringify(
+                    {
+                        version: GENERATED_RELATION_REGISTRY_METADATA_VERSION,
+                        fingerprint: expectedRegistry.getResolvedRelationGraphFingerprint(),
+                        snapshot: expectedRegistry.getResolvedRelationGraphSnapshot(),
+                    },
+                    null,
+                    2
+                )
+            );
+
+            const partialRegistry = new ModelRegistry();
+            Model({
+                registry: partialRegistry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+
+            partialRegistry.getResolvedRelationGraph();
+            expect(warnings).toEqual([]);
+
+            Model({
+                registry: partialRegistry,
+                namespace: 'blog',
+                name: 'Post',
+                table: 'posts',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    authorId: t.foreignKey('blog/User', {
+                        field: z.number().int(),
+                        relatedName: 'articles',
+                    }),
+                }),
+            });
+
+            partialRegistry.getResolvedRelationGraph();
+            expect(warnings).toEqual([expect.stringContaining("Run 'tango codegen relations' to refresh")]);
+        } finally {
+            process.chdir(cwdBefore);
+            process.env.NODE_ENV = nodeEnvBefore;
+            await rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('warns when a partial live registry disagrees on already-loaded model relations', async () => {
+        const root = await mkdtemp(join(tmpdir(), 'tango-schema-registry-partial-drift-'));
+        const cwdBefore = process.cwd();
+        const nodeEnvBefore = process.env.NODE_ENV;
+        const warnings: string[] = [];
+        process.chdir(root);
+        process.env.NODE_ENV = 'development';
+        setLoggerFactory({
+            error: () => {},
+            warn: (message) => warnings.push(message),
+            info: () => {},
+            debug: () => {},
+        });
+
+        try {
+            const expectedRegistry = new ModelRegistry();
+            const ExpectedUser = Model({
+                registry: expectedRegistry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+            Model({
+                registry: expectedRegistry,
+                namespace: 'blog',
+                name: 'Post',
+                table: 'posts',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    authorId: t.foreignKey(ExpectedUser, {
+                        field: z.number().int(),
+                        relatedName: 'posts',
+                    }),
+                }),
+            });
+            Model({
+                registry: expectedRegistry,
+                namespace: 'blog',
+                name: 'Comment',
+                table: 'comments',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+
+            await mkdir(join(root, GENERATED_RELATION_REGISTRY_DIRNAME), { recursive: true });
+            await writeFile(
+                join(root, GENERATED_RELATION_REGISTRY_DIRNAME, GENERATED_RELATION_REGISTRY_METADATA_FILENAME),
+                JSON.stringify(
+                    {
+                        version: GENERATED_RELATION_REGISTRY_METADATA_VERSION,
+                        fingerprint: expectedRegistry.getResolvedRelationGraphFingerprint(),
+                        snapshot: expectedRegistry.getResolvedRelationGraphSnapshot(),
+                    },
+                    null,
+                    2
+                )
+            );
+
+            const liveRegistry = new ModelRegistry();
+            const LiveUser = Model({
+                registry: liveRegistry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+            Model({
+                registry: liveRegistry,
+                namespace: 'blog',
+                name: 'Post',
+                table: 'posts',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    authorId: t.foreignKey(LiveUser, {
+                        field: z.number().int(),
+                        relatedName: 'articles',
+                    }),
+                }),
+            });
+
+            liveRegistry.getResolvedRelationGraph();
+            expect(warnings).toEqual([expect.stringContaining("Run 'tango codegen relations' to refresh")]);
+        } finally {
+            process.chdir(cwdBefore);
+            process.env.NODE_ENV = nodeEnvBefore;
+            await rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('skips generated relation registry drift checks outside development and test environments', async () => {
+        const root = await mkdtemp(join(tmpdir(), 'tango-schema-registry-prod-'));
+        const cwdBefore = process.cwd();
+        const nodeEnvBefore = process.env.NODE_ENV;
+        const warnings: string[] = [];
+        process.chdir(root);
+        process.env.NODE_ENV = 'production';
+        setLoggerFactory({
+            error: () => {},
+            warn: (message) => warnings.push(message),
+            info: () => {},
+            debug: () => {},
+        });
+
+        try {
+            const expectedRegistry = new ModelRegistry();
+            Model({
+                registry: expectedRegistry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+            await mkdir(join(root, GENERATED_RELATION_REGISTRY_DIRNAME), { recursive: true });
+            await writeFile(
+                join(root, GENERATED_RELATION_REGISTRY_DIRNAME, GENERATED_RELATION_REGISTRY_METADATA_FILENAME),
+                JSON.stringify(
+                    {
+                        version: GENERATED_RELATION_REGISTRY_METADATA_VERSION,
+                        fingerprint: 'stale-fingerprint',
+                        snapshot: expectedRegistry.getResolvedRelationGraphSnapshot(),
+                    },
+                    null,
+                    2
+                )
+            );
+
+            const registry = new ModelRegistry();
+            Model({
+                registry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+
+            registry.getResolvedRelationGraph();
+            expect(warnings).toEqual([]);
+        } finally {
+            process.chdir(cwdBefore);
+            process.env.NODE_ENV = nodeEnvBefore;
+            await rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('does not warn when the generated relation registry fingerprint matches the live graph', async () => {
+        const root = await mkdtemp(join(tmpdir(), 'tango-schema-registry-match-'));
+        const cwdBefore = process.cwd();
+        const nodeEnvBefore = process.env.NODE_ENV;
+        const warnings: string[] = [];
+        process.chdir(root);
+        process.env.NODE_ENV = 'development';
+        setLoggerFactory({
+            error: () => {},
+            warn: (message) => warnings.push(message),
+            info: () => {},
+            debug: () => {},
+        });
+
+        try {
+            const expectedRegistry = new ModelRegistry();
+            Model({
+                registry: expectedRegistry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+
+            await mkdir(join(root, GENERATED_RELATION_REGISTRY_DIRNAME), { recursive: true });
+            await writeFile(
+                join(root, GENERATED_RELATION_REGISTRY_DIRNAME, GENERATED_RELATION_REGISTRY_METADATA_FILENAME),
+                JSON.stringify(
+                    {
+                        version: GENERATED_RELATION_REGISTRY_METADATA_VERSION,
+                        fingerprint: expectedRegistry.getResolvedRelationGraphFingerprint(),
+                        snapshot: expectedRegistry.getResolvedRelationGraphSnapshot(),
+                    },
+                    null,
+                    2
+                )
+            );
+
+            const liveRegistry = new ModelRegistry();
+            Model({
+                registry: liveRegistry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+
+            liveRegistry.getResolvedRelationGraph();
+            expect(warnings).toEqual([]);
+        } finally {
+            process.chdir(cwdBefore);
+            process.env.NODE_ENV = nodeEnvBefore;
+            await rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('ignores malformed generated relation registry metadata', async () => {
+        const root = await mkdtemp(join(tmpdir(), 'tango-schema-registry-malformed-'));
+        const cwdBefore = process.cwd();
+        const nodeEnvBefore = process.env.NODE_ENV;
+        const warnings: string[] = [];
+        process.chdir(root);
+        process.env.NODE_ENV = 'development';
+        setLoggerFactory({
+            error: () => {},
+            warn: (message) => warnings.push(message),
+            info: () => {},
+            debug: () => {},
+        });
+
+        try {
+            await mkdir(join(root, GENERATED_RELATION_REGISTRY_DIRNAME), { recursive: true });
+            await writeFile(
+                join(root, GENERATED_RELATION_REGISTRY_DIRNAME, GENERATED_RELATION_REGISTRY_METADATA_FILENAME),
+                JSON.stringify({ version: GENERATED_RELATION_REGISTRY_METADATA_VERSION, fingerprint: 123 }),
+                'utf8'
+            );
+
+            const registry = new ModelRegistry();
+            Model({
+                registry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+
+            expect(() => registry.getResolvedRelationGraph()).not.toThrow();
+            expect(warnings).toEqual([
+                expect.stringContaining('Ignoring malformed generated relation registry metadata'),
+            ]);
+        } finally {
+            process.chdir(cwdBefore);
+            process.env.NODE_ENV = nodeEnvBefore;
+            await rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('ignores unreadable generated relation registry metadata and warns once', async () => {
+        const root = await mkdtemp(join(tmpdir(), 'tango-schema-registry-invalid-'));
+        const cwdBefore = process.cwd();
+        const nodeEnvBefore = process.env.NODE_ENV;
+        const warnings: string[] = [];
+        process.chdir(root);
+        process.env.NODE_ENV = 'development';
+        setLoggerFactory({
+            error: () => {},
+            warn: (message) => warnings.push(message),
+            info: () => {},
+            debug: () => {},
+        });
+
+        try {
+            await mkdir(join(root, GENERATED_RELATION_REGISTRY_DIRNAME), { recursive: true });
+            await writeFile(
+                join(root, GENERATED_RELATION_REGISTRY_DIRNAME, GENERATED_RELATION_REGISTRY_METADATA_FILENAME),
+                '{not-json',
+                'utf8'
+            );
+
+            const registry = new ModelRegistry();
+            Model({
+                registry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+
+            expect(() => registry.getResolvedRelationGraph()).not.toThrow();
+            expect(warnings).toEqual([expect.stringContaining('Unable to read generated relation registry metadata')]);
+        } finally {
+            process.chdir(cwdBefore);
+            process.env.NODE_ENV = nodeEnvBefore;
+            await rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('warns when the live registry includes models absent from the generated relation registry snapshot', async () => {
+        const root = await mkdtemp(join(tmpdir(), 'tango-schema-registry-extra-'));
+        const cwdBefore = process.cwd();
+        const nodeEnvBefore = process.env.NODE_ENV;
+        const warnings: string[] = [];
+        process.chdir(root);
+        process.env.NODE_ENV = 'development';
+        setLoggerFactory({
+            error: () => {},
+            warn: (message) => warnings.push(message),
+            info: () => {},
+            debug: () => {},
+        });
+
+        try {
+            const expectedRegistry = new ModelRegistry();
+            Model({
+                registry: expectedRegistry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+
+            await mkdir(join(root, GENERATED_RELATION_REGISTRY_DIRNAME), { recursive: true });
+            await writeFile(
+                join(root, GENERATED_RELATION_REGISTRY_DIRNAME, GENERATED_RELATION_REGISTRY_METADATA_FILENAME),
+                JSON.stringify(
+                    {
+                        version: GENERATED_RELATION_REGISTRY_METADATA_VERSION,
+                        fingerprint: expectedRegistry.getResolvedRelationGraphFingerprint(),
+                        snapshot: expectedRegistry.getResolvedRelationGraphSnapshot(),
+                    },
+                    null,
+                    2
+                )
+            );
+
+            const liveRegistry = new ModelRegistry();
+            Model({
+                registry: liveRegistry,
+                namespace: 'blog',
+                name: 'User',
+                table: 'users',
+                schema: z.object({ id: t.primaryKey(z.number().int()) }),
+            });
+            Model({
+                registry: liveRegistry,
+                namespace: 'blog',
+                name: 'Post',
+                table: 'posts',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    authorId: t.foreignKey('blog/User', {
+                        field: z.number().int(),
+                        relatedName: 'posts',
+                    }),
+                }),
+            });
+
+            liveRegistry.getResolvedRelationGraph();
+            expect(warnings).toEqual([expect.stringContaining("Run 'tango codegen relations' to refresh")]);
+        } finally {
+            process.chdir(cwdBefore);
+            process.env.NODE_ENV = nodeEnvBefore;
+            await rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('treats only relation-identical subsets as partial registry snapshots', () => {
+        const registry = new ModelRegistry() as unknown as {
+            isPartialRegistrySnapshot: (
+                liveSnapshot: {
+                    models: Array<{ key: string; relations: Array<{ name: string }> }>;
+                },
+                expectedSnapshot: {
+                    models: Array<{ key: string; relations: Array<{ name: string }> }>;
+                }
+            ) => boolean;
+        };
+
+        expect(
+            registry.isPartialRegistrySnapshot(
+                {
+                    models: [{ key: 'blog/User', relations: [{ name: 'posts' }] }],
+                },
+                {
+                    models: [
+                        { key: 'blog/User', relations: [{ name: 'posts' }] },
+                        { key: 'blog/Post', relations: [] },
+                    ],
+                }
+            )
+        ).toBe(true);
+
+        expect(
+            registry.isPartialRegistrySnapshot(
+                {
+                    models: [{ key: 'blog/User', relations: [{ name: 'articles' }] }],
+                },
+                {
+                    models: [
+                        { key: 'blog/User', relations: [{ name: 'posts' }] },
+                        { key: 'blog/Post', relations: [] },
+                    ],
+                }
+            )
+        ).toBe(false);
     });
 });

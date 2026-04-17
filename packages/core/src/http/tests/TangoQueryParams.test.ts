@@ -67,6 +67,26 @@ describe(TangoQueryParams, () => {
         expect(TangoQueryParams.isTangoQueryParams({})).toBe(false);
     });
 
+    it('replaces and removes values immutably and renders a relative URL', () => {
+        const params = TangoQueryParams.fromRecord({
+            search: 'orm',
+            limit: '20',
+            offset: '0',
+        });
+
+        const updated = params.withValues({
+            limit: 10,
+            offset: 30,
+            search: undefined,
+            category: ['orm', 'http'],
+            tag: [],
+        });
+
+        expect(params.toRelativeURL()).toBe('?search=orm&limit=20&offset=0');
+        expect(updated.toRelativeURL()).toBe('?limit=10&offset=30&category=orm&category=http');
+        expect(TangoQueryParams.fromRecord({}).toRelativeURL()).toBe('');
+    });
+
     it('returns undefined for blank search values and empty ordering inputs', () => {
         const params = TangoQueryParams.fromRecord({
             search: '   ',

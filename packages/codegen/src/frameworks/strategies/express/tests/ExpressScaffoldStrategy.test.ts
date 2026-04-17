@@ -44,6 +44,7 @@ describe(ExpressScaffoldStrategy, () => {
             expect(packageJson).toContain('"better-sqlite3"');
             expect(packageJson).not.toContain('"pg"');
             expect(packageJson).toContain('"@danceroutine/tango-openapi"');
+            expect(packageJson).toContain('"codegen:relations"');
             expect(config).toContain("adapter: 'sqlite'");
             expect(config).toContain('./.data/express-sqlite.sqlite');
             expect((JSON.parse(tsconfig) as { include: string[] }).include).toContain('migrations/**/*.ts');
@@ -57,6 +58,7 @@ describe(ExpressScaffoldStrategy, () => {
             expect(indexSource).toContain('await registerTango(app)');
             expect(readme).toContain('First-time setup');
             expect(readme).toContain('make:migrations --name initial');
+            expect(readme).toContain('codegen:relations');
             expect(migrationsKeep).toBe('');
         });
 

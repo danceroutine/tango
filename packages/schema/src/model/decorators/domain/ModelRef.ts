@@ -1,7 +1,7 @@
 import type { Model, ModelKeyOf } from '../../../domain';
 
 // TODO: consider async model callbacks such as `() => Promise<Model>` when Tango tackles lazy import boundaries for cyclical model graphs.
-// See the ADR: https://tangowebframework.dev/contributors/adr/relation-target-typing-without-codegen
+// See the ADR: https://tangowebframework.dev/contributors/adr/deep-relation-hydration-with-generated-path-typing
 declare const TANGO_TYPED_MODEL_REF_TARGET: unique symbol;
 
 export interface TypedModelRef<TModel extends Model = Model> {

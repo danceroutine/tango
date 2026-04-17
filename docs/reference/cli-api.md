@@ -32,7 +32,7 @@ The rest of the documentation assumes the `tango` executable is available in you
 
 ## Built-in commands
 
-The CLI has two public workflows.
+The CLI has three public workflows.
 
 Project creation goes through one command:
 
@@ -45,7 +45,11 @@ Schema maintenance for an existing Tango application goes through four commands:
 - `tango plan`
 - `tango status`
 
-That keeps the public command surface centered on the two jobs most applications reach for first: creating a project and maintaining its database schema.
+Relation-typing generation goes through one direct command:
+
+- `tango codegen relations`
+
+That keeps the public command surface centered on the three jobs most applications reach for first: creating a project, maintaining its database schema, and keeping generated relation typing current.
 
 ## Common command-line usage
 
@@ -66,7 +70,13 @@ tango plan --config ./tango.config.ts
 tango status --config ./tango.config.ts
 ```
 
-`tango make:migrations` generates the next migration step from model metadata and the current database schema. `tango migrate` applies pending migrations. `tango plan` shows the SQL Tango would run. `tango status` shows which migration ids the target database has already recorded.
+Use the direct relation command when relation metadata changed but no migration file is needed:
+
+```bash
+tango codegen relations --models ./src/models.ts
+```
+
+`tango make:migrations` generates the next migration step from model metadata and the current database schema, while also refreshing the generated relation registry for the same model module. Use `tango codegen relations` when relation metadata changed but no migration file is needed. `tango migrate` applies pending migrations. `tango plan` shows the SQL Tango would run. `tango status` shows which migration ids the target database has already recorded.
 
 ## Config-aware migration commands
 

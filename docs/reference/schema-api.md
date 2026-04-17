@@ -226,7 +226,7 @@ Use `modelRef<TModel>(key)` when a relation should keep the runtime decoupling o
 const authorTarget = t.modelRef<typeof UserModel>('blog/User');
 ```
 
-At runtime, Tango resolves `blog/User` through the model registry. At type-check time, the generic carries `typeof UserModel`, which lets querysets infer hydrated relation shapes from string-key references. A plain string key still works for runtime relation resolution when application code does not need strict hydrated relation typing.
+At runtime, Tango resolves `blog/User` through the model registry. At type-check time, the generic carries `typeof UserModel`, which lets querysets infer hydrated relation shapes from string-key references. Generated relation typing is now the supported path for reverse and nested relation names, so most application code no longer needs explicit target-model generics once the app-local registry is current. A plain string key still works for runtime relation resolution when application code does not need strict hydrated relation typing.
 
 #### `foreignKey(target, config?)`
 
@@ -274,7 +274,7 @@ const PostSchema = z.object({
 });
 ```
 
-An unhydrated result exposes `author` as the stored reference value. A queryset that calls `selectRelated('author')` exposes `author` as the hydrated user model or `null`.
+An unhydrated result exposes `author` as the stored reference value. A queryset that calls `selectRelated('author')` exposes `author` as the hydrated user model or `null`, and nested traversal can continue from there through paths such as `author__profile`.
 
 #### `oneToOne(target, config?)`
 
@@ -398,7 +398,7 @@ const PostModel = Model({
 
 ## `ModelRegistry`
 
-`ModelRegistry` resolves models by their `namespace/name` key. Most application code uses the shared registry that `Model(...)` writes to automatically. Separate registry instances are useful when you need an isolated model set.
+`ModelRegistry` resolves models by their `namespace/name` key. Most application code uses the default shared registry that `Model(...)` writes to automatically. Separate registry instances are useful when you need an isolated model set.
 
 ```ts
 const registry = new ModelRegistry();
@@ -408,7 +408,9 @@ const sameModel = registry.get('blog', 'Post');
 const resolved = registry.resolveRef('blog/Post');
 ```
 
-`ModelRegistry.global()` returns the shared process-wide registry used by `Model(...)`.
+`ModelRegistry.global()` returns the shared default registry used by `Model(...)` for the current `@danceroutine/tango-schema` package instance.
+
+`ModelRegistry.active()` and `ModelRegistry.runWithRegistry(...)` handle the explicit construction path. That active binding is the part Tango shares across separate schema package copies, which lets maintainer tooling such as model loading and code generation bind one registry intentionally without turning the ambient default registry into process-wide state.
 
 `ModelRegistry.register(model)` and `ModelRegistry.registerMany(models)` add models to that shared registry.
 
