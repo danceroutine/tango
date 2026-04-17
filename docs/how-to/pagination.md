@@ -127,7 +127,7 @@ paginator.parse(params);
 const pagedQueryset = paginator.apply(baseQueryset);
 const [page, totalCount] = await Promise.all([pagedQueryset.fetch(), baseQueryset.count()]);
 
-return paginator.toResponse(page.toArray(), { totalCount });
+return paginator.toResponse([...page], { totalCount });
 ```
 
 The pattern stays the same:

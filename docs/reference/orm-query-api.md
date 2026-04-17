@@ -424,7 +424,15 @@ The result contains the selected `PostModel` fields and the hydrated `author` mo
 
 ### `fetch(shape?)`
 
-Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that implements `Iterable<Out>`, so you can use `for...of`, array spread, or destructuring such as `const [first] = page`. Call `toArray()` when you need a real array instance (for example, `.map` without spreading). For compatibility, `QueryResult` still exposes a deprecated `results` getter.
+Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that implements `Iterable<Out>`, so you can use `for...of`, array spread, or destructuring such as `const [first] = page`. For compatibility, `QueryResult` still exposes a deprecated `results` getter.
+
+`toArray()` returns a shallow copy when you want an ordinary array value:
+
+```ts
+const page = await PostModel.objects.query().filter({ published: true }).fetch();
+const rows = page.toArray();
+rows.map((post) => post.id);
+```
 
 ```ts
 const page = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetch();

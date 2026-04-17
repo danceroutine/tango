@@ -156,8 +156,8 @@ it('executes a queryset against the real test database', async () => {
 
     const result = await queryset.filter({ published: true }).fetch();
 
-    expect(result.toArray()).toHaveLength(1);
-    expect(result.toArray()[0]?.title).toBe('Hello, Tango');
+    expect([...result]).toHaveLength(1);
+    expect([...result][0]?.title).toBe('Hello, Tango');
 });
 ```
 

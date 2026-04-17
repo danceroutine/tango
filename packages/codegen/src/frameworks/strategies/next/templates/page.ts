@@ -15,9 +15,9 @@ export default async function HomePage() {
     return (
         <main style={{ fontFamily: 'system-ui', margin: '2rem auto', maxWidth: '60ch' }}>
             <h1>Tango + Next.js</h1>
-            <p>Showing {todos.toArray().length} todos through Tango's runtime-backed model manager.</p>
+            <p>Showing {[...todos].length} todos through Tango's runtime-backed model manager.</p>
             <ul>
-                {todos.toArray().map((todo) => (
+                {[...todos].map((todo) => (
                     <li key={todo.id}>{todo.title}</li>
                 ))}
             </ul>

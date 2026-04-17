@@ -14,7 +14,7 @@ async function ensureUsers(targetUserCount = 8): Promise<readonly User[]> {
         await UserModel.objects.bulkCreate(rows);
     }
 
-    return (await UserModel.objects.query().orderBy('id').fetch()).toArray();
+    return [...(await UserModel.objects.query().orderBy('id').fetch())];
 }
 
 async function ensurePosts(users: readonly User[], targetPostCount: number): Promise<readonly Post[]> {
@@ -43,7 +43,7 @@ async function ensurePosts(users: readonly User[], targetPostCount: number): Pro
         }
     }
 
-    return (await PostModel.objects.query().orderBy('id').fetch()).toArray();
+    return [...(await PostModel.objects.query().orderBy('id').fetch())];
 }
 
 async function ensureComments(users: readonly User[], posts: readonly Post[]): Promise<number> {
