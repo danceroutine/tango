@@ -18,7 +18,7 @@ hero:
 
 features:
     - title: Type-safe ORM
-      details: Tango integrates Zod into your model definitions, combining the best of DRF Serializers with Django models, with the declarative interface and type-inferrence of Zod.
+      details: Tango integrates Zod into your model definitions, combining the best of DRF Serializers with Django models, with the declarative interface and type inference of Zod.
     - title: Django + DRF inspired API layer
       details: Expose your datalayer through your API with minimal boilerplate, utilizing the same viewset and API patterns you're used to from DRF
     - title: Framework interoperability

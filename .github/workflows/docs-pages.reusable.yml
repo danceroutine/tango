@@ -1,0 +1,65 @@
+name: Docs Pages (reusable)
+
+on:
+    workflow_call:
+
+concurrency:
+    group: docs-pages
+    cancel-in-progress: true
+
+jobs:
+    build:
+        name: Build docs
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+
+            - name: Get pnpm store directory
+              id: pnpm-cache
+              shell: bash
+              run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+            - name: Setup pnpm cache
+              uses: actions/cache@v4
+              with:
+                  path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+                  key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pnpm-store-
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Setup Pages
+              uses: actions/configure-pages@v5
+
+            - name: Build docs
+              env:
+                  TANGO_DOCS_BASE: /
+              run: pnpm docs:build
+
+            - name: Upload Pages artifact
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: docs/.vitepress/dist
+
+    deploy:
+        name: Deploy docs
+        needs: build
+        runs-on: ubuntu-latest
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4
