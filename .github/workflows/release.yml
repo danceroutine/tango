@@ -207,4 +207,4 @@ jobs:
               && inputs.release_type == 'stable-recovery'
               && needs.release.outputs.publish_state_mode == 'publish'
             )
-        uses: ./.github/workflows/docs-pages.reusable.yml
+        uses: danceroutine/tango/.github/workflows/docs-pages.reusable.yml@main

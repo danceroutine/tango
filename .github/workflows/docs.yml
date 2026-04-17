@@ -22,4 +22,4 @@ concurrency:
 jobs:
     pages:
         name: Docs Pages
-        uses: ./.github/workflows/docs-pages.reusable.yml
+        uses: danceroutine/tango/.github/workflows/docs-pages.reusable.yml@main
