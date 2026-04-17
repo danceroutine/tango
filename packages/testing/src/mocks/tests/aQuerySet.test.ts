@@ -40,7 +40,7 @@ describe(aQuerySet, () => {
         expect(qs.select(['id'])).toBe(qs);
         expect(qs.selectRelated('comments')).toBe(qs);
         expect(qs.prefetchRelated('comments')).toBe(qs);
-        await expect(qs.fetch()).resolves.toEqual({ results: [{ id: 1 }], nextCursor: 'next-cursor' });
+        await expect(qs.fetch()).resolves.toMatchObject({ results: [{ id: 1 }], nextCursor: 'next-cursor' });
         await expect(qs.fetchOne()).resolves.toEqual({ id: 1 });
         await expect(qs.count()).resolves.toBe(9);
         await expect(qs.exists()).resolves.toBe(true);
@@ -56,7 +56,7 @@ describe(aQuerySet, () => {
         expect(qs.select(['id'])).toBe(qs);
         expect(qs.selectRelated('comments')).toBe(qs);
         expect(qs.prefetchRelated('comments')).toBe(qs);
-        await expect(qs.fetch()).resolves.toEqual({ results: [], nextCursor: null });
+        await expect(qs.fetch()).resolves.toMatchObject({ results: [], nextCursor: null });
         await expect(qs.fetchOne()).resolves.toBeNull();
         await expect(qs.count()).resolves.toBe(0);
         await expect(qs.exists()).resolves.toBe(false);
@@ -70,7 +70,7 @@ describe(aQuerySet, () => {
             fetchOne: async () => ({ id: 1 }),
         });
 
-        await expect(qs.fetch()).resolves.toEqual({ results: [{ id: 1 }], nextCursor: null });
+        await expect(qs.fetch()).resolves.toMatchObject({ results: [{ id: 1 }], nextCursor: null });
         await expect(qs.fetchOne()).resolves.toEqual({ id: 1 });
         expectTypeOf(qs).toEqualTypeOf<QuerySet<Model, Selected>>();
     });

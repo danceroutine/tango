@@ -7,7 +7,7 @@ import { RequestContext } from '../../context/index';
 import { FilterSet } from '../../filters/index';
 import { CursorPaginator } from '../../paginators/CursorPaginator';
 import { ModelSerializer } from '../../serializer/index';
-import { aManager, aQuerySet, aRequestContext } from '@danceroutine/tango-testing';
+import { aManager, aQueryResult, aQuerySet, aRequestContext } from '@danceroutine/tango-testing';
 import type { ManagerLike } from '@danceroutine/tango-orm';
 import type { ResourceModelLike } from '../../resource/index';
 
@@ -103,10 +103,12 @@ function aResourcesRequestContext(
 describe(GenericAPIView, () => {
     it('lists records and creates new ones for collection routes', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue({
-            results: [{ id: 1, email: 'a@example.com', name: 'A' }],
-            nextCursor: null,
-        });
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(
+            aQueryResult({
+                results: [{ id: 1, email: 'a@example.com', name: 'A' }],
+                nextCursor: null,
+            })
+        );
         vi.mocked(querySetDouble.count).mockResolvedValue(1);
 
         const manager = aManager<UserRecord>({
@@ -227,7 +229,7 @@ describe(GenericAPIView, () => {
 
     it('applies configured filters and supports custom paginator factories', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ results: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
         currentUserModel = {
@@ -260,7 +262,7 @@ describe(GenericAPIView, () => {
 
     it('coerces boolean query params from model metadata during list filters', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ results: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
         currentUserModel = {
@@ -293,7 +295,7 @@ describe(GenericAPIView, () => {
 
     it('coerces numeric query params from model metadata during list filters', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ results: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
         currentUserModel = {
@@ -326,7 +328,7 @@ describe(GenericAPIView, () => {
 
     it('skips empty filter results and ignores invalid ordering tokens', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ results: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
         currentUserModel = {

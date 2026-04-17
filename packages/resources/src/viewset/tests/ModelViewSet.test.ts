@@ -6,7 +6,7 @@ import { RequestContext } from '../../context';
 import { FilterSet } from '../../filters';
 import { CursorPaginator } from '../../paginators/CursorPaginator';
 import { ModelSerializer, type AnyModelSerializerClass } from '../../serializer/index';
-import { aManager, aQuerySet, aRequestContext } from '@danceroutine/tango-testing';
+import { aManager, aQueryResult, aQuerySet, aRequestContext } from '@danceroutine/tango-testing';
 import type { ManagerLike } from '@danceroutine/tango-orm';
 import type { ResourceModelLike } from '../../resource/index';
 
@@ -124,7 +124,7 @@ describe(ModelViewSet, () => {
 
     beforeEach(() => {
         querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ results: [], nextCursor: null }));
         vi.mocked(querySetDouble.fetchOne).mockResolvedValue(null);
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
