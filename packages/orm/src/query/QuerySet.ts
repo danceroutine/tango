@@ -8,6 +8,7 @@ import type { OrderToken } from './domain/OrderToken';
 import type { FilterInput } from './domain/FilterInput';
 import type { CompiledQuery } from './domain/CompiledQuery';
 import type { CompiledHydrationNode } from './domain/CompiledQuery';
+import { QueryResult } from './domain/QueryResult';
 import type {
     GeneratedHydratedRelationMap,
     GeneratedPrefetchRelatedPathKeys,
@@ -92,7 +93,7 @@ export class QuerySet<
     TBaseResult extends Record<string, unknown> = TModel,
     TSourceModel = unknown,
     THydrated extends Record<string, unknown> = Record<never, never>,
-> {
+> implements AsyncIterable<HydratedQueryResult<TBaseResult, THydrated>> {
     static readonly BRAND = 'tango.orm.query_set' as const;
     readonly __tangoBrand: typeof QuerySet.BRAND = QuerySet.BRAND;
 
@@ -300,10 +301,14 @@ export class QuerySet<
               ? projectedRows.map(shape)
               : projectedRows.map((r) => shape.parse(r));
 
-        return {
-            results,
-            nextCursor: null,
-        };
+        return new QueryResult(results, { nextCursor: null });
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<HydratedQueryResult<TBaseResult, THydrated>> {
+        const result = await this.fetch();
+        for (const row of result as QueryResult<HydratedQueryResult<TBaseResult, THydrated>>) {
+            yield row;
+        }
     }
 
     /**
