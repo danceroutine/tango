@@ -4,55 +4,197 @@ This file is generated from stable release changesets during Tango stable releas
 
 ## 1.5.0 - 2026-04-17
 
-- Add generated relation typing, deep relation hydration, and the supporting tooling and package contract updates. Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-resources`, `@danceroutine/tango-codegen`, `@danceroutine/tango-openapi`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`, `@danceroutine/tango-adapters-express`.
+Tango's relation workflow now extends from first-hop hydration into deeper generated relation-aware contracts. Application code can traverse more of its related graph while keeping ORM results, generated surfaces, and runtime-facing contracts aligned.
+
+- Add generated relation typing and deep relation hydration for nested eager-loading paths.
+- Carry the new relation metadata through schema, codegen, OpenAPI, migrations, testing, and Express-facing integration so generated artifacts and runtime behavior agree on the same relation graph.
+
+Previously:
+
+```ts
+const recentPosts = await PostModel.objects
+    .query()
+    .filter({ published: true })
+    .selectRelated('author')
+    .fetch();
+
+const firstPost = recentPosts.results[0];
+
+firstPost.author?.email;
+// firstPost.author?.profile is not attached here.
+// firstPost.comments is not attached here.
+```
+
+Now:
+
+```ts
+const recentPosts = await PostModel.objects
+    .query()
+    .filter({ published: true })
+    .selectRelated('author__profile')
+    .prefetchRelated('comments__author')
+    .fetch();
+
+const firstPost = recentPosts.results[0];
+
+firstPost.author?.profile?.displayName;
+firstPost.comments[0]?.author?.email;
+// firstPost.author?.profile is attached and typed here.
+// firstPost.comments[0]?.author is attached and typed here.
+```
 
 ## 1.4.0 - 2026-04-09
 
-- Add a supported ORM transaction API centered on `transaction.atomic(async (tx) => ...)`, nested savepoints, and `tx.onCommit(...)`.
+Tango now provides a first-class ORM transaction boundary for multi-step write workflows. Transaction-aware hooks also receive a narrow post-commit contract so application code can schedule durable side effects without depending on ORM internals.
 
-Extend schema write-hook args with a narrow transaction callback contract so hooks can register post-commit work without depending on ORM internals.
+- Add `transaction.atomic(async (tx) => ...)`, nested savepoints, and `tx.onCommit(...)` for commit-aware application workflows.
+- Extend schema write-hook args with an optional transaction callback contract so hooks can register post-commit work without taking a broad ORM dependency.
+- Add the testing fixtures and client updates needed to exercise the runtime-backed transaction workflow end to end.
 
-Add testing fixtures and client contract updates needed to exercise the new runtime-backed transaction workflow. Affected packages: `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-testing`.
+Previously:
+
+```ts
+const user = await UserModel.objects.create({
+    email: 'author@example.com',
+});
+
+await ProfileModel.objects.create({
+    userId: user.id,
+});
+
+// If a later step throws here, both writes stay committed.
+sendWelcomeEmail(user.email);
+// This side effect also runs before the workflow is durably complete.
+```
+
+Now:
+
+```ts
+await transaction.atomic(async (tx) => {
+    const user = await UserModel.objects.create({
+        email: 'author@example.com',
+    });
+
+    await ProfileModel.objects.create({
+        userId: user.id,
+    });
+
+    // If a later step throws here, both writes roll back together.
+    tx.onCommit(() => {
+        sendWelcomeEmail(user.email);
+    });
+    // This side effect runs only after the outer commit succeeds.
+});
+```
 
 ## 1.3.0 - 2026-04-08
 
-- Add typed relation hydration for Tango querysets.
+Typed relation hydration is now available for Tango querysets. Query code can ask Tango to attach related records directly, while TypeScript keeps the hydrated result shape aligned with the relation metadata authored in the model layer.
 
-Querysets can now hydrate direct single-valued relations with `selectRelated(...)` and reverse collection relations with `prefetchRelated(...)`. Relation hydration is typed from field-authored relation metadata, with `t.modelRef<TModel>(...)` providing a typed string-reference path for projects that want runtime model-key decoupling without losing TypeScript result typing.
+- Add `selectRelated(...)` for single-valued relation traversal and `prefetchRelated(...)` for collection-rooted traversal.
+- Type relation hydration from model-authored relation metadata, including typed string references through `t.modelRef<TModel>(...)`.
+- Update relation-aware query planning and ORM result typing so selected model fields and hydrated relation properties compose correctly.
 
-This also moves relation-aware query planning through the SQL validation layer, adds compiler-owned prefetch SQL generation, and updates ORM result typing so selected model fields and hydrated relation properties compose correctly. Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-resources`, `@danceroutine/tango-codegen`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`, `@danceroutine/tango-cli`.
+Previously:
+
+```ts
+const recentPosts = await PostModel.objects
+    .query()
+    .filter({ published: true })
+    .fetch();
+
+const firstPost = recentPosts.results[0];
+
+// firstPost.author is still the stored reference value here.
+// firstPost.author?.email is not available from the queryset result.
+```
+
+Now:
+
+```ts
+const recentPosts = await PostModel.objects
+    .query()
+    .filter({ published: true })
+    .selectRelated('author')
+    .fetch();
+
+const firstPost = recentPosts.results[0];
+
+// firstPost.author is now the hydrated user model or null.
+firstPost.author?.email;
+```
 
 ## 1.2.0 - 2026-04-08
 
-- Add decorator-owned relation resolution and field metadata APIs.
+The model metadata that relation-aware features build on is now stronger and more consistent. Schema, ORM, migrations, and code generation now share a clearer resolved relation graph and a more fluent scalar metadata authoring shape.
 
-Schema now supports object-form relation decorator configs, decorator-level relation naming, resolved relation graph finalization, and the fluent `t.field(...).build()` scalar metadata builder. ORM model metadata now consumes the resolved relation graph for relation metadata and aliases. Testing adds `withGlobalTestApi` for module-loading test helpers. Migrations now load model modules through a registry-aware loader, and codegen templates emit the new fluent scalar metadata form. Affected packages: `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-codegen`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`.
+- Add object-form relation decorator configuration, decorator-level relation naming, and resolved relation graph finalization.
+- Add the fluent scalar metadata builder form `t.field(...).build()`.
+- Update ORM metadata, migrations, testing helpers, and codegen templates to consume the resolved relation graph consistently.
 
 ## 1.1.3 - 2026-04-07
 
-- Fixed type narrowing on select() to align with database projection Affected packages: `@danceroutine/tango-orm`, `@danceroutine/tango-testing`.
+- Fix `select()` result typing so projected fields narrow to the database projection rather than the full model shape.
+
+Previously:
+
+```ts
+const postCards = await PostModel.objects
+    .query()
+    .select(['id', 'title'] as const)
+    .fetch();
+
+const firstPost = postCards.results[0];
+
+firstPost.id;
+firstPost.title;
+// firstPost could still be treated like the full model shape here.
+// firstPost.slug;
+```
+
+Now:
+
+```ts
+const postCards = await PostModel.objects
+    .query()
+    .select(['id', 'title'] as const)
+    .fetch();
+
+const firstPost = postCards.results[0];
+
+firstPost.id;
+firstPost.title;
+// firstPost is narrowed to the selected projection here.
+// firstPost.slug; // type error
+```
 
 ## 1.1.2 - 2026-04-04
 
-- Update package documentation to reflect docsite url changes Affected packages: `@danceroutine/tango-schema`, `@danceroutine/tango-orm`, `@danceroutine/tango-resources`, `@danceroutine/tango-openapi`, `@danceroutine/tango-migrations`, `@danceroutine/tango-adapters-next`, `@danceroutine/tango-adapters-nuxt`, `@danceroutine/tango-adapters-express`.
+- Update package documentation to match the new documentation site URLs.
 
 ## 1.1.1 - 2026-04-02
 
-- Updated package readmes to point to the new contributor documentation Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-schema`, `@danceroutine/tango-config`, `@danceroutine/tango-openapi`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`, `@danceroutine/tango-adapters-core`, `@danceroutine/tango-adapters-next`, `@danceroutine/tango-adapters-express`.
+- Update package READMEs to point maintainers to the new contributor documentation.
 
 ## 1.1.0 - 2026-04-01
 
-- Add first-class Nuxt support with a dedicated adapter package, Nuxt project scaffolding, an official Nuxt blog example, and Nuxt docs coverage. Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-codegen`, `@danceroutine/tango-cli`, `@danceroutine/tango-adapters-nuxt`.
+First-class Nuxt support is now available. Tango can live inside Nitro event handlers with an official adapter, generated project scaffolding, and a supported tutorial path that shows how the Tango layers fit into a Nuxt application.
+
+- Add the dedicated `@danceroutine/tango-adapters-nuxt` package.
+- Add Nuxt project scaffolding and an official Nuxt blog example.
+- Add Nuxt documentation coverage so the adapter, tutorial, and generated project shape describe the same integration model.
 
 ## 1.0.2 - 2026-03-31
 
-- Infer typed filter coercion from Tango model metadata so resource query params can be parsed into boolean, numeric, and timestamp values centrally. Affected packages: `@danceroutine/tango-resources`.
-- Derive resource OpenAPI lookup fields from Tango model metadata instead of manager internals during schema description. Affected packages: `@danceroutine/tango-resources`.
+- Infer typed filter coercion from model metadata so resource query params parse booleans, numbers, and timestamps centrally.
+- Derive resource OpenAPI lookup fields from model metadata during schema description.
 
 ## 1.0.1 - 2026-03-31
 
-- Hoist shared HTTP method and action scope value types into adapters core so framework adapters stop re-declaring them. Affected packages: `@danceroutine/tango-adapters-core`, `@danceroutine/tango-adapters-next`.
+- Hoist shared HTTP method and action-scope value types into adapters core so framework adapters stop re-declaring the same contract.
 
 ## 1.0.0 - 2026-03-30
 
-- Promote Tango's public packages to their first stable 1.0.0 release. Affected packages: `@danceroutine/tango-core`, `@danceroutine/tango-schema`, `@danceroutine/tango-config`, `@danceroutine/tango-orm`, `@danceroutine/tango-resources`, `@danceroutine/tango-codegen`, `@danceroutine/tango-openapi`, `@danceroutine/tango-migrations`, `@danceroutine/tango-testing`, `@danceroutine/tango-cli`, `@danceroutine/tango-adapters-core`, `@danceroutine/tango-adapters-next`, `@danceroutine/tango-adapters-express`.
+Tango's public packages now reach their first stable `1.0.0` release. This establishes the initial stable contract across the model, ORM, resource, tooling, migration, testing, and adapter layers that now make up the framework's supported package surface.
+
+- Publish Tango's first stable package line across the core framework, tooling, adapters, and supporting packages.

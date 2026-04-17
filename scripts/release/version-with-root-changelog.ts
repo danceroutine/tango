@@ -147,9 +147,9 @@ export async function readReleaseVersion(rootDir: string, packageNames: string[]
 export function prependReleaseEntry(
     existingContent: string,
     releaseEntry: ReleaseEntry,
-    packageOrder: string[]
+    _packageOrder: string[]
 ): string {
-    const formattedEntry = formatReleaseEntry(releaseEntry, packageOrder);
+    const formattedEntry = formatReleaseEntry(releaseEntry);
     const normalizedExistingContent = normalizeLineEndings(existingContent).trim();
 
     if (
@@ -256,34 +256,18 @@ async function findPackageJsonPaths(directory: string): Promise<string[]> {
     return packageJsonPaths.sort();
 }
 
-function formatReleaseEntry(releaseEntry: ReleaseEntry, packageOrder: string[]): string {
+function formatReleaseEntry(releaseEntry: ReleaseEntry): string {
     const lines = [`## ${releaseEntry.version} - ${releaseEntry.date}`, ''];
 
-    for (const note of releaseEntry.notes) {
-        lines.push(`- ${formatBulletLine(note, packageOrder)}`);
-    }
+    releaseEntry.notes.forEach((note, index) => {
+        lines.push(note.summary.trim());
+
+        if (index < releaseEntry.notes.length - 1) {
+            lines.push('');
+        }
+    });
 
     return lines.join('\n');
-}
-
-function formatBulletLine(note: ChangesetReleaseNote, packageOrder: string[]): string {
-    const orderedPackages = orderPackages(note.packages, packageOrder);
-    return `${note.summary} Affected packages: ${orderedPackages.map((packageName) => `\`${packageName}\``).join(', ')}.`;
-}
-
-function orderPackages(packageNames: string[], packageOrder: string[]): string[] {
-    const packageIndex = new Map(packageOrder.map((packageName, index) => [packageName, index]));
-
-    return [...packageNames].sort((left, right) => {
-        const leftIndex = packageIndex.get(left) ?? Number.MAX_SAFE_INTEGER;
-        const rightIndex = packageIndex.get(right) ?? Number.MAX_SAFE_INTEGER;
-
-        if (leftIndex !== rightIndex) {
-            return leftIndex - rightIndex;
-        }
-
-        return left.localeCompare(right);
-    });
 }
 
 function normalizeLineEndings(value: string): string {

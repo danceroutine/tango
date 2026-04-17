@@ -14,6 +14,8 @@ This will prompt you to select which packages have changed and what type of chan
 
 The summary you write is later used to generate Tango's root `CHANGELOG.md` for stable releases.
 
+Write that summary in the Markdown shape you want the changelog to preserve. The stable release script carries each changeset summary into the root changelog verbatim, so short bullets, short release-note paragraphs, and compact fenced examples can survive generation exactly as written.
+
 ## Releasing
 
 Releases are handled automatically via GitHub Actions:
