@@ -307,7 +307,8 @@ const postCards = await PostModel.objects
     .select(['id', 'title'] as const)
     .fetch();
 
-postCards.results[0].title;
+const [first] = postCards.toArray();
+first?.title;
 ```
 
 When Tango compiles the query, model fields become database columns:
@@ -327,7 +328,9 @@ Use `selectRelated(...)` when the requested path stays single-valued from hop to
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts.results[0].author?.profile?.displayName;
+for (const post of posts) {
+    post.author?.profile?.displayName;
+}
 ```
 
 `selectRelated(...)` accepts nested paths such as `author__profile`, but it rejects any path that crosses a collection edge. A path like `posts__author` belongs in `prefetchRelated(...)`, not `selectRelated(...)`.
@@ -365,8 +368,12 @@ In contrast, use `prefetchRelated(...)` when the requested path includes a colle
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users.results[0].posts[0]?.author?.email;
-users.results[0].posts[0]?.comments[0]?.body;
+for (const user of users) {
+    for (const post of user.posts) {
+        post.author?.email;
+        post.comments[0]?.body;
+    }
+}
 ```
 
 `prefetchRelated(...)` runs the base query first, then runs batched follow-up queries for the planned collection edges. A user record with no matching posts still receives `posts: []`, and a post record with no matching comments receives `comments: []`.
@@ -408,21 +415,42 @@ const postCards = withAuthor.select(['id', 'title'] as const);
 
 const page = await postCards.fetch();
 
-page.results[0].title;
-page.results[0].author?.email;
+const [first] = page.toArray();
+first?.title;
+first?.author?.email;
 ```
 
 The result contains the selected `PostModel` fields and the hydrated `author` model. The stored `authorId` field is not part of the base projection unless it is selected explicitly.
 
 ### `fetch(shape?)`
 
-Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` object with `results` and `nextCursor`.
+Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that you can iterate directly or convert to an array with `toArray()`. For compatibility, `QueryResult` still exposes a deprecated `results` getter.
 
 ```ts
 const page = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetch();
 ```
 
 At the queryset level, `nextCursor` is currently `null`. Cursor pagination belongs to resource paginators rather than the queryset contract itself.
+
+#### Iterating results and querysets
+
+Iterate a materialized query result when you want to keep query execution explicit:
+
+```ts
+const page = await PostModel.objects.query().filter({ published: true }).fetch();
+for (const post of page) {
+    post.title;
+}
+```
+
+Iterate a queryset directly when you want iteration to trigger evaluation:
+
+```ts
+const queryset = PostModel.objects.query().filter({ published: true });
+for await (const post of queryset) {
+    post.title;
+}
+```
 
 ### `fetchOne(shape?)`
 

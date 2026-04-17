@@ -10,7 +10,8 @@ Relation hydration needs to preserve Tango's type-safe ORM contract. Runtime hyd
 const page = await PostModel.objects.query().selectRelated('author').fetch();
 
 // Runtime could attach `author`, but TypeScript would still see only the base post row.
-page.results[0].author.email;
+const [first] = page.toArray();
+first?.author.email;
 ```
 
 Forward relations are the easier side of the problem. A model that declares `authorId: t.foreignKey(...)` owns enough schema information for Tango to infer a forward relation such as `Post.author`, provided the decorator carries a typed target model and a stable relation name.

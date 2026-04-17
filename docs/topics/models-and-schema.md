@@ -112,7 +112,8 @@ const recentPosts = await PostModel.objects
     .orderBy('-createdAt')
     .fetch();
 
-recentPosts.results[0].author?.email;
+const [firstPost] = recentPosts.toArray();
+firstPost?.author?.email;
 ```
 
 `selectRelated('author')` follows the resolved relation metadata, loads the related `UserModel`, and attaches it as `author`. The same relation graph now also supports nested traversal such as `selectRelated('author__profile')` and mixed collection traversal such as `prefetchRelated('posts__author')`.

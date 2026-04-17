@@ -174,7 +174,7 @@ const postHeaders = await PostModel.objects
     .fetch();
 ```
 
-In that example, each row in `postHeaders.results` is typed as `{ id, title, slug }`.
+In that example, each row yielded from `postHeaders` is typed as `{ id, title, slug }`.
 
 Widened arrays still work for SQL projection, but they fall back to the full row type because TypeScript can no longer prove which exact keys are present:
 
@@ -206,7 +206,8 @@ Use `selectRelated(...)` when the path stays single-valued from hop to hop. In t
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts.results[0].author?.profile?.displayName;
+const [firstPost] = posts.toArray();
+firstPost?.author?.profile?.displayName;
 ```
 
 `selectRelated(...)` is for single-valued relations such as `belongsTo`, `hasOne`, and reverse one-to-one paths. A missing related row is returned as `null` at the point where the path stops matching.
@@ -216,8 +217,9 @@ In contrast, use `prefetchRelated(...)` when the path includes a collection edge
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users.results[0].posts[0]?.author?.email;
-users.results[0].posts[0]?.comments[0]?.body;
+const [firstUser] = users.toArray();
+firstUser?.posts[0]?.author?.email;
+firstUser?.posts[0]?.comments[0]?.body;
 ```
 
 In that form, a user with no posts still receives `posts: []`, while a post with no comments receives `comments: []`.
@@ -231,7 +233,8 @@ const postCards = await PostModel.objects
     .select(['id', 'title'] as const)
     .fetch();
 
-postCards.results[0].author?.email;
+const [firstCard] = postCards.toArray();
+firstCard?.author?.email;
 ```
 
 The selected `PostModel` fields in that example are `id` and `title`, while the hydrated `author` model remains available.
