@@ -4,23 +4,28 @@ let didWarnDeprecatedResults = false;
 
 export class QueryResult<T> implements Iterable<T> {
     readonly nextCursor?: string | null;
-    private readonly _items: readonly T[];
+    readonly items: readonly T[];
 
     constructor(items: readonly T[], options?: { nextCursor?: string | null }) {
-        this._items = items;
+        Object.defineProperty(this, 'items', {
+            value: items,
+            enumerable: false,
+            writable: false,
+            configurable: false,
+        });
         this.nextCursor = options?.nextCursor ?? null;
     }
 
     [Symbol.iterator](): Iterator<T> {
-        return this._items[Symbol.iterator]();
+        return this.items[Symbol.iterator]();
     }
 
     toArray(): T[] {
-        return [...this._items];
+        return [...this.items];
     }
 
     toJSON(): { results: readonly T[]; nextCursor?: string | null } {
-        return { results: this._items, nextCursor: this.nextCursor };
+        return { results: this.items, nextCursor: this.nextCursor };
     }
 
     /**
@@ -33,6 +38,6 @@ export class QueryResult<T> implements Iterable<T> {
                 '`QueryResult.results` is deprecated. Iterate the QueryResult directly or call `toArray()` instead.'
             );
         }
-        return this._items;
+        return this.items;
     }
 }
