@@ -72,6 +72,433 @@ importers:
         specifier: ^4.0.6
         version: 4.0.6(@types/node@22.19.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.20.6)(yaml@2.8.3)
 
+  .temp/dogfood-runner: {}
+
+  .temp/express-dogfood-1773544911:
+    dependencies:
+      '@danceroutine/tango-adapters-express':
+        specifier: workspace:*
+        version: link:../../packages/adapters/express
+      '@danceroutine/tango-config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@danceroutine/tango-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@danceroutine/tango-migrations':
+        specifier: workspace:*
+        version: link:../../packages/migrations
+      '@danceroutine/tango-orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
+      '@danceroutine/tango-resources':
+        specifier: workspace:*
+        version: link:../../packages/resources
+      '@danceroutine/tango-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+      express:
+        specifier: ^4.21.2
+        version: 4.22.1
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@danceroutine/tango-cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.0
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  .temp/express-hardening-1773546487:
+    dependencies:
+      '@danceroutine/tango-adapters-express':
+        specifier: workspace:*
+        version: link:../../packages/adapters/express
+      '@danceroutine/tango-config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@danceroutine/tango-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@danceroutine/tango-migrations':
+        specifier: workspace:*
+        version: link:../../packages/migrations
+      '@danceroutine/tango-orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
+      '@danceroutine/tango-resources':
+        specifier: workspace:*
+        version: link:../../packages/resources
+      '@danceroutine/tango-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+      express:
+        specifier: ^4.21.2
+        version: 4.22.1
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@danceroutine/tango-cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.0
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  .temp/express-hardening-1773546506:
+    dependencies:
+      '@danceroutine/tango-adapters-express':
+        specifier: workspace:*
+        version: link:../../packages/adapters/express
+      '@danceroutine/tango-config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@danceroutine/tango-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@danceroutine/tango-migrations':
+        specifier: workspace:*
+        version: link:../../packages/migrations
+      '@danceroutine/tango-orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
+      '@danceroutine/tango-resources':
+        specifier: workspace:*
+        version: link:../../packages/resources
+      '@danceroutine/tango-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+      express:
+        specifier: ^4.21.2
+        version: 4.22.1
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@danceroutine/tango-cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.0
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  .temp/express-hardening-1773546629:
+    dependencies:
+      '@danceroutine/tango-adapters-express':
+        specifier: workspace:*
+        version: link:../../packages/adapters/express
+      '@danceroutine/tango-config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@danceroutine/tango-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@danceroutine/tango-migrations':
+        specifier: workspace:*
+        version: link:../../packages/migrations
+      '@danceroutine/tango-orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
+      '@danceroutine/tango-resources':
+        specifier: workspace:*
+        version: link:../../packages/resources
+      '@danceroutine/tango-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+      express:
+        specifier: ^4.21.2
+        version: 4.22.1
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@danceroutine/tango-cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.0
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  .temp/express-todo:
+    dependencies:
+      '@danceroutine/tango-adapters-express':
+        specifier: workspace:*
+        version: link:../../packages/adapters/express
+      '@danceroutine/tango-config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@danceroutine/tango-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@danceroutine/tango-migrations':
+        specifier: workspace:*
+        version: link:../../packages/migrations
+      '@danceroutine/tango-orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
+      '@danceroutine/tango-resources':
+        specifier: workspace:*
+        version: link:../../packages/resources
+      '@danceroutine/tango-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+      express:
+        specifier: ^4.21.2
+        version: 4.22.1
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@danceroutine/tango-cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.0
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  .temp/next-hardening-1773546649:
+    dependencies:
+      '@danceroutine/tango-adapters-next':
+        specifier: workspace:*
+        version: link:../../packages/adapters/next
+      '@danceroutine/tango-config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@danceroutine/tango-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@danceroutine/tango-migrations':
+        specifier: workspace:*
+        version: link:../../packages/migrations
+      '@danceroutine/tango-orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
+      '@danceroutine/tango-resources':
+        specifier: workspace:*
+        version: link:../../packages/resources
+      '@danceroutine/tango-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+      next:
+        specifier: ^15.1.6
+        version: 15.5.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@danceroutine/tango-cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.0
+      '@types/react':
+        specifier: ^19.0.6
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.2
+        version: 19.2.3(@types/react@19.2.14)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  .temp/next-hardening-1773546702:
+    dependencies:
+      '@danceroutine/tango-adapters-next':
+        specifier: workspace:*
+        version: link:../../packages/adapters/next
+      '@danceroutine/tango-config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@danceroutine/tango-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@danceroutine/tango-migrations':
+        specifier: workspace:*
+        version: link:../../packages/migrations
+      '@danceroutine/tango-orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
+      '@danceroutine/tango-resources':
+        specifier: workspace:*
+        version: link:../../packages/resources
+      '@danceroutine/tango-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+      next:
+        specifier: ^15.1.6
+        version: 15.5.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@danceroutine/tango-cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.0
+      '@types/react':
+        specifier: ^19.0.6
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.2
+        version: 19.2.3(@types/react@19.2.14)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  .temp/next-todo:
+    dependencies:
+      '@danceroutine/tango-adapters-next':
+        specifier: workspace:*
+        version: link:../../packages/adapters/next
+      '@danceroutine/tango-config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@danceroutine/tango-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@danceroutine/tango-migrations':
+        specifier: workspace:*
+        version: link:../../packages/migrations
+      '@danceroutine/tango-orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
+      '@danceroutine/tango-resources':
+        specifier: workspace:*
+        version: link:../../packages/resources
+      '@danceroutine/tango-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+      next:
+        specifier: ^15.1.6
+        version: 15.5.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@danceroutine/tango-cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.0
+      '@types/react':
+        specifier: ^19.0.6
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.2
+        version: 19.2.3(@types/react@19.2.14)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  .temp/pnpm-test:
+    devDependencies:
+      '@danceroutine/tango-cli':
+        specifier: link:/Users/pedro/coding/tango/packages/cli
+        version: link:../../packages/cli
+
   docs:
     devDependencies:
       '@types/node':

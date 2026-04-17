@@ -16,7 +16,7 @@ Most Tango applications are built from the same set of concerns.
 - `@danceroutine/tango-orm` provides you the same QuerySet based ORM contract you're used to from Django, backed by an extensible adapter system to enable onboarding new database management systems.
 - `@danceroutine/tango-migrations` provides the same onion-skin automatic migration process for deterministically evolving your database schema as you change your models.
 - `@danceroutine/tango-resources` exposes familiar DRF-style capabilities such as APIViews, Viewsets, and Serializers to integrate your application business logic to your API layer with minimal boilerplate.
-- An adapter package resposible for connecting your resources to the host framework you are using.
+- An adapter package responsible for connecting your resources to the host framework you are using.
 
 ## Start with a working Tango application
 
@@ -142,7 +142,7 @@ When the app is running, open:
 - `http://localhost:3002/api/posts?limit=20&offset=0`
 - `http://localhost:3002/api/openapi`
 
-The root page shows the Nuxt application as a user sees it, powered by the same ORM layer. If you'r interested in the Nitro API side, check out the posts endpoint to learn about Tango's API behavior in Nuxt. Additionally, the OpenAPI endpoint shows how Tango's API layer can also drive machine-readable self-documenting API output in the same application.
+The root page shows the Nuxt application as a user sees it, powered by the same ORM layer. If you're interested in the Nitro API side, check out the posts endpoint to learn about Tango's API behavior in Nuxt. Additionally, the OpenAPI endpoint shows how Tango's API layer can also drive machine-readable self-documenting API output in the same application.
 
 After that, inspect `nuxt.config.ts`, the Tango server handlers, the post serializer, the post viewset, and the Nuxt pages. That path shows how Tango can power the data and API layer while Nuxt continues to shape the user-facing application.
 

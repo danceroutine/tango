@@ -27,6 +27,7 @@ concurrency:
 
 permissions:
     contents: write
+    pages: write
     id-token: write
 
 jobs:
@@ -34,6 +35,9 @@ jobs:
         name: Release
         runs-on: ubuntu-latest
         environment: npm
+        outputs:
+            stable_release_mode: ${{ steps.stable-release.outputs.mode }}
+            publish_state_mode: ${{ steps.publish-state.outputs.mode }}
         services:
             postgres:
                 image: postgres:16
@@ -188,3 +192,19 @@ jobs:
               run: pnpm changeset publish --no-git-tag --snapshot --tag alpha
               env:
                   NPM_CONFIG_PROVENANCE: true
+
+    docs:
+        name: Deploy docs (stable publish)
+        needs: release
+        if: |
+            (
+              (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable'))
+              && needs.release.outputs.stable_release_mode == 'release'
+              && needs.release.outputs.publish_state_mode == 'publish'
+            )
+            || (
+              github.event_name == 'workflow_dispatch'
+              && inputs.release_type == 'stable-recovery'
+              && needs.release.outputs.publish_state_mode == 'publish'
+            )
+        uses: ./.github/workflows/docs-pages.reusable.yml

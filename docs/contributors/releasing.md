@@ -46,6 +46,8 @@ Stable releases are changeset-driven. Before you expect a stable publish to happ
 
 In normal operation, a push to `main` triggers the stable workflow automatically. If you need to rerun the stable path manually, dispatch the workflow with `release_type=stable` and `branch=main`.
 
+After a successful stable publish (including `stable-recovery`), the workflow also rebuilds and deploys the documentation site so the docs navigation version stays in sync with the latest release.
+
 ## Stable workflow behavior
 
 The stable workflow validates the current release state before it mutates any versions.
