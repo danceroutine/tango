@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { TangoResponse } from '@danceroutine/tango-core';
+import type { QuerySet } from '@danceroutine/tango-orm';
 import { aManager } from '@danceroutine/tango-testing';
 import {
     APIView,
@@ -119,6 +120,17 @@ class HealthAPIView extends APIView {
     protected override async get(_ctx: RequestContext): Promise<TangoResponse> {
         return TangoResponse.json({ status: 'ok' });
     }
+}
+
+function createUnpaginatedPaginator<TResult extends Record<string, unknown>>(_queryset: QuerySet<UserRecord, TResult>) {
+    return {
+        parse: () => {},
+        apply: <TBaseResult extends Record<string, unknown>, TSourceModel, THydrated extends Record<string, unknown>>(
+            queryset: QuerySet<UserRecord, TBaseResult, TSourceModel, THydrated>
+        ) => queryset,
+        toResponse: (results: TResult[]) => ({ results }),
+        needsTotalCount: () => false,
+    };
 }
 
 describe(generateOpenAPISpec, () => {
@@ -273,12 +285,7 @@ describe(generateOpenAPISpec, () => {
     it('omits offset pagination params when a custom paginator factory is configured', () => {
         const viewset = new CursorUserViewSet({
             serializer: UserSerializer,
-            paginatorFactory: (queryset) => ({
-                parse: () => {},
-                apply: () => queryset,
-                toResponse: (results) => ({ results }),
-                needsTotalCount: () => false,
-            }),
+            paginatorFactory: (queryset) => createUnpaginatedPaginator(queryset),
         });
 
         const spec = generateOpenAPISpec({
@@ -525,12 +532,7 @@ describe(generateOpenAPISpec, () => {
     it('omits paginated envelopes for generic views with custom paginator factories', () => {
         const view = new UserListView({
             serializer: UserSerializer,
-            paginatorFactory: (queryset) => ({
-                parse: () => {},
-                apply: () => queryset,
-                toResponse: (results) => ({ results }),
-                needsTotalCount: () => false,
-            }),
+            paginatorFactory: (queryset) => createUnpaginatedPaginator(queryset),
         });
 
         const spec = generateOpenAPISpec({

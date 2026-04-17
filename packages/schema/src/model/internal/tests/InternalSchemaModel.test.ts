@@ -105,4 +105,28 @@ describe(InternalSchemaModel, () => {
             "Model 'blog/User' is missing internal registry ownership metadata."
         );
     });
+
+    it('rejects branded models that are missing registry ownership metadata', () => {
+        const model = {
+            __tangoBrand: InternalSchemaModel.BRAND,
+            metadata: createModelMetadata(),
+            schema: z.object({}),
+            hooks: {},
+        } as unknown as Model;
+
+        expect(() => InternalSchemaModel.getRegistryOwner(model)).toThrow(
+            "Model 'blog/User' is missing internal registry ownership metadata."
+        );
+    });
+
+    it('treats branded models without stored normalized relations as relationless', () => {
+        const model = {
+            __tangoBrand: InternalSchemaModel.BRAND,
+            metadata: createModelMetadata(),
+            schema: z.object({}),
+            hooks: {},
+        } as unknown as Model;
+
+        expect(InternalSchemaModel.getNormalizedRelations(model)).toEqual([]);
+    });
 });

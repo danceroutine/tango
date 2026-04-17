@@ -1,5 +1,7 @@
 # 2026-04-06 Relation Target Typing Without Codegen
 
+> Superseded by [2026-04-09 Deep relation hydration with generated path typing](/contributors/adr/deep-relation-hydration-with-generated-path-typing). This ADR remains as historical context for the earlier one-hop hydration design.
+
 ## Problem
 
 Relation hydration needs to preserve Tango's type-safe ORM contract. Runtime hydration alone would let `selectRelated(...)` and `prefetchRelated(...)` attach related records to query results, but application code would still need casts before TypeScript could see those hydrated properties. That would weaken the value of adding hydration in a TypeScript-first ORM.

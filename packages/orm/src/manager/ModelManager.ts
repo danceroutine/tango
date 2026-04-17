@@ -1,7 +1,8 @@
 import { NotFoundError } from '@danceroutine/tango-core';
-import { ModelRegistry, type ModelWriteHooks } from '@danceroutine/tango-schema';
-import type { FilterInput, RelationMeta, TableMeta } from '../query/domain/index';
-import { InternalRelationKind } from '../query/domain/internal/InternalRelationKind';
+import type { ModelWriteHooks } from '@danceroutine/tango-schema';
+import type { Model as SchemaModel } from '@danceroutine/tango-schema/domain';
+import type { FilterInput, TableMeta } from '../query/domain/index';
+import { TableMetaFactory } from '../query/domain/TableMetaFactory';
 import type { QuerySet } from '../query/index';
 import { QuerySet as QuerySetClass } from '../query/index';
 import type { Dialect, QueryExecutor } from '../query/index';
@@ -14,19 +15,18 @@ import { RuntimeBoundClient } from './internal/RuntimeBoundClient';
 
 const sqlSafetyAdapter = new OrmSqlSafetyAdapter();
 
-type FieldLike = {
-    name: string;
-    type: string;
-    primaryKey?: boolean;
+type ModelMetadataLike = Omit<SchemaModel['metadata'], 'key' | 'namespace' | 'fields'> & {
+    key?: string;
+    namespace?: string;
+    fields: Array<{
+        name: string;
+        type: string;
+        primaryKey?: boolean;
+    }>;
 };
 
 type ModelLike<TModelRow extends Record<string, unknown>> = {
-    metadata: {
-        key?: string;
-        name: string;
-        table: string;
-        fields: FieldLike[];
-    };
+    metadata: ModelMetadataLike;
     schema: {
         parse(input: unknown): TModelRow;
     };
@@ -83,60 +83,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
     }
 
     private static createTableMeta<TModelRow extends Record<string, unknown>>(model: ModelLike<TModelRow>): TableMeta {
-        const pkField = model.metadata.fields.find((field) => field.primaryKey);
-        if (!pkField) {
-            throw new Error(`Model '${model.metadata.name}' cannot attach a manager without a primary key field.`);
-        }
-
-        const rawMeta: TableMeta = {
-            table: model.metadata.table,
-            pk: pkField.name,
-            columns: Object.fromEntries(model.metadata.fields.map((field) => [field.name, field.type])),
-        };
-
-        if (model.metadata.key) {
-            const owner = ModelRegistry.getOwner(model as never);
-            const relations = owner.getResolvedRelationGraph().byModel.get(model.metadata.key);
-            if (relations && relations.size > 0) {
-                // This metadata is recomputed on access today. Most application tables have a small relation set, so
-                // keeping this path direct is acceptable until profiling points to a dedicated manager-meta cache.
-                rawMeta.relations = Object.fromEntries(
-                    Array.from(relations.entries())
-                        .filter(([, relation]) => relation.kind !== InternalRelationKind.MANY_TO_MANY)
-                        .map(([name, relation]) => {
-                            const targetModel = owner.getByKey(relation.targetModelKey)!;
-                            // Query planning needs the target model's SQL-facing shape so joined and prefetched rows can be
-                            // selected, normalized, and attached without leaking internal alias columns.
-                            const targetColumns = Object.fromEntries(
-                                targetModel.metadata.fields.map((field) => [field.name, field.type])
-                            );
-                            // Forward relations join from this table's FK to the target key. Reverse relations flip that:
-                            // this table's primary key matches the target model's FK back to this model.
-                            const sourceKey =
-                                relation.kind === InternalRelationKind.BELONGS_TO
-                                    ? relation.localFieldName
-                                    : relation.targetFieldName;
-                            const targetKey =
-                                relation.kind === InternalRelationKind.BELONGS_TO
-                                    ? relation.targetFieldName
-                                    : relation.localFieldName;
-
-                            return [
-                                name,
-                                {
-                                    kind: relation.kind as RelationMeta['kind'],
-                                    table: targetModel.metadata.table,
-                                    sourceKey: sourceKey as string,
-                                    targetKey: targetKey as string,
-                                    targetColumns,
-                                    alias: relation.alias,
-                                },
-                            ];
-                        })
-                );
-            }
-        }
-
+        const rawMeta = TableMetaFactory.create(model);
         const validatedMeta = sqlSafetyAdapter.validate({
             kind: 'insert',
             meta: rawMeta,

@@ -17,6 +17,9 @@ export type { QuerySetState } from './QuerySetState';
 export type { RelationMeta } from './RelationMeta';
 export type {
     ForwardSingleRelations,
+    GeneratedHydratedRelationMap,
+    GeneratedPrefetchRelatedPathKeys,
+    GeneratedSelectRelatedPathKeys,
     HydratedQueryResult,
     HydratedRelationMap,
     ManyRelationHydrationCardinality,
@@ -31,4 +34,5 @@ export type {
 } from './RelationTyping';
 export { InternalRelationHydrationCardinality } from './RelationTyping';
 export type { TableMeta } from './TableMeta';
+export { TableMetaFactory } from './TableMetaFactory';
 export type { WhereClause } from './WhereClause';

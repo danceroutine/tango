@@ -3,7 +3,7 @@ import { ExpressAdapter } from '@danceroutine/tango-adapters-express/adapter';
 import { seedExampleData } from '../scripts/bootstrap';
 import { createOpenAPISpec } from './openapi';
 import { CommentViewSet, PostViewSet, UserViewSet } from './viewsets/index';
-import { HealthAPIView, UserListCreateAPIView } from './views/index';
+import { EditorialOverviewAPIView, HealthAPIView, UserListCreateAPIView } from './views/index';
 
 /**
  * Express example server entrypoint.
@@ -23,6 +23,7 @@ async function main(): Promise<void> {
     const postViewSet = new PostViewSet();
     const commentViewSet = new CommentViewSet();
     const healthAPIView = new HealthAPIView();
+    const editorialOverviewAPIView = new EditorialOverviewAPIView();
     const userListCreateAPIView = new UserListCreateAPIView();
     const adapter = new ExpressAdapter();
 
@@ -36,6 +37,7 @@ async function main(): Promise<void> {
     adapter.registerViewSet(app, '/api/posts', postViewSet);
     adapter.registerViewSet(app, '/api/comments', commentViewSet);
     adapter.registerAPIView(app, '/api/healthz', healthAPIView);
+    adapter.registerAPIView(app, '/api/editorial/overview', editorialOverviewAPIView);
     adapter.registerAPIView(app, '/api/generic/users', userListCreateAPIView);
 
     const port = Number(process.env.PORT) || 3000;

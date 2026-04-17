@@ -9,7 +9,15 @@ export * as integration from './integration/index';
 export * as vitest from './vitest/index';
 export * as express from './express/index';
 
-export { aDBClient, aManager, aQueryResult, aQuerySet, aRequestContext, aQueryExecutor } from './mocks/index';
+export {
+    aDBClient,
+    aManager,
+    aQueryResult,
+    aQuerySet,
+    aRequestContext,
+    aQueryExecutor,
+    aRelationMeta,
+} from './mocks/index';
 export { anExpressRequest, anExpressResponse } from './express/index';
 export type {
     DBClient,

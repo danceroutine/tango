@@ -70,7 +70,7 @@ describe(registerModelObjects, () => {
             }),
         });
 
-        expect(PostModel.objects.meta.relations).toEqual({
+        expect(PostModel.objects.meta.relations).toMatchObject({
             author: {
                 kind: 'belongsTo',
                 table: 'users',
@@ -83,7 +83,7 @@ describe(registerModelObjects, () => {
             },
         });
         expect(PostModel.objects.meta.relations).not.toHaveProperty('tags');
-        expect(UserModel.objects.meta.relations).toEqual({
+        expect(UserModel.objects.meta.relations).toMatchObject({
             posts: {
                 kind: 'hasMany',
                 table: 'posts',
@@ -116,7 +116,7 @@ describe(registerModelObjects, () => {
             }),
         });
 
-        expect(PostModel.objects.meta.relations).toEqual({
+        expect(PostModel.objects.meta.relations).toMatchObject({
             author: {
                 kind: 'belongsTo',
                 table: 'users',
@@ -151,7 +151,7 @@ describe(registerModelObjects, () => {
             }),
         });
 
-        expect(UserModel.objects.meta.relations).toEqual({
+        expect(UserModel.objects.meta.relations).toMatchObject({
             profile: {
                 kind: 'hasOne',
                 table: 'profiles',

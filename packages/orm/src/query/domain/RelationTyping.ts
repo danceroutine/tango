@@ -20,6 +20,11 @@ export type HydratedQueryResult<TBase extends Record<string, unknown>, THydrated
     // No relation hydration requested: keep the base projection exactly as-is.
     [keyof THydrated] extends [never] ? TBase : Omit<TBase, keyof THydrated> & THydrated;
 
+declare global {
+    // oxlint-disable-next-line no-empty-object-type
+    interface TangoGeneratedRelationRegistry {}
+}
+
 // A model's own schema is the only source TypeScript can inspect without codegen or an ambient registry.
 // These helpers progressively peel that schema apart into field definitions and persisted row shapes.
 // "AnyModel" is a structural upper bound for model values when the exact schema/key is not important.
@@ -42,6 +47,154 @@ type IsLiteralString<TValue> = TValue extends string ? (string extends TValue ? 
 // A model has strict relation typing only when its model key is still a literal type.
 type HasStrictModelKey<TModel> =
     TModel extends Model<z.ZodObject<z.ZodRawShape>, infer TKey> ? IsLiteralString<TKey> : false;
+
+// Extract the literal model key from a Tango Model type. The generated
+// relation registry is indexed by these stable ids.
+type ModelKey<TModel> = TModel extends Model<z.ZodObject<z.ZodRawShape>, infer TKey extends string> ? TKey : never;
+
+// Merge one-hydration-per-path object fragments into one final hydrated map.
+type UnionToIntersection<TValue> = (TValue extends unknown ? (value: TValue) => void : never) extends (
+    value: infer TIntersection
+) => void
+    ? TIntersection
+    : never;
+
+type JoinPathSegments<TSegments extends readonly string[]> = TSegments extends readonly [
+    infer THead extends string,
+    ...infer TRest extends string[],
+]
+    ? TRest['length'] extends 0
+        ? THead
+        : `${THead}__${JoinPathSegments<TRest>}`
+    : never;
+
+// Split a Django-style path into tuple segments so recursive conditional types
+// can walk one relation hop at a time.
+type SplitPath<TPath extends string> = TPath extends `${infer THead}__${infer TRest}`
+    ? [THead, ...SplitPath<TRest>]
+    : [TPath];
+
+type TailTuple<TTuple extends readonly unknown[]> = TTuple extends readonly [unknown, ...infer TRest] ? TRest : [];
+// Generated typing allows four recursive revisits before it falls back to
+// weaker typing. Runtime traversal can still go deeper than this budget.
+type DefaultGeneratedCycleBudget = readonly [1, 1, 1, 1];
+type GeneratedRelationRegistry = TangoGeneratedRelationRegistry;
+type GeneratedRelationKeys<TSourceModel> = Extract<keyof GeneratedRelations<TSourceModel>, string>;
+
+// Only read from the ambient generated registry when the caller supplied a
+// model whose key remains a literal type.
+type GeneratedRelations<TSourceModel> =
+    HasStrictModelKey<TSourceModel> extends true
+        ? ModelKey<TSourceModel> extends keyof GeneratedRelationRegistry
+            ? GeneratedRelationRegistry[ModelKey<TSourceModel>]
+            : // oxlint-disable-next-line typescript/ban-types, typescript/no-empty-object-type
+              {}
+        : // oxlint-disable-next-line typescript/ban-types, typescript/no-empty-object-type
+          {};
+
+type NextSeenModels<TSeen extends readonly string[], TTargetModel> =
+    ModelKey<TTargetModel> extends string ? [...TSeen, ModelKey<TTargetModel>] : TSeen;
+
+// Revisiting a model is allowed while the cycle budget still has entries.
+type CanTraverseGeneratedTarget<
+    TTargetModel,
+    TSeen extends readonly string[],
+    TCycleBudget extends readonly unknown[],
+> = ModelKey<TTargetModel> extends TSeen[number] ? (TCycleBudget extends [] ? false : true) : true;
+
+// Only consume budget when the next edge revisits a model already on the path.
+type NextGeneratedCycleBudget<TTargetModel, TSeen extends readonly string[], TCycleBudget extends readonly unknown[]> =
+    ModelKey<TTargetModel> extends TSeen[number] ? TailTuple<TCycleBudget> : TCycleBudget;
+
+type GeneratedCardinalityIncludesMany<TCardinality extends RelationHydrationCardinality> =
+    TCardinality extends typeof InternalRelationHydrationCardinality.MANY ? true : false;
+
+export type GeneratedSelectRelatedPathKeys<
+    TSourceModel,
+    TSeen extends readonly string[] = [ModelKey<TSourceModel>],
+    TCycleBudget extends readonly unknown[] = DefaultGeneratedCycleBudget,
+> = {
+    [TKey in GeneratedRelationKeys<TSourceModel>]: GeneratedRelations<TSourceModel>[TKey] extends {
+        target: infer TTarget extends AnyModel;
+        cardinality: typeof InternalRelationHydrationCardinality.SINGLE;
+    }
+        ?
+              | TKey
+              | (CanTraverseGeneratedTarget<TTarget, TSeen, TCycleBudget> extends true
+                    ? `${TKey}__${GeneratedSelectRelatedPathKeys<
+                          TTarget,
+                          NextSeenModels<TSeen, TTarget>,
+                          NextGeneratedCycleBudget<TTarget, TSeen, TCycleBudget>
+                      >}`
+                    : never)
+        : never;
+}[GeneratedRelationKeys<TSourceModel>];
+
+export type GeneratedPrefetchRelatedPathKeys<
+    TSourceModel,
+    THasMany extends boolean = false,
+    TSeen extends readonly string[] = [ModelKey<TSourceModel>],
+    TCycleBudget extends readonly unknown[] = DefaultGeneratedCycleBudget,
+> = {
+    [TKey in GeneratedRelationKeys<TSourceModel>]: GeneratedRelations<TSourceModel>[TKey] extends {
+        target: infer TTarget extends AnyModel;
+        cardinality: infer TCardinality extends RelationHydrationCardinality;
+    }
+        ?
+              | (THasMany extends true
+                    ? TKey
+                    : GeneratedCardinalityIncludesMany<TCardinality> extends true
+                      ? TKey
+                      : never)
+              | (CanTraverseGeneratedTarget<TTarget, TSeen, TCycleBudget> extends true
+                    ? `${TKey}__${GeneratedPrefetchRelatedPathKeys<
+                          TTarget,
+                          THasMany extends true ? true : GeneratedCardinalityIncludesMany<TCardinality>,
+                          NextSeenModels<TSeen, TTarget>,
+                          NextGeneratedCycleBudget<TTarget, TSeen, TCycleBudget>
+                      >}`
+                    : never)
+        : never;
+}[GeneratedRelationKeys<TSourceModel>];
+
+// Hydrated target values recurse through the remaining path suffix, so a path
+// like `posts__author` becomes `{ posts: Array<{ author: ... }> }`.
+type GeneratedHydratedTarget<TDescriptor, TPath extends string | never> = TDescriptor extends {
+    target: infer TTarget extends AnyModel;
+}
+    ? [TPath] extends [never]
+        ? ModelRow<TTarget>
+        : HydratedQueryResult<ModelRow<TTarget>, GeneratedHydratedRelationMap<TTarget, TPath>>
+    : never;
+
+type GeneratedHydratedValue<TDescriptor, TPath extends string | never> = TDescriptor extends {
+    cardinality: infer TCardinality extends RelationHydrationCardinality;
+}
+    ? TCardinality extends typeof InternalRelationHydrationCardinality.SINGLE
+        ? GeneratedHydratedTarget<TDescriptor, TPath> | null
+        : GeneratedHydratedTarget<TDescriptor, TPath>[]
+    : never;
+
+// Turn one path string into the object fragment it contributes before all path
+// fragments are merged into the final hydrated relation map.
+type GeneratedHydrationForPath<TSourceModel, TPath extends string> =
+    SplitPath<TPath> extends [infer THead extends string, ...infer TRest extends string[]]
+        ? THead extends GeneratedRelationKeys<TSourceModel>
+            ? {
+                  [TKey in THead]: GeneratedHydratedValue<
+                      GeneratedRelations<TSourceModel>[THead],
+                      JoinPathSegments<TRest>
+                  >;
+              }
+            : // oxlint-disable-next-line typescript/ban-types, typescript/no-empty-object-type
+              {}
+        : // oxlint-disable-next-line typescript/ban-types, typescript/no-empty-object-type
+          {};
+
+export type GeneratedHydratedRelationMap<TSourceModel, TPaths extends string | never> = ([TPaths] extends [never]
+    ? Record<never, never>
+    : UnionToIntersection<TPaths extends string ? GeneratedHydrationForPath<TSourceModel, TPaths> : never>) &
+    Record<never, never>;
 
 export type HasStrictRelationTyping<TSourceModel> = HasStrictModelKey<TSourceModel>;
 

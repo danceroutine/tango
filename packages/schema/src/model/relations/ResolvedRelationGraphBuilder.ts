@@ -1,6 +1,7 @@
 import type { Model, RelationDef } from '../../domain/index';
 import type { FinalizedStorageArtifacts } from '../fields/FinalizedStorageArtifacts';
 import { InternalSchemaModel } from '../internal/InternalSchemaModel';
+import type { ResolvedRelationGraphSnapshot } from '../registry/ResolvedRelationGraphSnapshot';
 import type { NormalizedRelationStorageDescriptor } from './NormalizedRelationStorageDescriptor';
 import type { ResolvedRelationDescriptor, ResolvedRelationGraph } from './ResolvedRelationGraph';
 import {
@@ -53,6 +54,40 @@ export class ResolvedRelationGraphBuilder {
 
     static build(options: GraphBuilderOptions): ResolvedRelationGraph {
         return new ResolvedRelationGraphBuilder(options).build();
+    }
+
+    /**
+     * Serialize a resolved graph into the canonical snapshot shape used by
+     * relation-registry code generation and fingerprinting.
+     */
+    static createSnapshot(graph: ResolvedRelationGraph): ResolvedRelationGraphSnapshot {
+        return {
+            models: Array.from(graph.byModel.entries())
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([key, relations]) => ({
+                    key,
+                    relations: Array.from(relations.values())
+                        .sort((left, right) => left.name.localeCompare(right.name))
+                        .map((relation) => ({
+                            edgeId: relation.edgeId,
+                            sourceModelKey: relation.sourceModelKey,
+                            targetModelKey: relation.targetModelKey,
+                            name: relation.name,
+                            inverseEdgeId: relation.inverseEdgeId,
+                            kind: relation.kind,
+                            storageStrategy: relation.storageStrategy,
+                            cardinality: relation.cardinality,
+                            localFieldName: relation.localFieldName,
+                            targetFieldName: relation.targetFieldName,
+                            alias: relation.alias,
+                            capabilities: {
+                                migratable: relation.capabilities.migratable,
+                                queryable: relation.capabilities.queryable,
+                                hydratable: relation.capabilities.hydratable,
+                            },
+                        })),
+                })),
+        };
     }
 
     /**

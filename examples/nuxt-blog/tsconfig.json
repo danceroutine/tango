@@ -15,6 +15,8 @@
             "@danceroutine/tango-adapters-core/*": ["../../packages/adapters/core/src/*"],
             "@danceroutine/tango-adapters-nuxt": ["../../packages/adapters/nuxt/src/index.ts"],
             "@danceroutine/tango-adapters-nuxt/*": ["../../packages/adapters/nuxt/src/*"],
+            "@danceroutine/tango-codegen": ["../../packages/codegen/src/index.ts"],
+            "@danceroutine/tango-codegen/*": ["../../packages/codegen/src/*"],
             "@danceroutine/tango-config": ["../../packages/config/src/index.ts"],
             "@danceroutine/tango-config/*": ["../../packages/config/src/*"],
             "@danceroutine/tango-core": ["../../packages/core/src/index.ts"],
@@ -31,6 +33,6 @@
             "@danceroutine/tango-schema/*": ["../../packages/schema/src/*"]
         }
     },
-    "include": [".nuxt/**/*.d.ts", "**/*.ts", "**/*.vue", "migrations/**/*.ts"],
+    "include": [".nuxt/**/*.d.ts", "**/*.ts", "**/*.vue", "migrations/**/*.ts", ".tango/**/*.d.ts"],
     "exclude": ["node_modules"]
 }

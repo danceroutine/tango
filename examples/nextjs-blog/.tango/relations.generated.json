@@ -1,0 +1,131 @@
+{
+    "version": 1,
+    "fingerprint": "6bce3be407cc76a040b5b04e63959cbedd1f526f3ab04263e5e7e4c8b3062561",
+    "snapshot": {
+        "models": [
+            {
+                "key": "nextjs-blog/Comment",
+                "relations": [
+                    {
+                        "edgeId": "nextjs-blog/Comment:authorId:foreignKey",
+                        "sourceModelKey": "nextjs-blog/Comment",
+                        "targetModelKey": "nextjs-blog/User",
+                        "name": "author",
+                        "inverseEdgeId": "nextjs-blog/Comment:authorId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "user_author",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "nextjs-blog/Comment:postId:foreignKey",
+                        "sourceModelKey": "nextjs-blog/Comment",
+                        "targetModelKey": "nextjs-blog/Post",
+                        "name": "post",
+                        "inverseEdgeId": "nextjs-blog/Comment:postId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "postId",
+                        "targetFieldName": "id",
+                        "alias": "post_post",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            },
+            {
+                "key": "nextjs-blog/Post",
+                "relations": [
+                    {
+                        "edgeId": "nextjs-blog/Post:authorId:foreignKey",
+                        "sourceModelKey": "nextjs-blog/Post",
+                        "targetModelKey": "nextjs-blog/User",
+                        "name": "author",
+                        "inverseEdgeId": "nextjs-blog/Post:authorId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "user_author",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "nextjs-blog/Comment:postId:foreignKey:inverse",
+                        "sourceModelKey": "nextjs-blog/Post",
+                        "targetModelKey": "nextjs-blog/Comment",
+                        "name": "comments",
+                        "inverseEdgeId": "nextjs-blog/Comment:postId:foreignKey",
+                        "kind": "hasMany",
+                        "storageStrategy": "reverse_reference",
+                        "cardinality": "many",
+                        "localFieldName": "postId",
+                        "targetFieldName": "id",
+                        "alias": "comment_comments",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            },
+            {
+                "key": "nextjs-blog/User",
+                "relations": [
+                    {
+                        "edgeId": "nextjs-blog/Comment:authorId:foreignKey:inverse",
+                        "sourceModelKey": "nextjs-blog/User",
+                        "targetModelKey": "nextjs-blog/Comment",
+                        "name": "comments",
+                        "inverseEdgeId": "nextjs-blog/Comment:authorId:foreignKey",
+                        "kind": "hasMany",
+                        "storageStrategy": "reverse_reference",
+                        "cardinality": "many",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "comment_comments",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "nextjs-blog/Post:authorId:foreignKey:inverse",
+                        "sourceModelKey": "nextjs-blog/User",
+                        "targetModelKey": "nextjs-blog/Post",
+                        "name": "posts",
+                        "inverseEdgeId": "nextjs-blog/Post:authorId:foreignKey",
+                        "kind": "hasMany",
+                        "storageStrategy": "reverse_reference",
+                        "cardinality": "many",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "post_posts",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

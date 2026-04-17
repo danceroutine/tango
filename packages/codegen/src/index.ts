@@ -9,7 +9,13 @@ export * as frameworks from './frameworks/index';
 export * as commands from './commands/index';
 
 export type { CodegenFieldMeta, CodegenModel } from './domain/index';
-export { generateMigrationFromModels, generateModelInterface, generateViewSet } from './generators/index';
+export {
+    generateMigrationFromModels,
+    generateModelInterface,
+    generateRelationRegistryArtifacts,
+    writeRelationRegistryArtifacts,
+    generateViewSet,
+} from './generators/index';
 export { mapFieldTypeToTS, normalizeFields } from './mappers/index';
 export {
     FrameworkScaffoldRegistry,
@@ -25,4 +31,4 @@ export type {
     ScaffoldDialect,
     SupportedFramework,
 } from './frameworks/index';
-export { registerCodegenCommands } from './commands/index';
+export { loadProjectModule, registerCodegenCommands, runGenerateRelationsCommand } from './commands/index';

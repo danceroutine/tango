@@ -26,6 +26,7 @@ export class PackageJsonTemplateBuilder extends TemplateBuilder {
                     'setup:schema': 'pnpm exec tango migrate --config ./tango.config.ts',
                     'make:migrations':
                         'pnpm exec tango make:migrations --config ./tango.config.ts --models ./lib/models/index.ts --name "${npm_config_name:-manual_change}"',
+                    'codegen:relations': 'pnpm exec tango codegen relations --models ./lib/models/index.ts',
                     prebootstrap: 'pnpm run setup:schema',
                     bootstrap: 'tsx scripts/bootstrap.ts',
                 },

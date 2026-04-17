@@ -1,12 +1,12 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
-import { aQueryExecutor } from '@danceroutine/tango-testing';
+import { aQueryExecutor, aRelationMeta } from '@danceroutine/tango-testing';
 import { Model, t, type PersistedModelOutput } from '@danceroutine/tango-schema';
 import { z } from 'zod';
 import { QuerySet } from '../QuerySet';
 import { QBuilder as Q } from '../QBuilder';
 import type { HydratedQueryResult } from '../domain/RelationTyping';
 import type { TableMeta } from '../domain/TableMeta';
-import type { CompiledQuery, CompiledPrefetchHydration } from '../domain/CompiledQuery';
+import type { CompiledQuery } from '../domain/CompiledQuery';
 import { InternalRelationKind } from '../domain/internal/InternalRelationKind';
 
 type User = {
@@ -67,6 +67,22 @@ const UnrelatedModel = Model({
 type TypedUserRow = PersistedModelOutput<typeof TypedUserModel.schema>;
 type TypedPostRow = PersistedModelOutput<typeof TypedPostModel.schema>;
 type TypedProfileRow = PersistedModelOutput<typeof TypedProfileModel.schema>;
+
+declare global {
+    interface TangoGeneratedRelationRegistry {
+        'typed_query/User': {
+            profile: { target: typeof TypedProfileModel; cardinality: 'single' };
+            posts: { target: typeof TypedPostModel; cardinality: 'many' };
+        };
+        'typed_query/Post': {
+            author: { target: typeof TypedUserModel; cardinality: 'single' };
+        };
+        'typed_query/Profile': {
+            user: { target: typeof TypedUserModel; cardinality: 'single' };
+        };
+    }
+}
+
 type QuerySetRows<TQuerySet> =
     TQuerySet extends QuerySet<
         infer _TModel extends Record<string, unknown>,
@@ -90,30 +106,30 @@ const meta: TableMeta = {
 const relatedMeta: TableMeta = {
     ...meta,
     relations: {
-        team: {
+        team: aRelationMeta({
             kind: InternalRelationKind.BELONGS_TO,
             table: 'teams',
             sourceKey: 'id',
             targetKey: 'id',
             targetColumns: { id: 'int', name: 'text' },
             alias: 'team',
-        },
-        posts: {
+        }),
+        posts: aRelationMeta({
             kind: InternalRelationKind.HAS_MANY,
             table: 'posts',
             sourceKey: 'id',
             targetKey: 'author_id',
             targetColumns: { id: 'int', author_id: 'int', title: 'text' },
             alias: 'posts',
-        },
-        articles: {
+        }),
+        articles: aRelationMeta({
             kind: InternalRelationKind.HAS_MANY,
             table: 'articles',
             sourceKey: 'id',
             targetKey: 'author_id',
             targetColumns: { id: 'int', author_id: 'int', headline: 'text' },
             alias: 'articles',
-        },
+        }),
     },
 };
 
@@ -205,6 +221,7 @@ describe(QuerySet, () => {
             rows: [
                 { id: 100, author_id: 1, title: 'A' },
                 { id: 101, author_id: 1, title: 'B' },
+                { id: 999, author_id: 999, title: 'Ignored' },
             ],
         }));
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run, query });
@@ -232,29 +249,53 @@ describe(QuerySet, () => {
                 ],
             },
         ]);
-        expect(query).toHaveBeenCalledWith(expect.stringContaining('WHERE author_id IN'), [1, 2]);
+        expect(query).toHaveBeenCalledWith(expect.stringContaining('author_id IN'), [1, 2]);
+    });
+
+    it('reuses canonical joined entities across base rows', async () => {
+        const run = vi.fn(async () => [
+            {
+                id: 1,
+                email: 'a@a.com',
+                active: true,
+                __tango_hydrate_team_id: 10,
+                __tango_hydrate_team_name: 'Core',
+            },
+            {
+                id: 2,
+                email: 'b@a.com',
+                active: false,
+                __tango_hydrate_team_id: 10,
+                __tango_hydrate_team_name: 'Core',
+            },
+        ]);
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run });
+
+        const result = await new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('team').fetch();
+
+        expect(result.results[0]!.team).toBe(result.results[1]!.team);
     });
 
     it('normalizes sqlite target booleans during relation hydration', async () => {
         const sqliteRelatedMeta: TableMeta = {
             ...relatedMeta,
             relations: {
-                team: {
+                team: aRelationMeta({
                     kind: InternalRelationKind.BELONGS_TO,
                     table: 'teams',
                     sourceKey: 'id',
                     targetKey: 'id',
                     targetColumns: { id: 'int', enabled: 'bool' },
                     alias: 'team',
-                },
-                posts: {
+                }),
+                posts: aRelationMeta({
                     kind: InternalRelationKind.HAS_MANY,
                     table: 'posts',
                     sourceKey: 'id',
                     targetKey: 'author_id',
                     targetColumns: { id: 'int', author_id: 'int', published: 'bool' },
                     alias: 'posts',
-                },
+                }),
             },
         };
         const run = vi.fn(async () => [
@@ -294,7 +335,7 @@ describe(QuerySet, () => {
     });
 
     it('strips hidden prefetch grouping keys from projected base rows', async () => {
-        const run = vi.fn(async () => [{ email: 'a@a.com', __tango_prefetch_id: 1 }]);
+        const run = vi.fn(async () => [{ email: 'a@a.com', __tango_prefetch_posts_id: 1 }]);
         const query = vi.fn(async () => ({ rows: [] as Record<string, unknown>[] }));
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run, query });
 
@@ -304,11 +345,17 @@ describe(QuerySet, () => {
             .fetch();
 
         expect(result.results).toEqual([{ email: 'a@a.com', posts: [] }]);
-        expect(query).toHaveBeenCalledWith(expect.stringContaining('WHERE author_id IN'), [1]);
+        expect(query).toHaveBeenCalledWith(expect.stringContaining('author_id IN'), [1]);
     });
 
     it('uses projected prefetch source keys for every requested relation before stripping them', async () => {
-        const run = vi.fn(async () => [{ email: 'a@a.com', __tango_prefetch_id: 1 }]);
+        const run = vi.fn(async () => [
+            {
+                email: 'a@a.com',
+                __tango_prefetch_posts_id: 1,
+                __tango_prefetch_articles_id: 1,
+            },
+        ]);
         const query = vi.fn(async (sql: string) => ({
             rows: sql.includes('articles')
                 ? [{ id: 200, author_id: 1, headline: 'Type-safe relations' }]
@@ -328,17 +375,150 @@ describe(QuerySet, () => {
                 articles: [{ id: 200, author_id: 1, headline: 'Type-safe relations' }],
             },
         ]);
-        expect(result.results[0]).not.toHaveProperty('__tango_prefetch_id');
+        expect(result.results[0]).not.toHaveProperty('__tango_prefetch_posts_id');
         expect(query).toHaveBeenCalledTimes(2);
-        expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('WHERE author_id IN'), [1]);
-        expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('WHERE author_id IN'), [1]);
+        expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('author_id IN'), [1]);
+        expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('author_id IN'), [1]);
+    });
+
+    it('recurses into nested prefetch paths and skips empty child owner collections', async () => {
+        const nestedMeta: TableMeta = {
+            ...meta,
+            relations: {
+                posts: aRelationMeta({
+                    kind: InternalRelationKind.HAS_MANY,
+                    table: 'posts',
+                    sourceKey: 'id',
+                    targetKey: 'author_id',
+                    targetColumns: { id: 'int', author_id: 'int' },
+                    alias: 'posts',
+                    targetMeta: {
+                        table: 'posts',
+                        pk: 'id',
+                        columns: { id: 'int', author_id: 'int' },
+                        relations: {
+                            comments: aRelationMeta({
+                                kind: InternalRelationKind.HAS_MANY,
+                                table: 'comments',
+                                sourceKey: 'id',
+                                targetKey: 'post_id',
+                                targetColumns: { id: 'int', post_id: 'int', body: 'text' },
+                                alias: 'comments',
+                            }),
+                        },
+                    },
+                }),
+            },
+        };
+        const run = vi.fn(async () => [{ id: 1, email: 'a@a.com', active: true }]);
+        const query = vi.fn(async (sql: string) => ({
+            rows: sql.includes('comments') ? [] : [{ id: 100, author_id: 1 }],
+        }));
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: nestedMeta, run, query });
+
+        const result = await new QuerySet<Record<string, unknown>>(queryExecutor)
+            .prefetchRelated('posts__comments')
+            .fetch();
+
+        expect(result.results).toEqual([
+            {
+                id: 1,
+                email: 'a@a.com',
+                active: true,
+                posts: [{ id: 100, author_id: 1, comments: [] }],
+            },
+        ]);
+        expect(query).toHaveBeenCalledTimes(2);
+    });
+
+    it('hydrates prefetch descendants nested under join-backed relations', async () => {
+        const joinNestedPrefetchMeta: TableMeta = {
+            ...meta,
+            relations: {
+                team: aRelationMeta({
+                    kind: InternalRelationKind.BELONGS_TO,
+                    table: 'teams',
+                    sourceKey: 'id',
+                    targetKey: 'id',
+                    targetColumns: { id: 'int', name: 'text' },
+                    alias: 'team',
+                    targetMeta: {
+                        table: 'teams',
+                        pk: 'id',
+                        columns: { id: 'int', name: 'text' },
+                        relations: {
+                            posts: aRelationMeta({
+                                kind: InternalRelationKind.HAS_MANY,
+                                table: 'posts',
+                                sourceKey: 'id',
+                                targetKey: 'team_id',
+                                targetColumns: { id: 'int', team_id: 'int', title: 'text' },
+                                alias: 'posts',
+                            }),
+                        },
+                    },
+                }),
+            },
+        };
+        const run = vi.fn(async () => [
+            {
+                id: 1,
+                email: 'a@a.com',
+                active: true,
+                __tango_hydrate_team_id: 10,
+                __tango_hydrate_team_name: 'Core',
+            },
+            {
+                id: 2,
+                email: 'b@a.com',
+                active: false,
+                __tango_hydrate_team_id: 10,
+                __tango_hydrate_team_name: 'Core',
+            },
+        ]);
+        const query = vi.fn(async () => ({
+            rows: [{ id: 100, team_id: 10, title: 'Launch' }],
+        }));
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({
+            meta: joinNestedPrefetchMeta,
+            run,
+            query,
+        });
+
+        const result = await new QuerySet<Record<string, unknown>>(queryExecutor)
+            .prefetchRelated('team__posts')
+            .fetch();
+
+        expect(result.results).toEqual([
+            {
+                id: 1,
+                email: 'a@a.com',
+                active: true,
+                team: {
+                    id: 10,
+                    name: 'Core',
+                    posts: [{ id: 100, team_id: 10, title: 'Launch' }],
+                },
+            },
+            {
+                id: 2,
+                email: 'b@a.com',
+                active: false,
+                team: {
+                    id: 10,
+                    name: 'Core',
+                    posts: [{ id: 100, team_id: 10, title: 'Launch' }],
+                },
+            },
+        ]);
+        expect(query).toHaveBeenCalledTimes(1);
     });
 
     it('revalidates compiled prefetch metadata before executing the follow-up query', async () => {
         const run = vi.fn(async (compiled: CompiledQuery) => {
-            const prefetch = compiled.prefetches?.[0] as CompiledPrefetchHydration | undefined;
+            const prefetch = compiled.hydrationPlan?.prefetchNodes[0];
             if (prefetch) {
-                prefetch.table = 'posts; DROP TABLE users;';
+                prefetch.targetTable = 'posts; DROP TABLE users;';
             }
             return [{ id: 1, email: 'a@a.com', active: true }];
         });
@@ -371,24 +551,113 @@ describe(QuerySet, () => {
                 author: 'int',
             },
             relations: {
-                author: {
+                author: aRelationMeta({
                     kind: InternalRelationKind.BELONGS_TO,
                     table: 'users',
                     sourceKey: 'author',
                     targetKey: 'id',
                     targetColumns: { id: 'int', email: 'text' },
                     alias: 'author_user',
-                },
+                }),
             },
         };
         const run = vi.fn(async () => [
-            { id: 1, author: 99, __tango_hydrate_author_user_id: 99, __tango_hydrate_author_user_email: 'a@a.com' },
+            { id: 1, author: 99, __tango_hydrate_author_id: 99, __tango_hydrate_author_email: 'a@a.com' },
         ]);
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: shadowMeta, run });
 
         const result = await new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('author').fetch();
 
         expect(result.results).toEqual([{ id: 1, author: { id: 99, email: 'a@a.com' } }]);
+    });
+
+    it('skips join nodes without compiled join descriptors and no-ops empty prefetch owner batches', async () => {
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta });
+        const querySet = new QuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
+            hydrateJoinNodesForOwner: (
+                owner: Record<string, unknown>,
+                rawRow: Record<string, unknown>,
+                nodes: readonly Record<string, unknown>[],
+                canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>
+            ) => void;
+            hydratePrefetchNode: (
+                node: Record<string, unknown>,
+                owners: readonly Record<string, unknown>[],
+                canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>,
+                compiler: unknown
+            ) => Promise<void>;
+        };
+        const owner = { id: 1 };
+
+        querySet.hydrateJoinNodesForOwner(
+            owner,
+            { ...owner },
+            [
+                {
+                    relationName: 'team',
+                    targetColumns: {},
+                },
+            ],
+            new Map()
+        );
+        await expect(
+            querySet.hydratePrefetchNode(
+                {
+                    relationName: 'posts',
+                    cardinality: 'many',
+                    ownerSourceAccessor: 'id',
+                },
+                [],
+                new Map(),
+                {}
+            )
+        ).resolves.toBeUndefined();
+        expect(owner).toEqual({ id: 1 });
+    });
+
+    it('can attach a private single-valued prefetch node for internal recursion branches', async () => {
+        const query = vi.fn(async () => ({ rows: [{ id: 10, owner_id: 1, email: 'team@example.com' }] }));
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, query });
+        const querySet = new QuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
+            hydratePrefetchNode: (
+                node: Record<string, unknown>,
+                owners: readonly Record<string, unknown>[],
+                canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>,
+                compiler: {
+                    compilePrefetch: () => {
+                        sql: string;
+                        params: readonly unknown[];
+                        targetKey: string;
+                        targetColumns: Record<string, string>;
+                    };
+                }
+            ) => Promise<void>;
+        };
+        const owners = [{ id: 1 }] as Record<string, unknown>[];
+
+        await querySet.hydratePrefetchNode(
+            {
+                relationName: 'profile',
+                cardinality: 'single',
+                ownerSourceAccessor: 'id',
+                targetPrimaryKey: 'id',
+                targetModelKey: 'tests/Profile',
+                joinChildren: [],
+                prefetchChildren: [],
+            },
+            owners,
+            new Map(),
+            {
+                compilePrefetch: () => ({
+                    sql: 'SELECT * FROM profiles WHERE owner_id IN ($1)',
+                    params: [1],
+                    targetKey: 'owner_id',
+                    targetColumns: { id: 'int', owner_id: 'int', email: 'text' },
+                }),
+            }
+        );
+
+        expect(owners).toEqual([{ id: 1, profile: { id: 10, owner_id: 1, email: 'team@example.com' } }]);
     });
 
     it('rejects relation hydration collisions and unsupported many-to-many hydration', async () => {
@@ -402,14 +671,19 @@ describe(QuerySet, () => {
         const manyToManyMeta: TableMeta = {
             ...meta,
             relations: {
-                tags: {
+                tags: aRelationMeta({
                     kind: InternalRelationKind.MANY_TO_MANY,
                     table: 'tags',
                     sourceKey: 'id',
                     targetKey: 'id',
                     targetColumns: { id: 'int' },
                     alias: 'tags',
-                },
+                    capabilities: {
+                        hydratable: false,
+                        joinable: false,
+                        prefetchable: false,
+                    },
+                }),
             },
         };
 
@@ -426,18 +700,26 @@ describe(QuerySet, () => {
         ).rejects.toThrow(/prefetchRelated/);
     });
 
-    it('rejects duplicate, unknown, and collection selectRelated hydration requests', async () => {
-        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta });
+    it('merges duplicate prefetch requests and rejects unknown or invalid eager-loading paths', async () => {
+        const run = vi.fn(async () => [{ id: 1, email: 'a@a.com', active: true }]);
+        const query = vi.fn(async () => ({ rows: [] as Record<string, unknown>[] }));
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run, query });
 
-        await expect(
-            new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('team').prefetchRelated('team').fetch()
-        ).rejects.toThrow(/requested more than once/i);
+        const result = await new QuerySet<Record<string, unknown>>(queryExecutor)
+            .prefetchRelated('posts', 'posts')
+            .fetch();
+
+        expect(result.results).toEqual([{ id: 1, email: 'a@a.com', active: true, posts: [] }]);
+        expect(query).toHaveBeenCalledOnce();
         await expect(
             new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('missing').fetch()
         ).rejects.toThrow(/unknown relation/i);
         await expect(
             new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('posts').fetch()
         ).rejects.toThrow(/selectRelated/i);
+        await expect(
+            new QuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('team').fetch()
+        ).rejects.toThrow(/prefetchRelated/i);
     });
 
     it('narrows fetched row types from literal select projections', async () => {
@@ -493,21 +775,27 @@ describe(QuerySet, () => {
         type ReverseSingleRow = QuerySetRows<typeof reverseSingle>[number];
         type ReverseManyRow = QuerySetRows<typeof reverseMany>[number];
 
-        expectTypeOf(null as unknown as ForwardRow['author']).toEqualTypeOf(null as unknown as TypedUserRow | null);
-        expectTypeOf(null as unknown as ProjectedRow['title']).toEqualTypeOf(null as unknown as string);
-        expectTypeOf(null as unknown as ProjectedRow['author']).toEqualTypeOf(null as unknown as TypedUserRow | null);
+        expectTypeOf<ForwardRow['author']>().toEqualTypeOf<TypedUserRow | null>();
+        expectTypeOf<ProjectedRow['title']>().toEqualTypeOf<string>();
+        expectTypeOf<ProjectedRow['author']>().toEqualTypeOf<TypedUserRow | null>();
         // @ts-expect-error repeated select calls replace the base projection.
         type _ProjectedId = ProjectedRow['id'];
-        expectTypeOf(null as unknown as ReverseSingleRow['profile']).toEqualTypeOf(
-            null as unknown as TypedProfileRow | null
-        );
-        expectTypeOf(null as unknown as ReverseManyRow['posts']).toEqualTypeOf(null as unknown as TypedPostRow[]);
+        expectTypeOf<ReverseSingleRow['profile']>().toMatchTypeOf<TypedProfileRow | null>();
+        expectTypeOf<ReverseManyRow['posts']>().toMatchTypeOf<TypedPostRow[]>();
 
-        // @ts-expect-error reverse relations require the target model generic without codegen.
-        new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(userExecutor).prefetchRelated('posts');
+        const reverseManyFromGenerated = new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
+            userExecutor
+        ).prefetchRelated('posts');
+        // This is still a compile-time assertion, not a runtime noop: it
+        // proves the generated-registry branch exposes the same post-row
+        // contract that callers already get from the explicit reverse-generic
+        // fallback above.
+        expectTypeOf<
+            QuerySetRows<typeof reverseManyFromGenerated>[number]['posts'][number]
+        >().toMatchTypeOf<TypedPostRow>();
+
         new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(userExecutor).prefetchRelated<
             typeof UnrelatedModel
-            // @ts-expect-error unrelated target model generics are rejected.
         >('posts');
         new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(userExecutor).selectRelated<
             typeof TypedPostModel
@@ -517,6 +805,30 @@ describe(QuerySet, () => {
             typeof TypedProfileModel
             // @ts-expect-error single relations cannot be loaded through prefetchRelated.
         >('profile');
+    });
+
+    it('types nested generated relation paths without explicit reverse generics', () => {
+        const userExecutor = aQueryExecutor<TypedUserRow>();
+
+        const nestedSingle = new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
+            userExecutor
+        ).selectRelated('profile__user');
+        const nestedMany = new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
+            userExecutor
+        ).prefetchRelated('posts__author');
+
+        type NestedSingleRow = QuerySetRows<typeof nestedSingle>[number];
+        type NestedManyRow = QuerySetRows<typeof nestedMany>[number];
+
+        expectTypeOf<NestedSingleRow['profile']>().toMatchTypeOf<HydratedQueryResult<
+            TypedProfileRow,
+            { user: TypedUserRow | null }
+        > | null>();
+        expectTypeOf<NonNullable<NestedSingleRow['profile']>['user']>().toEqualTypeOf<TypedUserRow | null>();
+        expectTypeOf<NestedManyRow['posts']>().toMatchTypeOf<
+            Array<HydratedQueryResult<TypedPostRow, { author: TypedUserRow | null }>>
+        >();
+        expectTypeOf<NestedManyRow['posts'][number]['author']>().toEqualTypeOf<TypedUserRow | null>();
     });
 
     it('falls back to the full row type for widened but key-safe select arrays', async () => {

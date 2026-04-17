@@ -36,6 +36,52 @@ function ensureSmokeBuildPrerequisites(): void {
     }
 }
 
+function runSmokeCommand(label: string, args: readonly string[], env?: NodeJS.ProcessEnv): void {
+    const result = spawnSync('pnpm', [...args], {
+        cwd: process.cwd(),
+        env: {
+            ...process.env,
+            ...env,
+        },
+        encoding: 'utf8',
+    });
+
+    if (result.status === 0) {
+        return;
+    }
+
+    throw new Error(
+        [
+            `${label} failed: pnpm ${args.join(' ')}`,
+            `exit=${String(result.status)}`,
+            result.stdout ?? '',
+            result.stderr ?? '',
+        ].join('\n')
+    );
+}
+
+function getFirstAuthorIdFromPostList(payload: unknown): number {
+    const posts = Array.isArray(payload)
+        ? payload
+        : typeof payload === 'object' && payload !== null && Array.isArray((payload as { results?: unknown }).results)
+          ? (payload as { results: unknown[] }).results
+          : [];
+
+    for (const post of posts) {
+        if (
+            typeof post === 'object' &&
+            post !== null &&
+            typeof (post as { authorId?: unknown }).authorId === 'number'
+        ) {
+            return (post as { authorId: number }).authorId;
+        }
+    }
+
+    // Smoke runs start from a fresh SQLite file. The example bootstrap scripts seed
+    // users before posts, so the first seeded user id is stable across runs.
+    return 1;
+}
+
 smokeDescribe('example smoke tests', () => {
     let expressHarness: AppProcessHarness | null = null;
     let nextHarness: AppProcessHarness | null = null;
@@ -51,6 +97,13 @@ smokeDescribe('example smoke tests', () => {
         await rm(expressSqliteFile, { force: true });
         await rm(nextSqliteFile, { force: true });
         await rm(nuxtSqliteFile, { force: true });
+
+        runSmokeCommand('next bootstrap', ['--filter', '@danceroutine/tango-example-nextjs-blog', 'bootstrap'], {
+            TANGO_SQLITE_FILENAME: nextSqliteFile,
+        });
+        runSmokeCommand('nuxt bootstrap', ['--filter', '@danceroutine/tango-example-nuxt-blog', 'bootstrap'], {
+            TANGO_SQLITE_FILENAME: nuxtSqliteFile,
+        });
 
         expressHarness = await AppProcessHarness.start({
             command: 'pnpm',
@@ -168,6 +221,7 @@ smokeDescribe('example smoke tests', () => {
     it('smokes next CRUD routes through catch-all viewset handlers', async () => {
         const listBefore = await nextHarness!.request('/api/posts');
         expect(listBefore.status).toBe(200);
+        const nextAuthorId = getFirstAuthorIdFromPostList(await listBefore.json());
         const openapi = await nextHarness!.request('/api/openapi');
         await nextHarness!.assertResponseStatus(openapi, 200, 'next openapi endpoint failed');
         const nextSpec = (await openapi.json()) as { openapi?: string; paths?: Record<string, unknown> };
@@ -180,6 +234,7 @@ smokeDescribe('example smoke tests', () => {
             body: JSON.stringify({
                 title: 'Smoke Title',
                 content: 'Smoke Content',
+                authorId: nextAuthorId,
                 published: false,
             }),
         });
@@ -236,6 +291,10 @@ smokeDescribe('example smoke tests', () => {
         await nuxtHarness!.assertResponseStatus(home, 200, 'nuxt home page failed');
         expect(await home.text()).toContain('Tango + Nuxt');
 
+        const listBefore = await nuxtHarness!.request('/api/posts');
+        await nuxtHarness!.assertResponseStatus(listBefore, 200, 'nuxt list /api/posts failed');
+        const nuxtAuthorId = getFirstAuthorIdFromPostList(await listBefore.json());
+
         const openapi = await nuxtHarness!.request('/api/openapi');
         await nuxtHarness!.assertResponseStatus(openapi, 200, 'nuxt openapi endpoint failed');
         const nuxtSpec = (await openapi.json()) as { openapi?: string; paths?: Record<string, unknown> };
@@ -248,6 +307,7 @@ smokeDescribe('example smoke tests', () => {
             body: JSON.stringify({
                 title: 'Nuxt Smoke Title',
                 content: 'Nuxt Smoke Content',
+                authorId: nuxtAuthorId,
                 published: false,
             }),
         });

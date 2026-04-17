@@ -1,21 +1,8 @@
 import { TangoQueryParams } from '@danceroutine/tango-core';
 import { OffsetPaginator } from '@danceroutine/tango-resources';
 import { Q, type FilterInput } from '@danceroutine/tango-orm';
-import { PostModel, PostReadSchema, type Post } from '@/lib/models';
+import { PostModel, type Post } from '@/lib/models';
 
-function withSearchParam(url: string | undefined, search: string | undefined): string | undefined {
-    if (!url || !search) {
-        return url;
-    }
-
-    const params = new URLSearchParams(url.startsWith('?') ? url.slice(1) : url);
-    params.set('search', search);
-    return `?${params.toString()}`;
-}
-
-/**
- * Home page rendering paginated published posts from SQLite.
- */
 export default async function HomePage({
     searchParams,
 }: {
@@ -33,17 +20,21 @@ export default async function HomePage({
 
     const paginator = new OffsetPaginator(qs, 20);
     const { limit, offset } = paginator.parseParams(params);
-    const [{ results: posts }, totalCount] = await Promise.all([paginator.apply(qs).fetch(PostReadSchema), qs.count()]);
-
-    const pagination = paginator.toResponse(posts, { totalCount });
-    const previousHref = withSearchParam(pagination.previous ?? undefined, search);
-    const nextHref = withSearchParam(pagination.next ?? undefined, search);
+    const [{ results: posts }, totalCount] = await Promise.all([
+        paginator.apply(qs.selectRelated('author')).fetch(),
+        qs.count(),
+    ]);
+    const pagination = paginator.toResponse(posts, { totalCount, params });
+    const previousHref = pagination.previous ?? undefined;
+    const nextHref = pagination.next ?? undefined;
 
     return (
         <main className="container mx-auto px-4 py-8 max-w-4xl">
             <header className="mb-8">
                 <h1 className="text-4xl font-bold mb-2">Blog Posts</h1>
-                <p className="text-gray-600">SQLite-backed example with search + offset pagination.</p>
+                <p className="text-gray-600">
+                    SQLite-backed example with search, pagination, and joined author hydration.
+                </p>
             </header>
 
             <form method="GET" className="mb-8 flex gap-2">
@@ -66,10 +57,14 @@ export default async function HomePage({
                 ) : (
                     posts.map((post) => (
                         <article key={post.id} className="border rounded-lg p-6 shadow-sm">
+                            <div className="mb-3 flex items-center justify-between text-sm text-gray-500">
+                                <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                                <span>By {post.author?.username ?? 'Unknown author'}</span>
+                            </div>
                             <h2 className="text-2xl font-semibold mb-2">{post.title}</h2>
                             {post.excerpt && <p className="text-gray-600 mb-4">{post.excerpt}</p>}
                             <div className="flex justify-between items-center text-sm text-gray-500">
-                                <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                                <span>{post.published ? 'Published' : 'Draft'}</span>
                                 <a href={`/posts/${post.slug}`} className="text-blue-600 hover:underline">
                                     Read more →
                                 </a>

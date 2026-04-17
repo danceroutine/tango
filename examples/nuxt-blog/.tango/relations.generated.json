@@ -1,0 +1,131 @@
+{
+    "version": 1,
+    "fingerprint": "2c1c9e896dd689ff079fee3f0cd27efdd404874c73ae73f9732e020b28980a7f",
+    "snapshot": {
+        "models": [
+            {
+                "key": "nuxt-blog/Comment",
+                "relations": [
+                    {
+                        "edgeId": "nuxt-blog/Comment:authorId:foreignKey",
+                        "sourceModelKey": "nuxt-blog/Comment",
+                        "targetModelKey": "nuxt-blog/User",
+                        "name": "author",
+                        "inverseEdgeId": "nuxt-blog/Comment:authorId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "user_author",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "nuxt-blog/Comment:postId:foreignKey",
+                        "sourceModelKey": "nuxt-blog/Comment",
+                        "targetModelKey": "nuxt-blog/Post",
+                        "name": "post",
+                        "inverseEdgeId": "nuxt-blog/Comment:postId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "postId",
+                        "targetFieldName": "id",
+                        "alias": "post_post",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            },
+            {
+                "key": "nuxt-blog/Post",
+                "relations": [
+                    {
+                        "edgeId": "nuxt-blog/Post:authorId:foreignKey",
+                        "sourceModelKey": "nuxt-blog/Post",
+                        "targetModelKey": "nuxt-blog/User",
+                        "name": "author",
+                        "inverseEdgeId": "nuxt-blog/Post:authorId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "user_author",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "nuxt-blog/Comment:postId:foreignKey:inverse",
+                        "sourceModelKey": "nuxt-blog/Post",
+                        "targetModelKey": "nuxt-blog/Comment",
+                        "name": "comments",
+                        "inverseEdgeId": "nuxt-blog/Comment:postId:foreignKey",
+                        "kind": "hasMany",
+                        "storageStrategy": "reverse_reference",
+                        "cardinality": "many",
+                        "localFieldName": "postId",
+                        "targetFieldName": "id",
+                        "alias": "comment_comments",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            },
+            {
+                "key": "nuxt-blog/User",
+                "relations": [
+                    {
+                        "edgeId": "nuxt-blog/Comment:authorId:foreignKey:inverse",
+                        "sourceModelKey": "nuxt-blog/User",
+                        "targetModelKey": "nuxt-blog/Comment",
+                        "name": "comments",
+                        "inverseEdgeId": "nuxt-blog/Comment:authorId:foreignKey",
+                        "kind": "hasMany",
+                        "storageStrategy": "reverse_reference",
+                        "cardinality": "many",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "comment_comments",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "nuxt-blog/Post:authorId:foreignKey:inverse",
+                        "sourceModelKey": "nuxt-blog/User",
+                        "targetModelKey": "nuxt-blog/Post",
+                        "name": "posts",
+                        "inverseEdgeId": "nuxt-blog/Post:authorId:foreignKey",
+                        "kind": "hasMany",
+                        "storageStrategy": "reverse_reference",
+                        "cardinality": "many",
+                        "localFieldName": "authorId",
+                        "targetFieldName": "id",
+                        "alias": "post_posts",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -8,6 +8,8 @@
             "@danceroutine/tango-adapters-core/*": ["../../packages/adapters/core/src/*"],
             "@danceroutine/tango-adapters-express": ["../../packages/adapters/express/src/index.ts"],
             "@danceroutine/tango-adapters-express/*": ["../../packages/adapters/express/src/*"],
+            "@danceroutine/tango-codegen": ["../../packages/codegen/src/index.ts"],
+            "@danceroutine/tango-codegen/*": ["../../packages/codegen/src/*"],
             "@danceroutine/tango-config": ["../../packages/config/src/index.ts"],
             "@danceroutine/tango-config/*": ["../../packages/config/src/*"],
             "@danceroutine/tango-core": ["../../packages/core/src/index.ts"],
@@ -24,5 +26,5 @@
             "@danceroutine/tango-schema/*": ["../../packages/schema/src/*"]
         }
     },
-    "include": ["src/**/*.ts", "scripts/bootstrap.ts", "migrations/**/*.ts", "tango.config.ts"]
+    "include": ["src/**/*.ts", "scripts/bootstrap.ts", "migrations/**/*.ts", "tango.config.ts", ".tango/**/*.d.ts"]
 }

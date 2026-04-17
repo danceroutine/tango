@@ -13,8 +13,10 @@ import type { UpdateReferentialAction } from '../builder/contracts/UpdateReferen
 import { createDefaultIntrospectorStrategy } from '../strategies/IntrospectorStrategy';
 import { InternalDialect } from '../domain/internal/InternalDialect';
 import { loadConfig } from '@danceroutine/tango-config';
+import { loadProjectModule } from '@danceroutine/tango-codegen/commands';
+import { writeRelationRegistryArtifacts } from '@danceroutine/tango-codegen/generators';
 import { getLogger } from '@danceroutine/tango-core';
-import { ModelRegistry } from '@danceroutine/tango-schema';
+import { GENERATED_RELATION_REGISTRY_DIRNAME, ModelRegistry } from '@danceroutine/tango-schema';
 import { loadModule } from '../runtime/loadModule';
 
 const logger = getLogger('tango.migrations');
@@ -50,6 +52,16 @@ type ModelMetadataLike = {
 type CliDbClient = {
     query<T = unknown>(sql: string, params?: readonly unknown[]): Promise<{ rows: T[] }>;
     close(): Promise<void>;
+};
+
+type LoadedModelsResult = {
+    models: ModelMetadataLike[];
+    registry: ModelRegistry;
+    modelTypeAccessors: Record<string, string>;
+};
+
+type ModelContainerLike = {
+    metadata: ModelMetadataLike;
 };
 
 async function importModule(modulePath: string): Promise<Record<string, unknown>> {
@@ -149,35 +161,60 @@ async function resolveCommandInputs(argv: {
     };
 }
 
-async function loadModels(modelsPath: string): Promise<ModelMetadataLike[]> {
-    const registry = new ModelRegistry();
-    const mod = await loadModule(modelsPath, {
-        projectRoot: process.cwd(),
+function isModelContainerLike(value: unknown): value is ModelContainerLike {
+    return typeof value === 'object' && value !== null && 'metadata' in value;
+}
+
+function collectExportedModels(moduleValue: unknown): ModelMetadataLike[] {
+    if (!moduleValue || typeof moduleValue !== 'object') {
+        return [];
+    }
+
+    const models: ModelMetadataLike[] = [];
+    for (const value of Object.values(moduleValue as Record<string, unknown>)) {
+        if (isModelContainerLike(value)) {
+            models.push(value.metadata);
+            continue;
+        }
+
+        if (!value || typeof value !== 'object') {
+            continue;
+        }
+
+        for (const nestedValue of Object.values(value as Record<string, unknown>)) {
+            if (isModelContainerLike(nestedValue)) {
+                models.push(nestedValue.metadata);
+            }
+        }
+    }
+
+    return models;
+}
+
+async function loadModels(modelsPath: string): Promise<LoadedModelsResult> {
+    const {
+        loaded: mod,
         registry,
-        moduleCache: false,
+        modelTypeAccessors,
+    } = await loadProjectModule(modelsPath, {
+        projectRoot: process.cwd(),
+        outputDir: resolve(process.cwd(), GENERATED_RELATION_REGISTRY_DIRNAME),
     });
     const moduleValue = (mod.default ?? mod) as unknown;
 
-    const models: ModelMetadataLike[] = [];
-    if (moduleValue && typeof moduleValue === 'object' && 'metadata' in moduleValue) {
-        const direct = moduleValue as { metadata: ModelMetadataLike };
-        models.push(direct.metadata);
-    }
-    const exportedValues =
-        moduleValue && typeof moduleValue === 'object' ? Object.values(moduleValue as Record<string, unknown>) : [];
-
-    for (const value of exportedValues) {
-        if (value && typeof value === 'object' && 'metadata' in value) {
-            const model = value as { metadata: ModelMetadataLike };
-            models.push(model.metadata);
-        }
-    }
+    const models = isModelContainerLike(moduleValue)
+        ? [moduleValue.metadata, ...collectExportedModels(moduleValue)]
+        : collectExportedModels(moduleValue);
 
     if (models.length === 0) {
         throw new Error(`No models found in '${modelsPath}'. Ensure the module exports Model() definitions.`);
     }
 
-    return models;
+    return {
+        models,
+        registry,
+        modelTypeAccessors,
+    };
 }
 
 async function connectAndIntrospect(dbUrl: string, dialect: string): Promise<DbSchema> {
@@ -369,8 +406,19 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
                     config: argv.config as string | undefined,
                     env: argv.env as ConfigEnvironment | undefined,
                 });
-                const models = await loadModels(argv.models);
-                logger.info(`Found ${models.length} model(s): ${models.map((m) => m.table).join(', ')}`);
+                const loaded = await loadModels(argv.models);
+                logger.info(`Found ${loaded.models.length} model(s): ${loaded.models.map((m) => m.table).join(', ')}`);
+                try {
+                    await writeRelationRegistryArtifacts({
+                        registry: loaded.registry,
+                        modelTypeAccessors: loaded.modelTypeAccessors,
+                        outputDir: resolve(process.cwd(), GENERATED_RELATION_REGISTRY_DIRNAME),
+                    });
+                } catch (error) {
+                    logger.warn(
+                        `Unable to refresh generated relation registry during make:migrations. Continuing without updated relation artifacts: ${error instanceof Error ? error.message : String(error)}`
+                    );
+                }
 
                 let dbState: DbSchema;
                 if (resolved.db) {
@@ -380,7 +428,7 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
                     dbState = { tables: {} };
                 }
 
-                const operations = diffSchema(dbState, models);
+                const operations = diffSchema(dbState, loaded.models);
 
                 if (operations.length === 0) {
                     logger.info('No changes detected — models and database are in sync');

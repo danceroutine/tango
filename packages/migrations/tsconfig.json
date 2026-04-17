@@ -5,6 +5,8 @@
         "composite": false,
         "outDir": "./dist",
         "paths": {
+            "@danceroutine/tango-codegen": ["../codegen/src/index.ts"],
+            "@danceroutine/tango-codegen/*": ["../codegen/src/*"],
             "@danceroutine/tango-config": ["../config/src/index.ts"],
             "@danceroutine/tango-config/*": ["../config/src/*"],
             "@danceroutine/tango-core": ["../core/src/index.ts"],

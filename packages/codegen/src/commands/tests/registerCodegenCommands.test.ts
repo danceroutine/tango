@@ -1,8 +1,10 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import yargs from 'yargs';
 import { describe, expect, it, vi } from 'vitest';
+import { withGlobalTestApi } from '@danceroutine/tango-testing';
+import { Model, t } from '@danceroutine/tango-schema';
 import { registerCodegenCommands } from '../registerCodegenCommands';
 import { spawnSync } from 'node:child_process';
 
@@ -45,6 +47,61 @@ describe(registerCodegenCommands, () => {
 
             const readme = await readFile(join(targetDir, 'README.md'), 'utf8');
             expect(readme).toContain('scaffolded by `tango new --framework next`');
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('writes relation registry artifacts when codegen relations is used', async () => {
+        const dir = await mkdtemp(join(process.cwd(), '.tmp-tango-codegen-relations-cli-'));
+        try {
+            await mkdir(join(dir, 'src'), { recursive: true });
+            await writeFile(
+                join(dir, 'src/models.ts'),
+                `
+                import { z } from 'zod';
+                const { Model, t } = globalThis.__tangoCodegenRelationsCliTestApi;
+
+                export const UserModel = Model({
+                    namespace: 'blog',
+                    name: 'User',
+                    table: 'users',
+                    schema: z.object({
+                        id: t.primaryKey(z.number().int()),
+                    }),
+                });
+
+                export const PostModel = Model({
+                    namespace: 'blog',
+                    name: 'Post',
+                    table: 'posts',
+                    schema: z.object({
+                        id: t.primaryKey(z.number().int()),
+                        authorId: t.foreignKey('blog/User', {
+                            field: z.number().int(),
+                            relatedName: 'posts',
+                        }),
+                    }),
+                });
+                `,
+                'utf8'
+            );
+
+            const cwdBefore = process.cwd();
+            process.chdir(dir);
+            try {
+                await withGlobalTestApi('__tangoCodegenRelationsCliTestApi', { Model, t }, async () => {
+                    const parser = registerCodegenCommands(
+                        yargs(['codegen', 'relations', '--models', './src/models.ts'])
+                    );
+                    await parser.parseAsync();
+                });
+            } finally {
+                process.chdir(cwdBefore);
+            }
+
+            const declaration = await readFile(join(dir, '.tango/relations.generated.d.ts'), 'utf8');
+            expect(declaration).toContain('"blog/User"');
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

@@ -6,17 +6,17 @@ It will change as the framework evolves. For the current supported surface, see 
 
 ## What is on the roadmap?
 
-### Deeper relation hydration
+### Related-row projection and many-to-many hydration
 
-Tango supports one-level relation hydration for `belongsTo`, `hasOne`, and `hasMany` relations through `selectRelated(...)` and `prefetchRelated(...)`.
+Tango supports nested relation traversal such as `author__profile` and `posts__comments__author`, together with generated path typing that removes most explicit reverse target-model generics in the common case.
 
-Future relation work should extend that foundation to nested traversal such as `author__profile`, related-row projection, many-to-many hydration, and ambient or generated typing that removes explicit target-model generics from reverse relation calls.
+The next relation work is narrower and more specific: related-row projection, many-to-many hydration, and any follow-up ergonomics once those two capabilities have a coherent execution model.
 
 ### Transaction ergonomics beyond `atomic(...)`
 
 The core ORM transaction boundary is now `transaction.atomic(async (tx) => ...)`, including nested savepoints and post-commit work through `tx.onCommit(...)`.
 
-The base transaction contract is in place now, so the remaining work is mostly about fit and ergonomics. The main follow-up questions are request-scoped wrappers in host adapters, broader multi-database routing, and better SQLite ergonomics beyond the current file-backed transaction boundary.
+The base transaction contract is in place, so the remaining work is mostly about fit and ergonomics. The main follow-up work is request-scoped wrappers in host adapters, broader multi-database routing, and better SQLite ergonomics beyond the current file-backed transaction boundary.
 
 ### Agentic Development Support
 

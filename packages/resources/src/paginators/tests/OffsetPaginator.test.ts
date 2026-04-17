@@ -71,6 +71,27 @@ describe(OffsetPaginator, () => {
             expect(response.next).toBe('?limit=1&offset=1');
         });
 
+        it('preserves unrelated query params when provided the current TangoQueryParams', () => {
+            const paginator = new OffsetPaginator(dummyQueryset);
+            const params = query('limit=1&offset=0&search=tango');
+            paginator.parseParams(params);
+
+            const response = paginator.getPaginatedResponse([{ id: 1 }], 10, params);
+
+            expect(response.next).toBe('?limit=1&offset=1&search=tango');
+        });
+
+        it('drops page when preserving query params for next and previous links', () => {
+            const paginator = new OffsetPaginator(dummyQueryset);
+            const params = query('page=3&limit=5&search=tango');
+            paginator.parseParams(params);
+
+            const response = paginator.getPaginatedResponse([{ id: 11 }], 30, params);
+
+            expect(response.next).toBe('?limit=5&search=tango&offset=15');
+            expect(response.previous).toBe('?limit=5&search=tango&offset=5');
+        });
+
         it('includes previous link when offset > 0', () => {
             const paginator = new OffsetPaginator(dummyQueryset);
             paginator.parseParams(query('limit=1&offset=5'));

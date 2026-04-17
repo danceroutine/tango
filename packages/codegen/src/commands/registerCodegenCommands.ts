@@ -1,5 +1,6 @@
 import type { Argv } from 'yargs';
 import { withNewCommand } from './runNewCommand';
+import { withGenerateRelationsCommand } from './runGenerateRelationsCommand';
 import { withInitCommand } from './runInitCommand';
 
 /**
@@ -8,7 +9,8 @@ import { withInitCommand } from './runInitCommand';
 export function registerCodegenCommands(parser: Argv): Argv {
     const withTopLevelNew = withNewCommand(parser);
     const withTopLevelInit = withInitCommand(withTopLevelNew);
-    return withTopLevelInit.command('codegen <command>', 'Code generation command group', (builder) =>
-        withInitCommand(withNewCommand(builder))
+    const withTopLevelRelations = withGenerateRelationsCommand(withTopLevelInit);
+    return withTopLevelRelations.command('codegen <command>', 'Code generation command group', (builder) =>
+        withGenerateRelationsCommand(withInitCommand(withNewCommand(builder)))
     );
 }

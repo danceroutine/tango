@@ -7,8 +7,11 @@ import type { QueryResult } from './domain/QueryResult';
 import type { OrderToken } from './domain/OrderToken';
 import type { FilterInput } from './domain/FilterInput';
 import type { CompiledQuery } from './domain/CompiledQuery';
-import type { CompiledPrefetchHydration } from './domain/CompiledQuery';
+import type { CompiledHydrationNode } from './domain/CompiledQuery';
 import type {
+    GeneratedHydratedRelationMap,
+    GeneratedPrefetchRelatedPathKeys,
+    GeneratedSelectRelatedPathKeys,
     HydratedQueryResult,
     ManyRelationHydrationCardinality,
     MaybeHydratedRelationMap,
@@ -17,10 +20,10 @@ import type {
     SelectRelatedRelations,
     SingleRelationHydrationCardinality,
 } from './domain/RelationTyping';
+import { InternalRelationHydrationCardinality } from './domain/RelationTyping';
 import { InternalQNodeType } from './domain/internal/InternalQNodeType';
 import { InternalDirection } from './domain/internal/InternalDirection';
 import { InternalDialect } from './domain/internal/InternalDialect';
-import { InternalRelationKind } from './domain/internal/InternalRelationKind';
 import { QBuilder as Q } from './QBuilder';
 import { QueryCompiler } from './compiler';
 
@@ -66,7 +69,7 @@ type ProjectedResult<
 /**
  * Django-inspired query builder for constructing and executing database queries.
  * Provides a fluent API for filtering, ordering, pagination, projection, and
- * one-level relation hydration.
+ * nested relation hydration.
  *
  * @template TModel - The full model row type used for query composition
  * @template TBaseResult - The selected base-row shape returned by execution methods
@@ -186,18 +189,21 @@ export class QuerySet<
     }
 
     /**
-     * Hydrate single-valued relations through SQL joins.
+     * Hydrate single-valued relation paths through SQL joins.
      *
      * Forward `belongsTo` relations can be inferred from the source model's
      * field-authored relation metadata. Reverse `hasOne` relations can be
      * selected with a target model generic when the target model points back to
-     * the source model.
+     * the source model. Generated relation typing also enables nested `__`
+     * path keys for applications that keep the app-local registry current.
      */
     selectRelated<
         TTargetModel = undefined,
-        const TRelationName extends RelationKeys<
-            SelectRelatedRelations<TSourceModel, NoInfer<TTargetModel>>
-        > = RelationKeys<SelectRelatedRelations<TSourceModel, NoInfer<TTargetModel>>>,
+        const TRelationName extends
+            | RelationKeys<SelectRelatedRelations<TSourceModel, NoInfer<TTargetModel>>>
+            | GeneratedSelectRelatedPathKeys<TSourceModel> =
+            | RelationKeys<SelectRelatedRelations<TSourceModel, NoInfer<TTargetModel>>>
+            | GeneratedSelectRelatedPathKeys<TSourceModel>,
     >(
         ...rels: readonly TRelationName[]
     ): QuerySet<
@@ -208,24 +214,32 @@ export class QuerySet<
             MaybeHydratedRelationMap<
                 TSourceModel,
                 SelectRelatedRelations<TSourceModel, NoInfer<TTargetModel>>,
-                TRelationName,
+                Extract<TRelationName, RelationKeys<SelectRelatedRelations<TSourceModel, NoInfer<TTargetModel>>>>,
                 SingleRelationHydrationCardinality
+            > &
+            GeneratedHydratedRelationMap<
+                TSourceModel,
+                Extract<TRelationName, GeneratedSelectRelatedPathKeys<TSourceModel>>
             >
     > {
         return new QuerySet(this.executor, { ...this.state, selectRelated: [...rels] });
     }
 
     /**
-     * Hydrate collection relations with a follow-up query.
+     * Hydrate collection-rooted relation paths with follow-up queries.
      *
      * Reverse `hasMany` relations can be prefetched with a target model generic
-     * when the target model points back to the source model.
+     * when the target model points back to the source model. Generated relation
+     * typing also enables nested `__` path keys for applications that keep the
+     * app-local registry current.
      */
     prefetchRelated<
         TTargetModel = undefined,
-        const TRelationName extends RelationKeys<
-            PrefetchRelatedRelations<TSourceModel, NoInfer<TTargetModel>>
-        > = RelationKeys<PrefetchRelatedRelations<TSourceModel, NoInfer<TTargetModel>>>,
+        const TRelationName extends
+            | RelationKeys<PrefetchRelatedRelations<TSourceModel, NoInfer<TTargetModel>>>
+            | GeneratedPrefetchRelatedPathKeys<TSourceModel> =
+            | RelationKeys<PrefetchRelatedRelations<TSourceModel, NoInfer<TTargetModel>>>
+            | GeneratedPrefetchRelatedPathKeys<TSourceModel>,
     >(
         ...rels: readonly TRelationName[]
     ): QuerySet<
@@ -236,8 +250,12 @@ export class QuerySet<
             MaybeHydratedRelationMap<
                 TSourceModel,
                 PrefetchRelatedRelations<TSourceModel, NoInfer<TTargetModel>>,
-                TRelationName,
+                Extract<TRelationName, RelationKeys<PrefetchRelatedRelations<TSourceModel, NoInfer<TTargetModel>>>>,
                 ManyRelationHydrationCardinality
+            > &
+            GeneratedHydratedRelationMap<
+                TSourceModel,
+                Extract<TRelationName, GeneratedPrefetchRelatedPathKeys<TSourceModel>>
             >
     > {
         return new QuerySet(this.executor, { ...this.state, prefetchRelated: [...rels] });
@@ -269,7 +287,6 @@ export class QuerySet<
             | QueryShapeFunction<HydratedQueryResult<TBaseResult, THydrated>, Out>
             | QueryShapeParser<HydratedQueryResult<TBaseResult, THydrated>, Out>
     ): Promise<QueryResult<HydratedQueryResult<TBaseResult, THydrated> | Out>> {
-        this.validateHydrationState();
         const compiler = new QueryCompiler(this.executor.meta, this.executor.dialect);
         const compiled = compiler.compile(this.state);
         const rows = await this.executor.run(compiled);
@@ -325,9 +342,8 @@ export class QuerySet<
      * Execute a `COUNT(*)` query for the current filtered state.
      */
     async count(): Promise<number> {
-        this.validateHydrationState();
         const compiler = new QueryCompiler(this.executor.meta, this.executor.dialect);
-        const compiled = compiler.compile(this.state);
+        const compiled = compiler.compile(this.withoutHydrationState());
         const countQuery = `SELECT COUNT(*) as count FROM (${compiled.sql}) AS tango_count_subquery`;
         const rows = await this.executor.client.query<{ count: number }>(countQuery, compiled.params);
         return Number(rows.rows[0]?.count ?? 0);
@@ -362,162 +378,210 @@ export class QuerySet<
         return rows.map((row) => this.normalizeBooleanColumns(row, booleanColumns));
     }
 
-    private validateHydrationState(): void {
-        const seen = new Set<string>();
-        for (const relationName of [...(this.state.selectRelated ?? []), ...(this.state.prefetchRelated ?? [])]) {
-            if (seen.has(relationName)) {
-                throw new Error(`Relation '${relationName}' was requested more than once.`);
-            }
-            seen.add(relationName);
-
-            const relation = this.executor.meta.relations?.[relationName];
-            if (!relation) {
-                throw new Error(`Unknown relation '${relationName}' for table '${this.executor.meta.table}'.`);
-            }
-            if (relation.kind === InternalRelationKind.MANY_TO_MANY) {
-                throw new Error(`Relation '${relationName}' is many-to-many and cannot be hydrated yet.`);
-            }
-            if (
-                relationName in this.executor.meta.columns &&
-                !(relation.kind === InternalRelationKind.BELONGS_TO && relationName === relation.sourceKey)
-            ) {
-                throw new Error(
-                    `Relation '${relationName}' on table '${this.executor.meta.table}' collides with an existing field.`
-                );
-            }
-        }
-
-        for (const relationName of this.state.selectRelated ?? []) {
-            const relation = this.executor.meta.relations![relationName]!;
-            if (relation.kind !== InternalRelationKind.BELONGS_TO && relation.kind !== InternalRelationKind.HAS_ONE) {
-                throw new Error(`Relation '${relationName}' cannot be loaded with selectRelated(...).`);
-            }
-        }
-
-        for (const relationName of this.state.prefetchRelated ?? []) {
-            const relation = this.executor.meta.relations![relationName]!;
-            if (relation.kind !== InternalRelationKind.HAS_MANY) {
-                throw new Error(`Relation '${relationName}' cannot be loaded with prefetchRelated(...).`);
-            }
-        }
-    }
-
     private async hydrateRows(
         rows: Record<string, unknown>[],
         compiled: CompiledQuery
     ): Promise<Record<string, unknown>[]> {
-        const selectedRows = this.hydrateSelectedRows(rows, compiled);
-        return this.hydratePrefetchedRows(selectedRows, compiled);
-    }
-
-    private hydrateSelectedRows(rows: Record<string, unknown>[], compiled: CompiledQuery): Record<string, unknown>[] {
-        const hydrations = compiled.hydrations;
-        if (!hydrations?.length) {
+        if (!compiled.hydrationPlan) {
             return rows;
         }
 
-        return rows.map((row) => {
-            const next = { ...row };
-            for (const hydration of hydrations) {
-                const target: Record<string, unknown> = {};
-                let hasTargetValue = false;
+        // Hydration mutates row objects by attaching related entities and
+        // stripping internal alias columns. Copy once here so the executor's
+        // raw rows remain untouched throughout the recursive hydration pass.
+        const hydratedRows = rows.map((row) => ({ ...row }));
+        // Canonicalize by model key and primary key so one database row maps to
+        // one in-memory object even when multiple hydration paths reach it.
+        const canonicalEntities = new Map<string, Map<string | number, Record<string, unknown>>>();
+        const queuedJoinPrefetchOwners = new Map<CompiledHydrationNode, Set<Record<string, unknown>>>();
+        const compiler = new QueryCompiler(this.executor.meta, this.executor.dialect);
 
-                for (const [column, alias] of Object.entries(hydration.columns)) {
-                    const value = next[alias];
-                    delete next[alias];
-                    target[column] = this.normalizeTargetValue(hydration.relationName, column, value);
-                    if (value !== null && value !== undefined) {
-                        hasTargetValue = true;
-                    }
+        for (const row of hydratedRows) {
+            this.hydrateJoinNodesForOwner(
+                row,
+                row,
+                compiled.hydrationPlan.joinNodes,
+                canonicalEntities,
+                queuedJoinPrefetchOwners
+            );
+        }
+
+        for (const node of compiled.hydrationPlan.prefetchNodes) {
+            await this.hydratePrefetchNode(node, hydratedRows, canonicalEntities, compiler);
+        }
+
+        for (const [node, owners] of queuedJoinPrefetchOwners.entries()) {
+            await this.hydratePrefetchNode(node, [...owners], canonicalEntities, compiler);
+        }
+
+        for (const row of hydratedRows) {
+            for (const alias of compiled.hydrationPlan.hiddenRootAliases) {
+                delete row[alias];
+            }
+        }
+
+        return hydratedRows;
+    }
+
+    private hydrateJoinNodesForOwner(
+        owner: Record<string, unknown>,
+        rawRow: Record<string, unknown>,
+        nodes: readonly CompiledHydrationNode[],
+        canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>,
+        queuedJoinPrefetchOwners?: Map<CompiledHydrationNode, Set<Record<string, unknown>>>
+    ): void {
+        // Join-backed descendants already live on the current SQL row. This
+        // pass reads the aliased columns, materializes the related entity, and
+        // then recurses into any join-backed children on the same row payload.
+        for (const node of nodes) {
+            if (!node.join) {
+                continue;
+            }
+
+            const target: Record<string, unknown> = {};
+            let hasTargetValue = false;
+
+            for (const [column, alias] of Object.entries(node.join.columns)) {
+                const value = rawRow[alias];
+                delete rawRow[alias];
+                target[column] = this.normalizeColumnValue(node.targetColumns[column], value);
+                if (value !== null && value !== undefined) {
+                    hasTargetValue = true;
+                }
+            }
+
+            if (!hasTargetValue) {
+                owner[node.relationName] = null;
+                continue;
+            }
+
+            const canonical = this.canonicalizeEntity(node, target, canonicalEntities);
+            owner[node.relationName] = canonical;
+            for (const childNode of node.prefetchChildren) {
+                const queuedOwners = queuedJoinPrefetchOwners?.get(childNode);
+                if (queuedOwners) {
+                    queuedOwners.add(canonical);
+                    continue;
                 }
 
-                next[hydration.relationName] = hasTargetValue ? target : null;
+                queuedJoinPrefetchOwners?.set(childNode, new Set([canonical]));
             }
-            return next;
-        });
+            this.hydrateJoinNodesForOwner(
+                canonical,
+                rawRow,
+                node.joinChildren,
+                canonicalEntities,
+                queuedJoinPrefetchOwners
+            );
+        }
     }
 
-    private async hydratePrefetchedRows(
-        rows: Record<string, unknown>[],
-        compiled: CompiledQuery
-    ): Promise<Record<string, unknown>[]> {
-        if (!compiled.prefetches?.length || rows.length === 0) {
-            return rows;
+    private async hydratePrefetchNode(
+        node: CompiledHydrationNode,
+        owners: readonly Record<string, unknown>[],
+        canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>,
+        compiler: QueryCompiler
+    ): Promise<void> {
+        if (owners.length === 0) {
+            return;
         }
 
-        const prefetchGroups = await Promise.all(
-            compiled.prefetches.map(async (prefetch) => {
-                const sourceValues = rows
-                    .map((row) => row[prefetch.sourceKeyAlias ?? prefetch.sourceKey])
-                    .filter(
-                        (value): value is string | number => typeof value === 'string' || typeof value === 'number'
-                    );
-                const uniqueSourceValues = [...new Set(sourceValues)];
-                // TODO: A future prefetch planner can batch compatible relation fetches into fewer database
-                // round trips. For now, prefetch is bounded by requested relation count, and each relation fetch is
-                // issued concurrently instead of once per base row.
-                return {
-                    prefetch,
-                    grouped: await this.fetchPrefetchGroup(prefetch, uniqueSourceValues),
-                };
-            })
-        );
+        // Prefetch-backed descendants run as follow-up queries keyed by the
+        // owner rows produced so far. Initialize defaults first so missing
+        // children still hydrate to [] or null deterministically.
+        const groupedOwners = this.groupOwnersByAccessor(owners, node.ownerSourceAccessor);
+        const sourceValues = [...groupedOwners.keys()];
+        for (const owner of owners) {
+            owner[node.relationName] = node.cardinality === InternalRelationHydrationCardinality.MANY ? [] : null;
+        }
 
-        const hiddenSourceAliases = new Set(
-            compiled.prefetches
-                .map((prefetch) => prefetch.sourceKeyAlias)
-                .filter((alias): alias is string => typeof alias === 'string')
-        );
-
-        return rows.map((row) => {
-            const next = { ...row };
-
-            for (const { prefetch, grouped } of prefetchGroups) {
-                const sourceValue = row[prefetch.sourceKeyAlias ?? prefetch.sourceKey];
-                next[prefetch.relationName] =
-                    typeof sourceValue === 'string' || typeof sourceValue === 'number'
-                        ? (grouped.get(sourceValue) ?? [])
-                        : [];
-            }
-
-            for (const alias of hiddenSourceAliases) {
-                delete next[alias];
-            }
-
-            return next;
-        });
-    }
-
-    private async fetchPrefetchGroup(
-        prefetch: CompiledPrefetchHydration,
-        sourceValues: readonly (string | number)[]
-    ): Promise<Map<string | number, Record<string, unknown>[]>> {
-        const compiledPrefetch = new QueryCompiler(this.executor.meta, this.executor.dialect).compilePrefetch(
-            prefetch,
-            sourceValues
-        );
-        const grouped = new Map<string | number, Record<string, unknown>[]>();
         if (sourceValues.length === 0) {
-            return grouped;
+            return;
         }
 
+        const compiledPrefetch = compiler.compilePrefetch(node, sourceValues);
         const result = await this.executor.client.query<Record<string, unknown>>(
             compiledPrefetch.sql,
             compiledPrefetch.params
         );
+        const groupedTargets = new Map<string | number, Record<string, unknown>[]>();
+        const canonicalChildren = new Map<string | number, Record<string, unknown>>();
 
-        for (const row of result.rows) {
-            const normalized = this.normalizeTargetRow(compiledPrefetch, row);
+        for (const rawResultRow of result.rows) {
+            const normalized = this.normalizeTargetRow(compiledPrefetch, rawResultRow);
+            const canonical = this.canonicalizeEntity(node, normalized, canonicalEntities);
+            this.hydrateJoinNodesForOwner(canonical, normalized, node.joinChildren, canonicalEntities);
+
             const key = normalized[compiledPrefetch.targetKey];
             if (typeof key !== 'string' && typeof key !== 'number') {
                 continue;
             }
+
+            const bucket = groupedTargets.get(key) ?? [];
+            bucket.push(canonical);
+            groupedTargets.set(key, bucket);
+            const childPrimaryKey = canonical[node.targetPrimaryKey];
+            if (typeof childPrimaryKey === 'string' || typeof childPrimaryKey === 'number') {
+                canonicalChildren.set(childPrimaryKey, canonical);
+            }
+        }
+
+        for (const [sourceValue, grouped] of groupedTargets.entries()) {
+            for (const owner of groupedOwners.get(sourceValue) ?? []) {
+                owner[node.relationName] =
+                    node.cardinality === InternalRelationHydrationCardinality.MANY ? grouped : grouped[0]!;
+            }
+        }
+
+        const childOwners = [...canonicalChildren.values()];
+        for (const childNode of node.prefetchChildren) {
+            await this.hydratePrefetchNode(childNode, childOwners, canonicalEntities, compiler);
+        }
+    }
+
+    private groupOwnersByAccessor(
+        owners: readonly Record<string, unknown>[],
+        accessor: string
+    ): Map<string | number, Record<string, unknown>[]> {
+        const grouped = new Map<string | number, Record<string, unknown>[]>();
+
+        for (const owner of owners) {
+            const key = owner[accessor];
+            if (typeof key !== 'string' && typeof key !== 'number') {
+                continue;
+            }
             const bucket = grouped.get(key) ?? [];
-            bucket.push(normalized);
+            bucket.push(owner);
             grouped.set(key, bucket);
         }
 
         return grouped;
+    }
+
+    private canonicalizeEntity(
+        node: CompiledHydrationNode,
+        row: Record<string, unknown>,
+        canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>
+    ): Record<string, unknown> {
+        // Mixed join/prefetch traversal can encounter the same related row more
+        // than once. Canonicalization ensures all later descendants attach to
+        // one stable object graph instead of competing copies.
+        const primaryKeyValue = row[node.targetPrimaryKey];
+        if (typeof primaryKeyValue !== 'string' && typeof primaryKeyValue !== 'number') {
+            return row;
+        }
+
+        const byModel =
+            canonicalEntities.get(node.targetModelKey) ?? new Map<string | number, Record<string, unknown>>();
+        const existing = byModel.get(primaryKeyValue);
+        if (existing) {
+            Object.assign(existing, row);
+            return existing;
+        }
+
+        byModel.set(primaryKeyValue, row);
+        canonicalEntities.set(node.targetModelKey, byModel);
+        return row;
     }
 
     private normalizeTargetRow(prefetch: TargetColumnMetadata, row: Record<string, unknown>): Record<string, unknown> {
@@ -540,12 +604,10 @@ export class QuerySet<
         return normalized ?? row;
     }
 
-    private normalizeTargetValue(relationName: string, column: string, value: unknown): unknown {
-        if (this.executor.dialect !== InternalDialect.SQLITE) {
-            return value;
-        }
-        const relation = this.executor.meta.relations![relationName]!;
-        return this.isBooleanColumnType(relation.targetColumns[column]) ? this.normalizeSqliteBoolean(value) : value;
+    private normalizeColumnValue(columnType: string | undefined, value: unknown): unknown {
+        return this.executor.dialect === InternalDialect.SQLITE && this.isBooleanColumnType(columnType)
+            ? this.normalizeSqliteBoolean(value)
+            : value;
     }
 
     private isBooleanColumnType(value: unknown): boolean {
@@ -578,5 +640,10 @@ export class QuerySet<
         }
 
         return normalized ?? row;
+    }
+
+    private withoutHydrationState(): QuerySetState<TModel> {
+        const { selectRelated: _selectRelated, prefetchRelated: _prefetchRelated, ...rest } = this.state;
+        return rest;
     }
 }

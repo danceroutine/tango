@@ -87,7 +87,9 @@ When the server is running, open these URLs:
 
 The health endpoint confirms that the application booted successfully. The posts endpoints show pagination, filtering, and ordering against real seeded data, which makes it easier to see how Tango resources expose a predictable query surface.
 
-After you have clicked through the endpoints, we recommend checking out the code in this order: the post model, the repository, the serializer, the viewset, and the Express bootstrap code. That path shows how Tango's persistence and API layers connect to a conventional JSON API server.
+After you have clicked through the endpoints, we recommend checking out the code in this order: the post model, the serializer, the viewset, and the Express bootstrap code. That path shows how Tango's persistence and API layers connect to a conventional JSON API server.
+
+The Express example is also the best place to inspect Tango's nested relation hydration story. Its blog models form a small relation graph with `Post.author`, `User.posts`, `Post.comments`, and `Comment.author`, so the example's model module is suitable both for runtime relation planning and for generated relation typing.
 
 ## Run the Next.js example
 
@@ -150,10 +152,11 @@ As you move through any of the examples, keep this sequence in mind:
 
 1. `tango.config.ts` selects the database and migration settings.
 2. A model definition describes data shape and schema metadata, and works in conjunction with the migration API to keep the database schema aligned with the model metadata.
-3. Models expose their ORM query entry via the `<Model>.objects` interface, same as Django, but with the added type-safety that TypeScript enables.
-4. Serializers give you an opportunity to define arbitrary or model-driven validation and two-way serialization to and from arbitrary JSON data and Tango models.
-5. Viewsets or APIViews define the HTTP-facing contract.
-6. Last of all, an adapter connects those Tango abstractions to the host framework.
+3. The exported model module is also the input for generated relation typing. `tango make:migrations` refreshes that generated registry during normal schema work, and `tango codegen relations` handles relation-only changes when no migration file is needed.
+4. Models expose their ORM query entry via the `<Model>.objects` interface, same as Django, but with the added type-safety that TypeScript enables.
+5. Serializers give you an opportunity to define arbitrary or model-driven validation and two-way serialization to and from arbitrary JSON data and Tango models.
+6. Viewsets or APIViews define the HTTP-facing contract.
+7. Last of all, an adapter connects those Tango abstractions to the host framework.
 
 Once that sequence feels familiar, the rest of the documentation becomes much easier to place because the same workflow shows up across the framework.
 
@@ -165,9 +168,10 @@ Use the Express example and do this:
 
 1. Add a field to `PostModel`.
 2. Generate a migration for the example.
-3. Apply the migration with `tango migrate`.
-4. Update the serializer or resource code if the new field belongs in the API contract.
-5. Confirm that the field appears in the API response.
+3. Notice that the same `make:migrations` step also refreshes the generated relation registry for that example's model module.
+4. Apply the migration with `tango migrate`.
+5. Update the serializer or resource code if the new field belongs in the API contract.
+6. Confirm that the field appears in the API response.
 
 That exercise touches the same boundaries you will use in a real Tango project: schema metadata, migrations, runtime persistence, and API exposure.
 

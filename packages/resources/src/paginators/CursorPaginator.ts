@@ -133,7 +133,10 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
         return false;
     }
 
-    toResponse<TResult>(results: TResult[]): CursorPaginatedResponse<TResult> {
+    toResponse<TResult>(
+        results: TResult[],
+        _context?: { totalCount?: number; params?: TangoQueryParams }
+    ): CursorPaginatedResponse<TResult> {
         const response: CursorPaginatedResponse<TResult> = { results };
         if (this.nextCursor) {
             response.next = this.buildPageLink(this.nextCursor);
@@ -154,7 +157,9 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
     /**
      * Apply cursor constraints and ordering to a queryset.
      */
-    apply(queryset: QuerySet<T>): QuerySet<T> {
+    apply<TBaseResult extends Record<string, unknown>, TSourceModel, THydrated extends Record<string, unknown>>(
+        queryset: QuerySet<T, TBaseResult, TSourceModel, THydrated>
+    ): QuerySet<T, TBaseResult, TSourceModel, THydrated> {
         let qs = queryset.limit(this.limit + 1);
         if (this.cursor) {
             const decoded = this.decodeCursor(this.cursor);

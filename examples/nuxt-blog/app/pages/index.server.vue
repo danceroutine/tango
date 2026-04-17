@@ -2,17 +2,7 @@
 import { toNuxtQueryParams } from '@danceroutine/tango-adapters-nuxt';
 import { OffsetPaginator } from '@danceroutine/tango-resources';
 import { Q, type FilterInput } from '@danceroutine/tango-orm';
-import { PostModel, PostReadSchema, type Post } from '~~/lib/models';
-
-function withSearchParam(url: string | null, search: string | undefined): string | null {
-    if (!url || !search) {
-        return url;
-    }
-
-    const params = new URLSearchParams(url.startsWith('?') ? url.slice(1) : url);
-    params.set('search', search);
-    return `?${params.toString()}`;
-}
+import { PostModel, type Post } from '~~/lib/models';
 
 const route = useRoute();
 const params = toNuxtQueryParams(route.query);
@@ -26,10 +16,13 @@ if (search) {
 
 const paginator = new OffsetPaginator(qs, 20);
 const { limit, offset } = paginator.parseParams(params);
-const [{ results: posts }, totalCount] = await Promise.all([paginator.apply(qs).fetch(PostReadSchema), qs.count()]);
-const pagination = paginator.toResponse(posts, { totalCount });
-const previousHref = withSearchParam(pagination.previous ?? null, search);
-const nextHref = withSearchParam(pagination.next ?? null, search);
+const [{ results: posts }, totalCount] = await Promise.all([
+    paginator.apply(qs.selectRelated('author')).fetch(),
+    qs.count(),
+]);
+const pagination = paginator.toResponse(posts, { totalCount, params });
+const previousHref = pagination.previous ?? null;
+const nextHref = pagination.next ?? null;
 </script>
 
 <template>
@@ -50,10 +43,11 @@ const nextHref = withSearchParam(pagination.next ?? null, search);
             <article v-for="post in posts" :key="post.id" class="post-card">
                 <div class="post-meta">
                     <span>{{ new Date(post.createdAt).toLocaleDateString() }}</span>
-                    <span>{{ post.published ? 'Published' : 'Draft' }}</span>
+                    <span>{{ post.author?.username ?? 'Unknown author' }}</span>
                 </div>
                 <h2>{{ post.title }}</h2>
                 <p v-if="post.excerpt">{{ post.excerpt }}</p>
+                <p class="post-status">{{ post.published ? 'Published' : 'Draft' }}</p>
                 <NuxtLink :to="`/posts/${post.slug}`">Read more</NuxtLink>
             </article>
 
@@ -146,6 +140,11 @@ const nextHref = withSearchParam(pagination.next ?? null, search);
 
 .post-card p {
     color: #374151;
+}
+
+.post-status {
+    margin-bottom: 0.75rem;
+    color: #6b7280;
 }
 
 .post-card a,

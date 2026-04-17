@@ -17,6 +17,17 @@ import { deriveTableName } from '../relations/SchemaNaming';
 
 type AnySchemaModel = Model<z.ZodObject<z.ZodRawShape>>;
 type AnyInternalSchemaModel = InternalSchemaModel<z.ZodObject<z.ZodRawShape>>;
+const REGISTRY_OWNER_KEY = Symbol.for('tango.schema.registryOwner');
+const NORMALIZED_RELATIONS_KEY = Symbol.for('tango.schema.normalizedRelations');
+const EXPLICIT_FIELDS_KEY = Symbol.for('tango.schema.explicitFields');
+const EXPLICIT_RELATIONS_KEY = Symbol.for('tango.schema.explicitRelations');
+
+type InternalSchemaModelCarrier = object & {
+    [REGISTRY_OWNER_KEY]?: ModelRegistry;
+    [NORMALIZED_RELATIONS_KEY]?: readonly NormalizedRelationStorageDescriptor[];
+    [EXPLICIT_FIELDS_KEY]?: readonly Field[];
+    [EXPLICIT_RELATIONS_KEY]?: Readonly<Record<string, RelationDef>>;
+};
 
 export class InternalSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>, TKey extends string = string>
     implements Model<TSchema, TKey>
@@ -31,27 +42,14 @@ export class InternalSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>, TKe
         ? TObject
         : never;
 
-    private readonly registry: ModelRegistry;
-    private readonly normalizedRelations: readonly NormalizedRelationStorageDescriptor[];
-    private readonly explicitFields?: readonly Field[];
-    private readonly explicitRelations?: Readonly<Record<string, RelationDef>>;
-
     private constructor(
-        registry: ModelRegistry,
         metadata: ModelMetadata,
         schema: TSchema,
-        hooks: ModelWriteHooks<PersistedModelOutput<TSchema>> | undefined,
-        normalizedRelations: readonly NormalizedRelationStorageDescriptor[],
-        explicitFields: readonly Field[] | undefined,
-        explicitRelations: Readonly<Record<string, RelationDef>> | undefined
+        hooks: ModelWriteHooks<PersistedModelOutput<TSchema>> | undefined
     ) {
-        this.registry = registry;
         this.metadata = metadata;
         this.schema = schema;
         this.hooks = hooks;
-        this.normalizedRelations = Object.freeze([...normalizedRelations]);
-        this.explicitFields = explicitFields ? Object.freeze([...explicitFields]) : undefined;
-        this.explicitRelations = explicitRelations;
     }
 
     static create<TSchema extends z.ZodObject<z.ZodRawShape>>(
@@ -90,15 +88,14 @@ export class InternalSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>, TKe
         });
         Object.freeze(metadata);
 
-        return new InternalSchemaModel(
+        const model = new InternalSchemaModel(metadata, definition.schema, definition.hooks);
+        InternalSchemaModel.attachInternals(model, {
             registry,
-            metadata,
-            definition.schema,
-            definition.hooks,
             normalizedRelations,
-            definition.fields,
-            relations
-        );
+            explicitFields: definition.fields,
+            explicitRelations: relations,
+        });
+        return model;
     }
 
     static isInternalSchemaModel(value: unknown): value is AnyInternalSchemaModel {
@@ -110,19 +107,23 @@ export class InternalSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>, TKe
     }
 
     static getRegistryOwner(model: AnySchemaModel): ModelRegistry {
-        return InternalSchemaModel.require(model).registry;
+        const owner = InternalSchemaModel.carrier(model)[REGISTRY_OWNER_KEY];
+        if (!owner) {
+            throw new Error(`Model '${model.metadata.key}' is missing internal registry ownership metadata.`);
+        }
+        return owner;
     }
 
     static getNormalizedRelations(model: AnySchemaModel): readonly NormalizedRelationStorageDescriptor[] {
-        return InternalSchemaModel.require(model).normalizedRelations;
+        return InternalSchemaModel.carrier(model)[NORMALIZED_RELATIONS_KEY] ?? [];
     }
 
     static getExplicitFields(model: AnySchemaModel): readonly Field[] | undefined {
-        return InternalSchemaModel.require(model).explicitFields;
+        return InternalSchemaModel.carrier(model)[EXPLICIT_FIELDS_KEY];
     }
 
     static getExplicitRelations(model: AnySchemaModel): Readonly<Record<string, RelationDef>> | undefined {
-        return InternalSchemaModel.require(model).explicitRelations;
+        return InternalSchemaModel.carrier(model)[EXPLICIT_RELATIONS_KEY];
     }
 
     private static validateDefinition<TSchema extends z.ZodObject<z.ZodRawShape>>(
@@ -145,5 +146,48 @@ export class InternalSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>, TKe
         }
 
         return model;
+    }
+
+    private static carrier(model: AnySchemaModel): InternalSchemaModelCarrier {
+        return InternalSchemaModel.require(model) as unknown as InternalSchemaModelCarrier;
+    }
+
+    private static attachInternals(
+        model: object,
+        internals: {
+            registry: ModelRegistry;
+            normalizedRelations: readonly NormalizedRelationStorageDescriptor[];
+            explicitFields?: readonly Field[];
+            explicitRelations?: Readonly<Record<string, RelationDef>>;
+        }
+    ): void {
+        const carrier = model as InternalSchemaModelCarrier;
+
+        Object.defineProperties(carrier, {
+            [REGISTRY_OWNER_KEY]: {
+                value: internals.registry,
+                enumerable: false,
+                configurable: false,
+                writable: false,
+            },
+            [NORMALIZED_RELATIONS_KEY]: {
+                value: Object.freeze([...internals.normalizedRelations]),
+                enumerable: false,
+                configurable: false,
+                writable: false,
+            },
+            [EXPLICIT_FIELDS_KEY]: {
+                value: internals.explicitFields ? Object.freeze([...internals.explicitFields]) : undefined,
+                enumerable: false,
+                configurable: false,
+                writable: false,
+            },
+            [EXPLICIT_RELATIONS_KEY]: {
+                value: internals.explicitRelations,
+                enumerable: false,
+                configurable: false,
+                writable: false,
+            },
+        });
     }
 }

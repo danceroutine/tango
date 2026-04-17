@@ -1,41 +1,46 @@
+import { isError } from '@danceroutine/tango-core';
 import type { LookupType } from '../domain/LookupType';
 import type { QuerySetState } from '../domain/QuerySetState';
 import type { TableMeta } from '../domain/TableMeta';
 import type { QNode } from '../domain/QNode';
-import type { CompiledPrefetchHydration, CompiledPrefetchQuery, CompiledQuery } from '../domain/CompiledQuery';
+import type {
+    CompiledHydrationNode,
+    CompiledHydrationPlanRoot,
+    CompiledJoinHydrationDescriptor,
+    CompiledPrefetchQuery,
+    CompiledQuery,
+} from '../domain/CompiledQuery';
 import type { WhereClause } from '../domain/WhereClause';
 import type { FilterInput } from '../domain/FilterInput';
 import type { Dialect } from '../domain/Dialect';
+import { InternalRelationHydrationLoadMode } from '../domain/RelationMeta';
 import { InternalDialect } from '../domain/internal/InternalDialect';
 import { InternalQNodeType } from '../domain/internal/InternalQNodeType';
 import { InternalLookupType } from '../domain/internal/InternalLookupType';
-import { InternalRelationKind } from '../domain/internal/InternalRelationKind';
 import { OrmSqlSafetyAdapter } from '../../validation';
+import { QueryPlanner } from '../planning';
+import type { QueryHydrationPlanNode } from '../planning';
 
-// The adapter is stateless, so a shared module instance keeps compiler construction cheap.
 const sqlSafetyAdapter = new OrmSqlSafetyAdapter();
 
+type JoinCollection = {
+    selects: string[];
+    joins: string[];
+};
+
 /**
- * Compiles immutable `QuerySet` state into parameterized SQL.
- *
- * The compiler is intentionally stateless with respect to execution and only
- * produces SQL + params artifacts that can be executed by a `DBClient`.
+ * Compiles immutable `QuerySet` state into parameterized SQL and recursive
+ * hydration execution artifacts.
  */
 export class QueryCompiler {
     static readonly BRAND = 'tango.orm.query_compiler' as const;
     readonly __tangoBrand: typeof QueryCompiler.BRAND = QueryCompiler.BRAND;
 
-    /**
-     * Build a compiler for the given repository metadata and SQL dialect.
-     */
     constructor(
         private meta: TableMeta,
         private dialect: Dialect = InternalDialect.POSTGRES
     ) {}
 
-    /**
-     * Narrow an unknown value to `QueryCompiler`.
-     */
     static isQueryCompiler(value: unknown): value is QueryCompiler {
         return (
             typeof value === 'object' &&
@@ -44,20 +49,15 @@ export class QueryCompiler {
         );
     }
 
-    /**
-     * Compile a query state tree into a SQL statement and bound parameters.
-     */
     compile<T>(state: QuerySetState<T>): CompiledQuery {
-        const selectRelationNames = state.selectRelated ?? [];
-        const prefetchRelationNames = state.prefetchRelated ?? [];
-        const relationNames = [...new Set([...selectRelationNames, ...prefetchRelationNames])];
+        const hydrationPlan = new QueryPlanner(this.meta).plan(state);
         const validatedPlan = sqlSafetyAdapter.validate({
             kind: 'select',
             meta: this.meta,
             selectFields: state.select?.map(String),
             filterKeys: this.collectStateFilterKeys(state),
             orderFields: state.order?.map((order) => String(order.by)),
-            relationNames,
+            relationNames: [],
         });
         const table = validatedPlan.meta.table;
         const whereParts: string[] = [];
@@ -83,48 +83,40 @@ export class QueryCompiler {
             }
         });
 
-        const baseSelect = state.select?.length
-            ? state.select.map((field) => validatedPlan.selectFields[String(field)]!).join(', ')
-            : `${table}.*`;
-        const relationSelects = selectRelationNames.flatMap((relationName) => {
-            const relation = validatedPlan.relations[relationName]!;
-            return Object.keys(relation.targetColumns).map(
-                (column) => `${relation.alias}.${column} AS ${this.buildHydrationColumnAlias(relation.alias, column)}`
-            );
-        });
-        const prefetchSourceSelects =
-            state.select?.length && prefetchRelationNames.length
-                ? prefetchRelationNames
-                      .map((relationName) => validatedPlan.relations[relationName]!)
-                      .filter((relation) => !state.select!.map(String).includes(relation.sourceKey))
-                      .map(
-                          (relation) =>
-                              `${table}.${relation.sourceKey} AS ${this.buildPrefetchSourceAlias(relation.sourceKey)}`
-                      )
-                : [];
-        const select = [baseSelect, ...relationSelects, ...prefetchSourceSelects].join(', ');
+        const baseSelects = state.select?.length
+            ? state.select.map((field) => validatedPlan.selectFields[String(field)]!)
+            : [`${table}.*`];
+        const joinCollection: JoinCollection = { selects: [], joins: [] };
+        const hiddenRootAliases: string[] = [];
 
-        const joins = selectRelationNames
-            .map((rel) => {
-                const relation = validatedPlan.relations[rel]!;
-                if (
-                    relation.kind !== InternalRelationKind.BELONGS_TO &&
-                    relation.kind !== InternalRelationKind.HAS_ONE
-                ) {
-                    throw new Error(`Relation '${rel}' cannot be loaded with selectRelated(...).`);
-                }
-                return `LEFT JOIN ${relation.table} ${relation.alias} ON ${relation.alias}.${relation.targetKey} = ${table}.${relation.sourceKey}`;
+        const compiledJoinNodes = hydrationPlan.joinNodes.map((node) =>
+            this.compileHydrationNode(node, {
+                rootTable: table,
+                ownerMeta: this.meta,
+                ownerAlias: table,
+                collectRootJoins: true,
+                rootSelectedFields: state.select?.map(String) ?? undefined,
+                hiddenRootAliases,
+                joinCollection,
             })
-            .filter(Boolean)
-            .join(' ');
+        );
+        const compiledPrefetchNodes = hydrationPlan.prefetchNodes.map((node) =>
+            this.compileHydrationNode(node, {
+                rootTable: table,
+                ownerMeta: this.meta,
+                ownerAlias: table,
+                collectRootJoins: false,
+                rootSelectedFields: state.select?.map(String) ?? undefined,
+                hiddenRootAliases,
+                joinCollection,
+            })
+        );
 
-        for (const rel of prefetchRelationNames) {
-            const relation = validatedPlan.relations[rel];
-            if (relation?.kind !== InternalRelationKind.HAS_MANY) {
-                throw new Error(`Relation '${rel}' cannot be loaded with prefetchRelated(...).`);
-            }
-        }
-
+        const select = [
+            ...baseSelects,
+            ...joinCollection.selects,
+            ...this.buildRootHiddenSelects(compiledPrefetchNodes, table),
+        ].join(', ');
         const whereSQL = whereParts.length ? ` WHERE ${whereParts.join(' AND ')}` : '';
         const orderSQL = ` ORDER BY ${
             state.order?.length
@@ -135,92 +127,280 @@ export class QueryCompiler {
         }`;
         const limitSQL = state.limit ? ` LIMIT ${state.limit}` : '';
         const offsetSQL = state.offset ? ` OFFSET ${state.offset}` : '';
-        const sql = `SELECT ${select} FROM ${table}${joins ? ` ${joins}` : ''}${whereSQL}${orderSQL}${limitSQL}${offsetSQL}`;
+        const sql = `SELECT ${select} FROM ${table}${joinCollection.joins.length ? ` ${joinCollection.joins.join(' ')}` : ''}${whereSQL}${orderSQL}${limitSQL}${offsetSQL}`;
+
+        const compiledHydrationPlan: CompiledHydrationPlanRoot | undefined =
+            compiledJoinNodes.length > 0 || compiledPrefetchNodes.length > 0
+                ? {
+                      requestedPaths: hydrationPlan.requestedPaths,
+                      hiddenRootAliases: [...new Set(hiddenRootAliases)],
+                      joinNodes: compiledJoinNodes,
+                      prefetchNodes: compiledPrefetchNodes,
+                  }
+                : undefined;
 
         return {
             sql,
             params,
-            hydrations: selectRelationNames.map((relationName) => {
-                const relation = validatedPlan.relations[relationName]!;
-                return {
-                    relationName,
-                    alias: relation.alias,
-                    columns: Object.fromEntries(
-                        Object.keys(relation.targetColumns).map((column) => [
-                            column,
-                            this.buildHydrationColumnAlias(relation.alias, column),
-                        ])
-                    ),
-                };
-            }),
-            prefetches: prefetchRelationNames.map((relationName) => {
-                const relation = validatedPlan.relations[relationName]!;
-                const needsAlias = !!state.select?.length && !state.select.map(String).includes(relation.sourceKey);
-                return {
-                    relationName,
-                    sourceKey: relation.sourceKey,
-                    sourceKeyAlias: needsAlias ? this.buildPrefetchSourceAlias(relation.sourceKey) : undefined,
-                    table: relation.table,
-                    targetKey: relation.targetKey,
-                    targetColumns: relation.targetColumns,
-                };
-            }),
+            hydrationPlan: compiledHydrationPlan,
         };
     }
 
-    /**
-     * Compile the follow-up query used by `prefetchRelated(...)`.
-     *
-     * The base query cannot bind source values until after it has returned rows,
-     * but SQL rendering and validation still belong to the compiler.
-     */
-    compilePrefetch(
-        prefetch: CompiledPrefetchHydration,
-        sourceValues: readonly (string | number)[]
-    ): CompiledPrefetchQuery {
-        const validatedPlan = sqlSafetyAdapter.validate({
-            kind: 'select',
-            meta: this.meta,
-            relationNames: [prefetch.relationName],
-        });
-        const relation = validatedPlan.relations[prefetch.relationName]!;
-
-        const compiledTargetColumns = Object.keys(prefetch.targetColumns).sort();
-        const validatedTargetColumns = Object.keys(relation.targetColumns).sort();
-        const compiledMatchesValidated =
-            prefetch.sourceKey === relation.sourceKey &&
-            prefetch.table === relation.table &&
-            prefetch.targetKey === relation.targetKey &&
-            compiledTargetColumns.length === validatedTargetColumns.length &&
-            compiledTargetColumns.every(
-                (column, index) =>
-                    column === validatedTargetColumns[index] &&
-                    prefetch.targetColumns[column] === relation.targetColumns[column]
-            );
-        if (!compiledMatchesValidated) {
-            throw new Error(`Compiled prefetch metadata for relation '${prefetch.relationName}' failed validation.`);
-        }
-
-        const columns = Object.keys(relation.targetColumns);
+    compilePrefetch(node: CompiledHydrationNode, sourceValues: readonly (string | number)[]): CompiledPrefetchQuery {
         const placeholders =
             this.dialect === InternalDialect.POSTGRES
                 ? sourceValues.map((_, index) => `$${index + 1}`).join(', ')
                 : sourceValues.map(() => '?').join(', ');
+        const validatedTarget = this.validatePrefetchTarget(node);
+        const baseAlias = this.buildPrefetchBaseAlias(node.relationPath);
+        const joinCollection: JoinCollection = { selects: [], joins: [] };
 
+        for (const joinChild of node.joinChildren) {
+            this.collectNestedJoinSql(joinChild, baseAlias, validatedTarget.columns, joinCollection);
+        }
+
+        const baseSelects = Object.keys(validatedTarget.columns).map((column) => `${baseAlias}.${column} AS ${column}`);
         return {
-            sql: `SELECT ${columns.join(', ')} FROM ${relation.table} WHERE ${relation.targetKey} IN (${placeholders}) ORDER BY ${relation.targetKey} ASC`,
+            sql: `SELECT ${[...baseSelects, ...joinCollection.selects].join(', ')} FROM ${validatedTarget.table} ${baseAlias}${joinCollection.joins.length ? ` ${joinCollection.joins.join(' ')}` : ''} WHERE ${baseAlias}.${validatedTarget.targetKey} IN (${placeholders}) ORDER BY ${baseAlias}.${validatedTarget.targetKey} ASC, ${baseAlias}.${validatedTarget.primaryKey} ASC`,
             params: sourceValues,
-            targetKey: relation.targetKey,
-            targetColumns: relation.targetColumns,
+            targetKey: validatedTarget.targetKey,
+            targetColumns: validatedTarget.columns,
         };
     }
 
-    private buildHydrationColumnAlias(alias: string, column: string): string {
-        return this.assertInternalAliasDoesNotCollide(`__tango_hydrate_${alias}_${column}`);
+    private compileHydrationNode(
+        node: QueryHydrationPlanNode,
+        context: {
+            rootTable: string;
+            ownerMeta: TableMeta;
+            ownerAlias: string;
+            collectRootJoins: boolean;
+            rootSelectedFields?: readonly string[];
+            hiddenRootAliases: string[];
+            joinCollection: JoinCollection;
+        }
+    ): CompiledHydrationNode {
+        const validatedRelation = this.validateHydrationRelation(context.ownerMeta, node.relationName);
+        const targetColumns = validatedRelation.targetColumns;
+        const targetMeta = node.relationEdge.targetMeta;
+        if (!targetMeta) {
+            throw new Error(`Relation path '${node.relationPath}' is missing target metadata.`);
+        }
+        const compiledJoinChildren = node.joinChildren.map((child) =>
+            this.compileHydrationNode(child, {
+                ...context,
+                ownerMeta: targetMeta,
+                ownerAlias: this.buildJoinAlias(node.relationPath),
+                collectRootJoins: context.collectRootJoins,
+            })
+        );
+        const compiledPrefetchChildren = node.prefetchChildren.map((child) =>
+            this.compileHydrationNode(child, {
+                ...context,
+                ownerMeta: targetMeta,
+                ownerAlias: this.buildJoinAlias(node.relationPath),
+                collectRootJoins: false,
+            })
+        );
+
+        let joinDescriptor: CompiledJoinHydrationDescriptor | undefined;
+        if (node.loadMode === InternalRelationHydrationLoadMode.JOIN) {
+            joinDescriptor = {
+                alias: this.buildJoinAlias(node.relationPath),
+                columns: Object.fromEntries(
+                    Object.keys(targetColumns).map((column) => [
+                        column,
+                        this.buildHydrationColumnAlias(node.relationPath, column),
+                    ])
+                ),
+            };
+
+            if (context.collectRootJoins) {
+                context.joinCollection.joins.push(
+                    `LEFT JOIN ${validatedRelation.table} ${joinDescriptor.alias} ON ${joinDescriptor.alias}.${validatedRelation.targetKey} = ${context.ownerAlias}.${validatedRelation.sourceKey}`
+                );
+                context.joinCollection.selects.push(
+                    ...Object.entries(joinDescriptor.columns).map(
+                        ([column, alias]) => `${joinDescriptor!.alias}.${column} AS ${alias}`
+                    )
+                );
+            }
+        }
+
+        const ownerSourceAccessor =
+            node.loadMode === InternalRelationHydrationLoadMode.PREFETCH &&
+            context.collectRootJoins === false &&
+            context.ownerAlias === context.rootTable &&
+            context.rootSelectedFields?.length &&
+            !context.rootSelectedFields.includes(validatedRelation.sourceKey)
+                ? this.buildPrefetchSourceAlias(node.relationPath, validatedRelation.sourceKey)
+                : validatedRelation.sourceKey;
+
+        if (
+            node.loadMode === InternalRelationHydrationLoadMode.PREFETCH &&
+            ownerSourceAccessor !== validatedRelation.sourceKey
+        ) {
+            context.hiddenRootAliases.push(ownerSourceAccessor);
+        }
+
+        return {
+            nodeId: node.nodeId,
+            relationName: node.relationName,
+            relationPath: node.relationPath,
+            ownerModelKey: node.ownerModelKey,
+            targetModelKey: node.targetModelKey,
+            loadMode: node.loadMode,
+            cardinality: node.cardinality,
+            sourceKey: validatedRelation.sourceKey,
+            ownerSourceAccessor,
+            targetKey: validatedRelation.targetKey,
+            targetTable: validatedRelation.table,
+            targetPrimaryKey: node.relationEdge.targetPrimaryKey,
+            targetColumns,
+            provenance: node.provenance,
+            joinChildren: compiledJoinChildren,
+            prefetchChildren: compiledPrefetchChildren,
+            join: joinDescriptor,
+        };
     }
 
-    private buildPrefetchSourceAlias(sourceKey: string): string {
-        return this.assertInternalAliasDoesNotCollide(`__tango_prefetch_${sourceKey}`);
+    private validateHydrationRelation(
+        ownerMeta: TableMeta,
+        relationName: string
+    ): NonNullable<TableMeta['relations']>[string] {
+        return sqlSafetyAdapter.validate({
+            kind: 'select',
+            meta: ownerMeta,
+            relationNames: [relationName],
+        }).relations[relationName]!;
+    }
+
+    private buildRootHiddenSelects(nodes: readonly CompiledHydrationNode[], table: string): string[] {
+        return nodes.flatMap((node) => {
+            const select =
+                node.ownerSourceAccessor !== node.sourceKey
+                    ? [`${table}.${node.sourceKey} AS ${node.ownerSourceAccessor}`]
+                    : [];
+            return [...select, ...this.buildRootHiddenSelects(node.prefetchChildren, table)];
+        });
+    }
+
+    private validatePrefetchTarget(node: CompiledHydrationNode): {
+        table: string;
+        primaryKey: string;
+        targetKey: string;
+        columns: Record<string, string>;
+    } {
+        try {
+            const validated = sqlSafetyAdapter.validate({
+                kind: 'select',
+                meta: {
+                    table: node.targetTable,
+                    pk: node.targetPrimaryKey,
+                    columns: node.targetColumns,
+                },
+                filterKeys: [node.targetKey],
+            });
+
+            return {
+                table: validated.meta.table,
+                primaryKey: validated.meta.pk,
+                targetKey: validated.filterKeys[node.targetKey]!.field,
+                columns: validated.meta.columns,
+            };
+        } catch (error) {
+            const message = isError(error) ? error.message : String(error);
+            throw new Error(`Compiled prefetch query failed validation: ${message}`, { cause: error });
+        }
+    }
+
+    private collectNestedJoinSql(
+        node: CompiledHydrationNode,
+        ownerAlias: string,
+        ownerColumns: Record<string, string>,
+        collection: JoinCollection
+    ): void {
+        if (!node.join) {
+            return;
+        }
+
+        const validatedTarget = this.validatePrefetchJoinTarget(node, ownerColumns);
+        const validatedJoinAlias = this.validateInternalAlias(node.join.alias);
+        const validatedJoinColumns = Object.fromEntries(
+            Object.entries(node.join.columns).map(([column, alias]) => {
+                if (!(column in validatedTarget.columns)) {
+                    throw new Error(
+                        `Compiled prefetch query failed validation: unknown nested join column '${column}'.`
+                    );
+                }
+                return [column, this.validateInternalAlias(alias)];
+            })
+        );
+
+        collection.joins.push(
+            `LEFT JOIN ${validatedTarget.table} ${validatedJoinAlias} ON ${validatedJoinAlias}.${validatedTarget.targetKey} = ${ownerAlias}.${node.sourceKey}`
+        );
+        collection.selects.push(
+            ...Object.entries(validatedJoinColumns).map(
+                ([column, alias]) => `${validatedJoinAlias}.${column} AS ${alias}`
+            )
+        );
+
+        for (const child of node.joinChildren) {
+            this.collectNestedJoinSql(child, validatedJoinAlias, validatedTarget.columns, collection);
+        }
+    }
+
+    private validatePrefetchJoinTarget(
+        node: CompiledHydrationNode,
+        ownerColumns: Record<string, string>
+    ): {
+        table: string;
+        primaryKey: string;
+        targetKey: string;
+        columns: Record<string, string>;
+    } {
+        if (!(node.sourceKey in ownerColumns)) {
+            throw new Error(
+                `Compiled prefetch query failed validation: unknown owner column '${node.sourceKey}' for nested join.`
+            );
+        }
+
+        return this.validatePrefetchTarget(node);
+    }
+
+    private validateInternalAlias(alias: string): string {
+        if (!/^__tango_[A-Za-z0-9_]+$/.test(alias)) {
+            throw new Error(`Compiled prefetch query failed validation: invalid internal alias '${alias}'.`);
+        }
+
+        return alias;
+    }
+
+    private buildJoinAlias(relationPath: string): string {
+        return this.assertInternalAliasDoesNotCollide(`__tango_join_${this.sanitizeRelationPath(relationPath)}`);
+    }
+
+    private buildPrefetchBaseAlias(relationPath: string): string {
+        return this.assertInternalAliasDoesNotCollide(
+            `__tango_prefetch_base_${this.sanitizeRelationPath(relationPath)}`
+        );
+    }
+
+    private buildHydrationColumnAlias(relationPath: string, column: string): string {
+        return this.assertInternalAliasDoesNotCollide(
+            `__tango_hydrate_${this.sanitizeRelationPath(relationPath)}_${column}`
+        );
+    }
+
+    private buildPrefetchSourceAlias(relationPath: string, sourceKey: string): string {
+        return this.assertInternalAliasDoesNotCollide(
+            `__tango_prefetch_${this.sanitizeRelationPath(relationPath)}_${sourceKey}`
+        );
+    }
+
+    private sanitizeRelationPath(relationPath: string): string {
+        return relationPath.replace(/[^a-zA-Z0-9]+/g, '_');
     }
 
     private assertInternalAliasDoesNotCollide(alias: string): string {

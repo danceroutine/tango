@@ -31,6 +31,7 @@ export default defineNuxtConfig({
         { route: '/api/health', handler: './server/tango/health.ts' },
         { route: '/api/openapi', handler: './server/tango/openapi.ts' },
         { route: '/api/status', handler: './server/tango/status.ts' },
+        { route: '/api/editorial/overview', handler: './server/tango/editorial-overview.ts' },
         { route: '/api/posts', handler: './server/tango/posts.ts' },
         { route: '/api/posts/**:tango', handler: './server/tango/posts.ts' },
         { route: '/api/posts-generic', handler: './server/tango/posts-generic.ts' },

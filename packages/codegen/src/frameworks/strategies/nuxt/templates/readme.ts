@@ -22,10 +22,13 @@ ${context.packageManager} run make:migrations --name initial
 ${context.packageManager} run dev
 \`\`\`
 
+\`make:migrations\` also refreshes the generated relation registry for the scaffolded model module. If you later change relation metadata without needing a new migration file, run \`${context.packageManager} run codegen:relations\`.
+
 ## Scripts
 
 - \`${context.packageManager} run dev\`
 - \`${context.packageManager} run make:migrations --name add_field\`
+- \`${context.packageManager} run codegen:relations\`
 - \`${context.packageManager} run setup:schema\`
 - \`${context.packageManager} run bootstrap\`
 - \`${context.packageManager} run typecheck\`
@@ -48,6 +51,7 @@ ${context.packageManager} run dev
 - \`lib/openapi.ts\` OpenAPI document generation
 - \`scripts/bootstrap.ts\` seed utility for a larger demo dataset
 - \`migrations/\` checked-in Tango migrations
+- \`.tango/\` generated relation typing artifacts
 `;
     }
 }

@@ -1,6 +1,8 @@
 import type { TangoRequest } from './TangoRequest';
 
 type QueryParamRecord = Record<string, string | string[] | undefined>;
+type QueryParamMutationValue = string | number | readonly (string | number)[] | null | undefined;
+type QueryParamMutationRecord = Record<string, QueryParamMutationValue>;
 
 /**
  * Immutable query parameter helper that normalizes framework-specific shapes
@@ -132,6 +134,44 @@ export class TangoQueryParams {
         }
 
         return params;
+    }
+
+    /**
+     * Return a new query param set with selected keys replaced or removed.
+     *
+     * `undefined`, `null`, and empty arrays remove the key entirely.
+     */
+    withValues(updates: QueryParamMutationRecord): TangoQueryParams {
+        const next = new Map<string, string[]>();
+
+        for (const [key, values] of this.values.entries()) {
+            next.set(key, [...values]);
+        }
+
+        for (const [key, value] of Object.entries(updates)) {
+            if (value === undefined || value === null) {
+                next.delete(key);
+                continue;
+            }
+
+            const normalized = Array.isArray(value) ? value.map((entry) => String(entry)) : [String(value)];
+            if (normalized.length === 0) {
+                next.delete(key);
+                continue;
+            }
+
+            next.set(key, normalized);
+        }
+
+        return new TangoQueryParams(next);
+    }
+
+    /**
+     * Convert to a relative query string suitable for links.
+     */
+    toRelativeURL(): string {
+        const query = this.toURLSearchParams().toString();
+        return query.length > 0 ? `?${query}` : '';
     }
 
     /**

@@ -201,27 +201,26 @@ This keeps the query definition and the final application-facing shape close tog
 
 Relations declared in the model layer also influence queryset behavior.
 
-Use `selectRelated(...)` when each fetched model record should include one related model. In the blog example, each `PostModel` has one author, so the queryset can attach the hydrated `author` model to each post result.
-
-When Tango prepares the database query for that ORM request, it uses a SQL join between the post table and the author table.
+Use `selectRelated(...)` when the path stays single-valued from hop to hop. In the blog example, each `PostModel` has one author, and each author may have one profile, so the queryset can attach both through one joined traversal:
 
 ```ts
-const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author').fetch();
+const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts.results[0].author?.email;
+posts.results[0].author?.profile?.displayName;
 ```
 
-`selectRelated(...)` is for single-valued relations such as `belongsTo` and `hasOne`. A missing related row is returned as `null`.
+`selectRelated(...)` is for single-valued relations such as `belongsTo`, `hasOne`, and reverse one-to-one paths. A missing related row is returned as `null` at the point where the path stops matching.
 
-In contrast, use `prefetchRelated(...)` when each fetched model record should include a collection relation such as `hasMany`. In the sample models for this article, the reverse side of `Post.author` is `User.posts`, which is declared on `PostModel`, so the call site supplies the target model generic to keep the reverse relation type-safe:
+In contrast, use `prefetchRelated(...)` when the path includes a collection edge such as `hasMany`. Prefetch paths may continue beyond that collection edge, so one prefetch branch can still hydrate deeper related objects:
 
 ```ts
-const users = await UserModel.objects.query().prefetchRelated<typeof PostModel>('posts').fetch();
+const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users.results[0].posts.map((post) => post.title);
+users.results[0].posts[0]?.author?.email;
+users.results[0].posts[0]?.comments[0]?.body;
 ```
 
-In the example above, a user record with no matching posts receives `posts: []`.
+In that form, a user with no posts still receives `posts: []`, while a post with no comments receives `comments: []`.
 
 Hydrated relation properties stay attached even when the selected model fields change:
 
@@ -237,9 +236,29 @@ postCards.results[0].author?.email;
 
 The selected `PostModel` fields in that example are `id` and `title`, while the hydrated `author` model remains available.
 
-::: info
-Relation hydration covers direct relations and returns full related models. Many-to-many hydration and nested traversal such as `author__profile` are separate future capabilities.
-:::
+### Generated relation typing and fallback generics
+
+Tango supports a generated ambient relation registry for nested path typing. In the common case, that means application code can write reverse and multi-hop hydration paths without explicit target-model generics:
+
+```ts
+const users = await UserModel.objects.query().prefetchRelated('posts__author').fetch();
+```
+
+Keep the generated registry current through the normal migration workflow or by running `tango codegen relations` directly when relation metadata changes without a schema diff.
+
+Explicit target-model generics still remain available as a fallback when generated typing is intentionally absent or temporarily stale:
+
+```ts
+const users = await UserModel.objects.query().prefetchRelated<typeof PostModel>('posts').fetch();
+```
+
+### Cyclic paths and scalar methods
+
+Finite cyclic paths are valid at runtime. If a model graph supports a path such as `manager__manager`, Tango validates that concrete path segment-by-segment and executes it like any other nested traversal.
+
+Generated path typing intentionally stops at a bounded cyclic expansion horizon. The bound exists because recursive path unions can grow quickly in TypeScript and degrade editor responsiveness long before runtime traversal becomes invalid. Common recursive paths stay strongly typed, while deeper cyclic paths fall back to weaker typing instead of becoming runtime-invalid.
+
+`count()` and `exists()` also stay scalar. They ignore eager-loading directives entirely, which means you can derive one immutable queryset shape and ask scalar questions about it before later calling `fetch()` on the same snapshot.
 
 ## Updating and deleting records
 

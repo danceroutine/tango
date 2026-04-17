@@ -6,7 +6,9 @@
         "outDir": "./dist",
         "paths": {
             "@danceroutine/tango-core": ["../core/src/index.ts"],
-            "@danceroutine/tango-core/*": ["../core/src/*"]
+            "@danceroutine/tango-core/*": ["../core/src/*"],
+            "@danceroutine/tango-schema": ["../schema/src/index.ts"],
+            "@danceroutine/tango-schema/*": ["../schema/src/*"]
         }
     },
     "include": ["src", "package.json"],
