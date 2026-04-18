@@ -71,6 +71,8 @@ type ProjectedResult<
  * Provides a fluent API for filtering, ordering, pagination, projection, and
  * nested relation hydration.
  *
+ * Refinements such as `filter`, `orderBy`, `select`, and relation loaders build query state only. SQL runs when you call an evaluation method (`fetch`, `fetchOne`, `count`, `exists`, or `for await` over this queryset). Passing a queryset between functions without evaluating it does not query the database.
+ *
  * @template TModel - The full model row type used for query composition
  * @template TBaseResult - The selected base-row shape returned by execution methods
  * @template TSourceModel - The source Tango model used for typed relation metadata
@@ -305,7 +307,12 @@ export class QuerySet<
     }
 
     /**
-     * Async iteration runs `fetch()` once and yields each row from that materialized result.
+     * Async iterable surface for `for await (... of queryset)`.
+     *
+     * Evaluates this queryset exactly **once**: it awaits {@link QuerySet.fetch} without arguments,
+     * then yields each element from that {@link QueryResult}. Re-entering the async iterator starts a
+     * **new** evaluation (a second database round-trip). Use {@link QuerySet.fetch} first and iterate
+     * the returned {@link QueryResult} if you need to walk the same materialized result multiple times.
      */
     async *[Symbol.asyncIterator](): AsyncIterator<HydratedQueryResult<TBaseResult, THydrated>> {
         const result = await this.fetch();

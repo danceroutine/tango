@@ -31,7 +31,7 @@ describe(QueryResult.name, () => {
     it('exposes length and map over rows', () => {
         const r = new QueryResult([{ id: 1 }, { id: 2 }]);
         expect(r.length).toBe(2);
-        expect(r.map((row) => row.id)).toEqual([1, 2]);
+        expect(r.map((record) => record.id)).toEqual([1, 2]);
     });
 
     it('supports at for indexed access', () => {

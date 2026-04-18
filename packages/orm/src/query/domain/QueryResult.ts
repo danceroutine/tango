@@ -3,7 +3,13 @@ import { getLogger } from '@danceroutine/tango-core';
 let didWarnDeprecatedResults = false;
 
 /**
- * Materialized rows returned by `QuerySet.fetch()`, including optional cursor metadata for pagination flows.
+ * Values materialized by {@link QuerySet.fetch}, iterable like an array plus `length`, `map`, `at`, and `toArray`.
+ *
+ * `items` is the ordered list for this execution. `nextCursor` is optional pagination metadata supplied by callers
+ * of the constructor (for example the resource layer). Querysets materialized through `fetch()` currently pass
+ * `nextCursor: null` because opaque cursor tokens are owned by paginators, not by the queryset API.
+ *
+ * Prefer iteration or `items` over the deprecated `results` getter, which warns once per process when accessed.
  */
 export class QueryResult<T> implements Iterable<T> {
     static readonly BRAND = 'tango.orm.query_result' as const;

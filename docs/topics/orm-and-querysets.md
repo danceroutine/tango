@@ -98,9 +98,12 @@ Queryset code becomes easier to reuse this way. One part of the application can 
 
 ## QuerySets are lazy
 
-Creating and refining a queryset does not execute a database query by itself.
+Internally, a queryset can be constructed, filtered, ordered, and passed around without hitting the database. No SQL runs until something evaluates the queryset.
 
-Tango waits until application code asks for results. In everyday use, that means the database is queried when code calls methods such as `fetch()`, `fetchOne()`, `count()`, or `exists()`. A `for await...of` loop over a queryset also runs the query: Tango materializes the queryset once and streams the returned rows.
+You evaluate a queryset when you:
+
+- Call **`fetch()`**, **`fetchOne()`**, **`count()`**, or **`exists()`**.
+- Run **`for await (const … of queryset)`**. That performs one **`fetch()`** for the current queryset state and yields each value from the returned result.
 
 ```ts
 const queryset = PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').limit(10);
@@ -108,7 +111,7 @@ const queryset = PostModel.objects.query().filter({ published: true }).orderBy('
 const posts = await queryset.fetch();
 ```
 
-The earlier `filter(...)`, `orderBy(...)`, and `limit(...)` calls only build the query. `fetch()` is the point where Tango actually asks the database for rows.
+The `filter(...)`, `orderBy(...)`, and `limit(...)` calls only refine the query. `fetch()` is where Tango sends SQL.
 
 ## Retrieving records
 
@@ -174,7 +177,7 @@ const postHeaders = await PostModel.objects
     .fetch();
 ```
 
-In that example, each row yielded from `postHeaders` is typed as `{ id, title, slug }`.
+In that example, each object in `postHeaders` is typed as `{ id, title, slug }`.
 
 Widened arrays still work for SQL projection, but they fall back to the full row type because TypeScript can no longer prove which exact keys are present:
 
