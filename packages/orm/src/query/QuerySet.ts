@@ -92,7 +92,8 @@ export class QuerySet<
     TBaseResult extends Record<string, unknown> = TModel,
     TSourceModel = unknown,
     THydrated extends Record<string, unknown> = Record<never, never>,
-> implements AsyncIterable<HydratedQueryResult<TBaseResult, THydrated>> {
+> implements AsyncIterable<HydratedQueryResult<TBaseResult, THydrated>>
+{
     static readonly BRAND = 'tango.orm.query_set' as const;
     readonly __tangoBrand: typeof QuerySet.BRAND = QuerySet.BRAND;
 
@@ -303,6 +304,9 @@ export class QuerySet<
         return new QueryResult(results, { nextCursor: null });
     }
 
+    /**
+     * Async iteration runs `fetch()` once and yields each row from that materialized result.
+     */
     async *[Symbol.asyncIterator](): AsyncIterator<HydratedQueryResult<TBaseResult, THydrated>> {
         const result = await this.fetch();
         for (const row of result as QueryResult<HydratedQueryResult<TBaseResult, THydrated>>) {

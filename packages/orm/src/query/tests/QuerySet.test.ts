@@ -3,6 +3,7 @@ import { aQueryExecutor, aRelationMeta } from '@danceroutine/tango-testing';
 import { Model, t, type PersistedModelOutput } from '@danceroutine/tango-schema';
 import { z } from 'zod';
 import { QuerySet } from '../QuerySet';
+import type { QueryResult } from '../domain/QueryResult';
 import { QBuilder as Q } from '../QBuilder';
 import type { HydratedQueryResult } from '../domain/RelationTyping';
 import type { TableMeta } from '../domain/TableMeta';
@@ -175,22 +176,32 @@ describe(QuerySet, () => {
 
     it('yields fetched rows when async-iterating a queryset', async () => {
         const { queryExecutor } = createQueryExecutorFixture(
-            [
-                { id: 1, email: 'a@a.com', active: true } as User,
-                { id: 2, email: 'b@a.com', active: false } as User,
-            ],
+            [{ id: 1, email: 'a@a.com', active: true } as User, { id: 2, email: 'b@a.com', active: false } as User],
             'postgres',
             relatedMeta
         );
         const qs = new QuerySet<User>(queryExecutor).orderBy('id');
-        const rows: User[] = [];
-        for await (const row of qs) {
-            rows.push(row);
+        const collected: User[] = [];
+        for await (const record of qs) {
+            collected.push(record);
         }
-        expect(rows).toEqual([
+        expect(collected).toEqual([
             { id: 1, email: 'a@a.com', active: true },
             { id: 2, email: 'b@a.com', active: false },
         ]);
+    });
+
+    it('issues a single database read per async-iteration of a queryset', async () => {
+        const { queryExecutor, run } = createQueryExecutorFixture(
+            [{ id: 1, email: 'a@a.com', active: true } as User],
+            'postgres',
+            relatedMeta
+        );
+        const qs = new QuerySet<User>(queryExecutor);
+        for await (const _ of qs) {
+            break;
+        }
+        expect(run).toHaveBeenCalledTimes(1);
     });
 
     it('hydrates single-valued selectRelated rows from aliased target columns', async () => {
@@ -748,7 +759,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User, Pick<User, 'id' | 'email'>>>();
-        expectTypeOf(result.items).toEqualTypeOf<Array<Pick<User, 'id' | 'email'>>>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<Pick<User, 'id' | 'email'>>>();
     });
 
     it('resets empty select projections back to the full row type', async () => {
@@ -757,7 +768,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User>>();
-        expectTypeOf(result.items).toEqualTypeOf<User[]>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<User>>();
     });
 
     it('replaces prior projections when select is called again', async () => {
@@ -766,7 +777,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User, Pick<User, 'email'>>>();
-        expectTypeOf(result.items).toEqualTypeOf<Array<Pick<User, 'email'>>>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<Pick<User, 'email'>>>();
     });
 
     it('types one-level relation hydration from field-authored relation metadata', () => {
@@ -858,7 +869,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User>>();
-        expectTypeOf(result.items).toEqualTypeOf<User[]>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<User>>();
     });
 
     it('rejects non-key select arrays at compile time', () => {
@@ -909,7 +920,7 @@ describe(QuerySet, () => {
         const fetched = await qs.fetch(shape);
         const fetchedOne = await qs.fetchOne(shape);
 
-        const fetchedResults: Array<User | string | { id: number }> = fetched.items;
+        const fetchedResults: Array<User | string | { id: number }> = [...fetched];
         const fetchedOneResult: User | string | { id: number } | null = fetchedOne;
         expect(fetchedResults).toHaveLength(1);
         expect(fetchedOneResult).toBeTruthy();
@@ -926,7 +937,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User, Pick<User, 'id'>>>();
-        expectTypeOf(result.items).toEqualTypeOf<Array<Pick<User, 'id'>>>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<Pick<User, 'id'>>>();
     });
 
     it('returns first row or null in fetchOne', async () => {

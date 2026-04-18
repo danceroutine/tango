@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { QueryResult } from '../QueryResult';
 
-describe(QueryResult, () => {
+describe(QueryResult.name, () => {
+    it('narrows instances with isQueryResult', () => {
+        const r = new QueryResult([1]);
+        expect(QueryResult.isQueryResult<number>(r)).toBe(true);
+        expect(QueryResult.isQueryResult<number>([1])).toBe(false);
+    });
+
     it('exposes length and map over rows', () => {
         const r = new QueryResult([{ id: 1 }, { id: 2 }]);
         expect(r.length).toBe(2);

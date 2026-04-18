@@ -100,7 +100,7 @@ Queryset code becomes easier to reuse this way. One part of the application can 
 
 Creating and refining a queryset does not execute a database query by itself.
 
-Tango waits until application code asks for results. In everyday use, that means the database is queried when code calls methods such as `fetch()`, `fetchOne()`, `count()`, or `exists()`.
+Tango waits until application code asks for results. In everyday use, that means the database is queried when code calls methods such as `fetch()`, `fetchOne()`, `count()`, or `exists()`. A `for await...of` loop over a queryset also runs the query: Tango materializes the queryset once and streams the returned rows.
 
 ```ts
 const queryset = PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').limit(10);

@@ -253,9 +253,21 @@ SQLite supports `transaction.atomic(...)` only on file-backed databases in this 
 
 Concurrent outer SQLite transactions still follow normal SQLite file-locking semantics, so overlapping write transactions are not guaranteed to succeed together.
 
+## `QueryResult<T>`
+
+`fetch()` returns a `QueryResult<T>` value. Application code treats it like a small read surface over the materialized rows: sync `for...of`, `length`, `map(...)`, `at(...)`, spread, and destructuring behave like ordinary arrays.
+
+`items` lists the hydrated rows for this execution. `nextCursor` carries opaque pagination state when a higher layer supplies it; materializing a queryset through `fetch()` sets `nextCursor` to `null` today because cursor pagination lives in the resource layer.
+
+`toArray()` returns a shallow copy when application code needs a plain `T[]` value for APIs that expect arrays.
+
+The deprecated `results` getter still returns the same backing list and logs a one-time warning at access time.
+
 ## `QuerySet<TModel, TBaseResult = TModel, TSourceModel = unknown, THydrated = Record<never, never>>`
 
 `QuerySet` represents a database query against one model. Each refinement returns a new queryset, leaving the earlier one unchanged. A queryset refinement only describes work. An execution method is a terminal call that sends SQL to the database and returns a promise, such as `fetch(...)`, `fetchOne(...)`, `count()`, or `exists()`.
+
+`for await...of` over a queryset runs one `fetch()` for that queryset state and yields each row from the returned `QueryResult`.
 
 The generic parameters track the full model record type, the current base projection, the source model used for relation typing, and any hydrated relation properties that should be attached when a row-returning execution method runs.
 
@@ -429,21 +441,24 @@ The result contains the selected `PostModel` fields and the hydrated `author` mo
 
 ### `fetch(shape?)`
 
-Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` that implements `Iterable<Out>` and also exposes `length`, `map`, and `at` like an array read surface. You can use `for...of`, array spread, destructuring such as `const [first] = page`, or read a row with `page.at(0)` when the result is non-empty. For compatibility, `QueryResult` still exposes a deprecated `results` getter.
+Use `fetch(shape?)` when application code wants all records for the current query. The return type is `QueryResult<Out>`; see [`QueryResult<T>`](#queryresultt) for iteration and array-like helpers.
 
-`toArray()` returns a shallow copy when you want an ordinary array value:
+At the queryset level, `nextCursor` on the returned value is `null`. Cursor pagination belongs to resource paginators rather than the queryset contract itself.
 
 ```ts
 const page = await PostModel.objects.query().filter({ published: true }).fetch();
-const rows = page.toArray();
-rows.map((post) => post.id);
+page.map((post) => post.id);
 ```
 
-At the queryset level, `nextCursor` is currently `null`. Cursor pagination belongs to resource paginators rather than the queryset contract itself.
+Call `toArray()` when you need a plain array value:
 
-#### Iterating results and querysets
+```ts
+const page = await PostModel.objects.query().filter({ published: true }).fetch();
+const posts = page.toArray();
+posts.map((post) => post.id);
+```
 
-Iterate a materialized query result when you want to keep query execution explicit:
+### Iterating a completed fetch
 
 ```ts
 const page = await PostModel.objects.query().filter({ published: true }).fetch();
@@ -452,7 +467,7 @@ for (const post of page) {
 }
 ```
 
-Iterate a queryset directly when you want iteration to trigger evaluation:
+### Iterating a queryset
 
 ```ts
 const queryset = PostModel.objects.query().filter({ published: true });

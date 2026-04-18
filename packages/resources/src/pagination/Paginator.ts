@@ -23,7 +23,7 @@ export interface Paginator<
     ): QuerySet<TModel, TBaseResult, TSourceModel, THydrated>;
     needsTotalCount(): boolean;
     toResponse(
-        results: TResult[] | QueryResult<TResult>,
+        results: readonly TResult[] | QueryResult<TResult>,
         context?: { totalCount?: number; params?: TangoQueryParams }
     ): TResponse;
 }

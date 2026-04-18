@@ -1,6 +1,6 @@
 import { TangoQueryParams } from '@danceroutine/tango-core';
 import type { FilterInput, QueryResult, QuerySet } from '@danceroutine/tango-orm';
-import { resolveQueryResultRows } from '../pagination/resolveQueryResultRows';
+import { BasePaginator } from '../pagination/BasePaginator';
 import type { Paginator, Page } from '../pagination/Paginator';
 import type { CursorPaginatedResponse } from '../pagination/PaginatedResponse';
 import { CursorPaginationInput } from '../pagination/CursorPaginationInput';
@@ -68,7 +68,10 @@ class CursorPage<T> implements Page<T> {
  * It supports `limit`, `cursor`, and `ordering` query params and returns DRF-style
  * paginated envelopes with cursor links.
  */
-export class CursorPaginator<T extends Record<string, unknown>> implements Paginator<T, T, CursorPaginatedResponse<T>> {
+export class CursorPaginator<T extends Record<string, unknown>>
+    extends BasePaginator
+    implements Paginator<T, T, CursorPaginatedResponse<T>>
+{
     static readonly BRAND = 'tango.resources.cursor_paginator' as const;
     readonly __tangoBrand: typeof CursorPaginator.BRAND = CursorPaginator.BRAND;
     private limit: number;
@@ -82,6 +85,7 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
         private perPage: number = 25,
         private cursorField: keyof T = 'id' as keyof T
     ) {
+        super();
         this.limit = perPage;
     }
 
@@ -135,10 +139,10 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
     }
 
     toResponse<TResult>(
-        results: TResult[] | QueryResult<TResult>,
+        results: readonly TResult[] | QueryResult<TResult>,
         _context?: { totalCount?: number; params?: TangoQueryParams }
     ): CursorPaginatedResponse<TResult> {
-        const response: CursorPaginatedResponse<TResult> = { results: resolveQueryResultRows(results) };
+        const response: CursorPaginatedResponse<TResult> = { results: this.resolveQueryResultRows(results) };
         if (this.nextCursor) {
             response.next = this.buildPageLink(this.nextCursor);
         }
@@ -152,7 +156,7 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
      * Backward-compatible alias for `toResponse`.
      */
     getPaginatedResponse<TResult>(
-        results: TResult[] | QueryResult<TResult>,
+        results: readonly TResult[] | QueryResult<TResult>,
         _totalCount?: number
     ): CursorPaginatedResponse<TResult> {
         return this.toResponse(results);
@@ -186,7 +190,7 @@ export class CursorPaginator<T extends Record<string, unknown>> implements Pagin
         const appliedCursor = cursor ?? this.cursor;
         this.cursor = appliedCursor;
         const fetched = await this.apply(this.queryset).fetch();
-        const results = resolveQueryResultRows(fetched);
+        const results = this.resolveQueryResultRows(fetched);
         const hasMore = results.length > this.limit;
 
         if (hasMore) {
