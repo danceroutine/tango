@@ -30,6 +30,16 @@ ORDER BY posts.id ASC
 
 Every queryset refinement returns a new queryset, so application code can keep base queries around and derive narrower versions from them.
 
+### `all()`
+
+Use `all()` when you want the same queryset entrypoint as `query()` but prefer Django-style naming.
+
+```ts
+const posts = PostModel.objects.all();
+```
+
+`ModelManager.all()` delegates to `query()`, so it produces the same lazy queryset state.
+
 ### `findById(id)`
 
 Use `findById(id)` when you want one model record by primary key and `null` is an acceptable result.
@@ -110,6 +120,29 @@ The persistence layer receives a delete statement scoped to the primary key:
 ```sql
 DELETE FROM posts
 WHERE id = ?
+```
+
+### `getOrCreate({ where, defaults? })`
+
+Use `getOrCreate` when one call should return an existing record that matches `where` or create a new one. Tango derives create values from plain filter fields, from `defaults`, and (for `Q` trees) from unambiguous `Q` leaves. If the `where` filter is a `Q` node, you must pass `defaults` with at least one non-primary-key field so the insert is fully specified.
+
+```ts
+const { record, created } = await UserModel.objects.getOrCreate({
+    where: { email: 'user@example.com' },
+    defaults: { name: 'User' },
+});
+```
+
+### `updateOrCreate({ where, defaults?, update? })`
+
+Use `updateOrCreate` when a record may already match `where`. If no row matches, Tango creates one (using the same payload rules as `getOrCreate`). If a row matches, Tango applies `update` when it is present, otherwise it applies `defaults` as the patch. An empty patch does not run an update.
+
+```ts
+const { record, created, updated } = await UserModel.objects.updateOrCreate({
+    where: { email: 'user@example.com' },
+    defaults: { name: 'User' },
+    update: { name: 'Updated' },
+});
 ```
 
 ### `bulkCreate(inputs)`
@@ -267,9 +300,18 @@ The deprecated `results` getter still returns the same backing list and logs a o
 
 `QuerySet` represents a database query against one model. Each refinement returns a new queryset, leaving the earlier one unchanged. A queryset refinement only describes work. An execution method is a terminal call that sends SQL to the database and returns a promise, such as `fetch(...)`, `fetchOne(...)`, `count()`, or `exists()`.
 
-`for await...of` over a queryset runs one `fetch()` for that queryset state and yields each row from the returned `QueryResult`.
+Django's `QuerySet` is evaluated when the result is needed; in Tango, that moment is an explicit async call such as `fetch()`, a scalar terminal such as `get()`, or async iteration: `for await...of` over a queryset runs one `fetch()` for that queryset state and yields each row from the returned `QueryResult`. Page-oriented callers still reach for `fetch()` first; it is not deprecated.
 
 The generic parameters track the full model record type, the current base projection, the source model used for relation typing, and any hydrated relation properties that should be attached when a row-returning execution method runs.
+
+### `all()`
+
+Call `all()` on a queryset to return a new queryset with the same state. It is a no-op clone, similar to Django's `all()`.
+
+```ts
+const base = PostModel.objects.query();
+const same = base.all();
+```
 
 ### `filter(q)` and `exclude(q)`
 
@@ -484,6 +526,8 @@ Use `fetchOne(shape?)` when application code only needs the first model record t
 const first = await PostModel.objects.query().orderBy('title').fetchOne();
 ```
 
+`first(shape?)` is an alias for `fetchOne(shape?)`.
+
 The SQL is the current query with a one-record limit:
 
 ```sql
@@ -491,6 +535,22 @@ SELECT posts.*
 FROM posts
 ORDER BY posts.title ASC
 LIMIT 1
+```
+
+### `last(shape?)`
+
+Use `last(shape?)` when application code wants the last row in the sense of "reverse the current `orderBy` spec and take one." If the queryset has no ordering, Tango orders by primary key descending before applying `limit(1)`.
+
+```ts
+const newest = await PostModel.objects.all().orderBy('createdAt').last();
+```
+
+### `get(q, shape?)`
+
+Use `get(q, shape?)` when exactly one row must match. It applies `filter(q)`, limits internally to detect ambiguity, and throws `NotFoundError` when no row matches or `MultipleObjectsReturned` when more than one row matches.
+
+```ts
+const post = await PostModel.objects.all().get({ slug: 'hello' });
 ```
 
 ### `count()`

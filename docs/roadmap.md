@@ -52,6 +52,10 @@ Tango migrations are currently one ordered sequence.
 
 That works well for straightforward deployment flows, but larger teams often end up doing schema work in parallel across multiple branches. Support for non-linear dependencies, merge-aware migration workflows, or both would make that work easier to review, verify, and deploy safely.
 
+### ORM query API conveniences (Django-style)
+
+Tango's queryset and manager layer is growing toward familiar Django ergonomics. The following are not part of the current supported contract in this document, but they are the main follow-up items for human planning: `values()` and `valuesList()`-style column projections, `distinct()`, `selectForUpdate()` and other row-locking modes, database-level `aggregate()` and per-row `annotate()`, and related SQL features that need a consistent story across dialects and transactions.
+
 ## Related pages
 
 - [Supported and unsupported features](/guide/supported-and-unsupported)

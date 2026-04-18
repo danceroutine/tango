@@ -1,4 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { MultipleObjectsReturned, NotFoundError } from '@danceroutine/tango-core';
+import type { QNode } from '../domain/QNode';
 import { aQueryExecutor, aRelationMeta } from '@danceroutine/tango-testing';
 import { Model, t, type PersistedModelOutput } from '@danceroutine/tango-schema';
 import { z } from 'zod';
@@ -1081,5 +1083,138 @@ describe(QuerySet, () => {
 
         expect(result.items[0]).toEqual({ id: 9, email: 'multi@a.com', active: true, verified: false });
         expect(parser.parse).toHaveBeenCalledWith({ id: 9, email: 'multi@a.com', active: true, verified: false });
+    });
+
+    describe('django-style aliases', () => {
+        it('exposes all as a fresh queryset with the same state', () => {
+            const queryExecutor = aQueryExecutor<User>({ meta });
+            const qs = new QuerySet<User>(queryExecutor).filter({ active: true });
+            const all = qs.all();
+            expect(all).not.toBe(qs);
+        });
+
+        it('returns the same row from first as from fetchOne', async () => {
+            const row = { id: 1, email: 'a@a.com', active: true };
+            const run = vi.fn(async () => [row]);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor);
+
+            await expect(qs.first()).resolves.toEqual(row);
+            await expect(qs.fetchOne()).resolves.toEqual(row);
+            expect(run).toHaveBeenCalledTimes(2);
+        });
+
+        it('returns the last row when ordering is inverted', async () => {
+            const rows = [
+                { id: 1, email: 'a@a.com', active: true },
+                { id: 2, email: 'b@b.com', active: true },
+            ];
+            const run = vi.fn(async (): Promise<User[]> => [rows[1]!]);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor).orderBy('id');
+
+            await expect(qs.last()).resolves.toEqual(rows[1]);
+            expect(run).toHaveBeenCalledOnce();
+            const calls = run.mock.calls as unknown as Array<[{ sql: string }]>;
+            expect(calls.length).toBeGreaterThan(0);
+            const compiled = calls[0]![0];
+            expect(String(compiled.sql)).toMatch(/ORDER BY users\.id DESC/i);
+        });
+
+        it('inverts multi-field ordering for last', async () => {
+            const run = vi.fn(async () => [] as User[]);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor).orderBy('email', '-id');
+
+            await expect(qs.last()).resolves.toBeNull();
+            const calls = run.mock.calls as unknown as Array<[{ sql: string }]>;
+            expect(calls.length).toBeGreaterThan(0);
+            const sql = String(calls[0]![0].sql);
+            expect(sql).toMatch(/ORDER BY users\.email DESC/i);
+            expect(sql).toContain('users.id ASC');
+        });
+
+        it('orders by primary key descending when last runs without explicit ordering', async () => {
+            const row = { id: 2, email: 'b@b.com', active: true };
+            const run = vi.fn(async () => [row]);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor);
+
+            await expect(qs.last()).resolves.toEqual(row);
+            const calls = run.mock.calls as unknown as Array<[{ sql: string }]>;
+            expect(calls.length).toBeGreaterThan(0);
+            const compiled = calls[0]![0];
+            expect(String(compiled.sql)).toMatch(/ORDER BY users\.id DESC/i);
+        });
+
+        it('returns the single matching row from get', async () => {
+            const row = { id: 1, email: 'a@a.com', active: true };
+            const run = vi.fn(async () => [row]);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor);
+
+            await expect(qs.get({ id: 1 })).resolves.toEqual(row);
+            expect(run).toHaveBeenCalledOnce();
+        });
+
+        it('throws when get finds no rows', async () => {
+            const run = vi.fn(async () => []);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor);
+
+            await expect(qs.get({ id: 9 })).rejects.toBeInstanceOf(NotFoundError);
+        });
+
+        it('throws when get finds more than one row', async () => {
+            const run = vi.fn(async () => [
+                { id: 1, email: 'a@a.com', active: true },
+                { id: 2, email: 'b@b.com', active: true },
+            ]);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor);
+
+            await expect(qs.get({ active: true })).rejects.toBeInstanceOf(MultipleObjectsReturned);
+        });
+
+        it('narrows get output when a shape is provided', async () => {
+            const row = { id: 1, email: 'a@a.com', active: true };
+            const run = vi.fn(async () => [row]);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor);
+
+            const email = await qs.get({ id: 1 }, (r) => r.email);
+            expectTypeOf(email).toEqualTypeOf<string>();
+            expect(email).toBe('a@a.com');
+        });
+
+        it('throws when get uses Q composition without matches', async () => {
+            const row = { id: 1, email: 'a@a.com', active: true };
+            const q: QNode<User> = Q.and<User>({ active: false }, { id: row.id });
+            const run = vi.fn(async () => []);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor);
+
+            await expect(qs.get(q)).rejects.toBeInstanceOf(NotFoundError);
+        });
+
+        it('narrows parser output when get receives a parser shape', async () => {
+            const row = { id: 1, email: 'a@a.com', active: true };
+            const run = vi.fn(async () => [row]);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor);
+
+            const parsed = await qs.get({ id: 1 }, { parse: (r) => ({ title: r.email }) });
+            expectTypeOf(parsed).toEqualTypeOf<{ title: string }>();
+            expect(parsed).toEqual({ title: 'a@a.com' });
+        });
+
+        it('runs the shaped get branch without an undefined shape sentinel', async () => {
+            const row = { id: 1, email: 'a@a.com', active: true };
+            const run = vi.fn(async () => [row]);
+            const queryExecutor = aQueryExecutor<User>({ meta, run });
+            const qs = new QuerySet<User>(queryExecutor);
+
+            await expect(qs.get({ id: 1 }, (r) => r.email)).resolves.toBe('a@a.com');
+        });
     });
 });

@@ -25,4 +25,23 @@ describe(QueryResult.name, () => {
         const r = new QueryResult([{ a: 1 }, { a: 2 }]);
         expect([...r]).toEqual([{ a: 1 }, { a: 2 }]);
     });
+
+    it('returns a plain array from toArray', () => {
+        const r = new QueryResult([1, 2]);
+        const copy = r.toArray();
+        expect(copy).toEqual([1, 2]);
+        expect(copy).not.toBe(r.items);
+    });
+
+    it('serializes to JSON with results and next cursor', () => {
+        const r = new QueryResult([1, 2], { nextCursor: 'c' });
+        expect(r.toJSON()).toEqual({ results: [1, 2], nextCursor: 'c' });
+        expect(new QueryResult([1]).toJSON()).toEqual({ results: [1], nextCursor: null });
+    });
+
+    it('still exposes rows through the compatibility accessor', () => {
+        const r = new QueryResult([9]);
+        expect(r.results).toEqual([9]);
+        expect(r.results).toEqual([9]);
+    });
 });

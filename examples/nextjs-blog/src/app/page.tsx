@@ -11,7 +11,7 @@ export default async function HomePage({
     const params = TangoQueryParams.fromRecord(await searchParams);
     const search = params.getSearch();
 
-    let qs = PostModel.objects.query().orderBy('-createdAt').filter({ published: true });
+    let qs = PostModel.objects.all().orderBy('-createdAt').filter({ published: true });
 
     if (search) {
         const searchFilters: FilterInput<Post>[] = [{ title__icontains: search }, { content__icontains: search }];

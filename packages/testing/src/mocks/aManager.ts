@@ -7,6 +7,9 @@ export type ManagerOverrides<TModel extends Record<string, unknown>> = {
     meta?: TableMeta;
     querySet?: QuerySet<TModel>;
     query?: ManagerLike<TModel>['query'];
+    all?: ManagerLike<TModel>['all'];
+    getOrCreate?: ManagerLike<TModel>['getOrCreate'];
+    updateOrCreate?: ManagerLike<TModel>['updateOrCreate'];
     findById?: ManagerLike<TModel>['findById'];
     getOrThrow?: ManagerLike<TModel>['getOrThrow'];
     create?: ManagerLike<TModel>['create'];
@@ -26,6 +29,7 @@ export function aManager<TModel extends Record<string, unknown>>(
     type ModelId = TModel[keyof TModel];
 
     const queryImpl = overrides.query ?? (() => querySet);
+    const allImpl = overrides.all ?? (() => queryImpl());
     const findByIdImpl = overrides.findById ?? (async () => null as TModel | null);
     const getOrThrowImpl =
         overrides.getOrThrow ??
@@ -40,10 +44,28 @@ export function aManager<TModel extends Record<string, unknown>>(
     const updateImpl = overrides.update ?? (async (_id: ModelId, patch: Partial<TModel>) => patch as TModel);
     const deleteImpl = overrides.delete ?? (async (_id: ModelId) => {});
     const bulkCreateImpl = overrides.bulkCreate ?? (async (inputs: Partial<TModel>[]) => inputs as TModel[]);
+    const getOrCreateImpl =
+        overrides.getOrCreate ??
+        (async ({ defaults }: Parameters<ManagerLike<TModel>['getOrCreate']>[0]) => ({
+            record: { ...(defaults ?? {}) } as TModel,
+            created: true,
+        }));
+    const updateOrCreateImpl =
+        overrides.updateOrCreate ??
+        (async ({ defaults }: Parameters<ManagerLike<TModel>['updateOrCreate']>[0]) => ({
+            record: { ...(defaults ?? {}) } as TModel,
+            created: true,
+            updated: false,
+        }));
 
     return {
         meta,
         query: vi.fn(() => queryImpl()),
+        all: vi.fn(() => allImpl()),
+        getOrCreate: vi.fn((args: Parameters<ManagerLike<TModel>['getOrCreate']>[0]) => getOrCreateImpl(args)),
+        updateOrCreate: vi.fn((args: Parameters<ManagerLike<TModel>['updateOrCreate']>[0]) =>
+            updateOrCreateImpl(args)
+        ),
         findById: vi.fn((id: ModelId) => findByIdImpl(id)),
         getOrThrow: vi.fn((id: ModelId) => getOrThrowImpl(id)),
         create: vi.fn((input: Partial<TModel>) => createImpl(input)),
