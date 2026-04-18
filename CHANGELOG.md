@@ -16,11 +16,7 @@ Tango's relation workflow now extends from first-hop hydration into deeper gener
 Previously:
 
 ```ts
-const recentPosts = await PostModel.objects
-    .query()
-    .filter({ published: true })
-    .selectRelated('author')
-    .fetch();
+const recentPosts = await PostModel.objects.query().filter({ published: true }).selectRelated('author').fetch();
 
 const firstPost = recentPosts.results[0];
 
@@ -102,10 +98,7 @@ Typed relation hydration is now available for Tango querysets. Query code can as
 Previously:
 
 ```ts
-const recentPosts = await PostModel.objects
-    .query()
-    .filter({ published: true })
-    .fetch();
+const recentPosts = await PostModel.objects.query().filter({ published: true }).fetch();
 
 const firstPost = recentPosts.results[0];
 
@@ -116,11 +109,7 @@ const firstPost = recentPosts.results[0];
 Now:
 
 ```ts
-const recentPosts = await PostModel.objects
-    .query()
-    .filter({ published: true })
-    .selectRelated('author')
-    .fetch();
+const recentPosts = await PostModel.objects.query().filter({ published: true }).selectRelated('author').fetch();
 
 const firstPost = recentPosts.results[0];
 

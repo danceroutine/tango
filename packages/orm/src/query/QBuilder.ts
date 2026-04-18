@@ -1,6 +1,7 @@
 import type { QNode } from './domain/QNode';
 import type { FilterInput } from './domain/FilterInput';
 import { InternalQNodeType } from './domain/internal/InternalQNodeType';
+import { isQNodeLike } from './internal/isQNodeLike';
 
 /**
  * Static builder for composing boolean query expressions.
@@ -54,8 +55,8 @@ export class QBuilder {
     }
 
     private static wrapNode<T>(input: FilterInput<T> | QNode<T>): QNode<T> {
-        if ((input as QNode<T>).kind) {
-            return input as QNode<T>;
+        if (isQNodeLike(input)) {
+            return input;
         }
         return {
             kind: InternalQNodeType.ATOM,

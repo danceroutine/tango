@@ -13,8 +13,10 @@ The manager is the main entry point for model-backed work. If application code w
 The same manager is also where application code begins read queries:
 
 ```ts
-const queryset = PostModel.objects.query();
+const queryset = PostModel.objects.all();
 ```
+
+`all()` matches Django naming and returns the same lazy queryset as `query()`.
 
 `PostModel` describes what a stored blog post is. `PostModel.objects` is the API you use when you want to work with stored blog posts in the database. The manager lives on the model class because it represents table-level work for the post table, while one row instance represents one stored post.
 
@@ -60,10 +62,10 @@ A `QuerySet` represents a database query before it is executed.
 
 Sometimes that query means "all posts." Sometimes it means "all published posts from this author, ordered by creation date." Sometimes it means "one post with this identifier, if it exists." In each case, the query can keep being refined before Tango asks the database to return rows.
 
-A queryset begins with `query()`:
+A queryset begins with `query()` or `all()`:
 
 ```ts
-const allPosts = PostModel.objects.query();
+const allPosts = PostModel.objects.all();
 ```
 
 At that point, no filtering, ordering, or limiting has been applied. The queryset represents the base table query for posts.
@@ -87,7 +89,7 @@ You can read that queryset from top to bottom as one sentence about the data the
 Refining a queryset does not mutate the previous queryset. Each refinement returns a new `QuerySet`.
 
 ```ts
-const allPosts = PostModel.objects.query();
+const allPosts = PostModel.objects.all();
 const publishedPosts = allPosts.filter({ published: true });
 const newestPublishedPosts = publishedPosts.orderBy('-createdAt');
 ```
@@ -102,16 +104,16 @@ Internally, a queryset can be constructed, filtered, ordered, and passed around 
 
 You evaluate a queryset when you:
 
-- Call **`fetch()`**, **`fetchOne()`**, **`count()`**, or **`exists()`**.
+- Call **`fetch()`**, **`fetchOne()`**, **`first()`**, **`last()`**, **`get()`**, **`count()`**, or **`exists()`**.
 - Run **`for await (const … of queryset)`**. That performs one **`fetch()`** for the current queryset state and yields each value from the returned result.
 
 ```ts
-const queryset = PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').limit(10);
+const queryset = PostModel.objects.all().filter({ published: true }).orderBy('-createdAt').limit(10);
 
 const posts = await queryset.fetch();
 ```
 
-The `filter(...)`, `orderBy(...)`, and `limit(...)` calls only refine the query. `fetch()` is where Tango sends SQL.
+The `filter(...)`, `orderBy(...)`, and `limit(...)` calls only refine the query. `fetch()` is one explicit terminal where Tango sends SQL; `for await...of`, `first()`, `last()`, and `get()` are others.
 
 After the first row-returning evaluation, the same queryset instance reuses its cached materialized result on later `fetch()` or async-iteration calls. Build a refined queryset when you want a different SQL query and a separate cache.
 
@@ -119,17 +121,19 @@ After the first row-returning evaluation, the same queryset instance reuses its 
 
 Different retrieval methods communicate different expectations about the result.
 
-If you want a flexible query that may return many rows, start with `query()` and finish with `fetch()`:
+If you want a flexible query that may return many rows, start with `query()` or `all()` and finish with `fetch()`:
 
 ```ts
-const publishedPosts = await PostModel.objects.query().filter({ published: true }).fetch();
+const publishedPosts = await PostModel.objects.all().filter({ published: true }).fetch();
 ```
 
-If you expect at most one row from a refined queryset, use `fetchOne()`:
+If you expect at most one row from a refined queryset, use `fetchOne()` or `first()`:
 
 ```ts
-const latestPost = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetchOne();
+const latestPost = await PostModel.objects.all().filter({ published: true }).orderBy('-createdAt').first();
 ```
+
+For Django-style strictness when exactly one row must exist, use `get(...)` on the queryset; it raises `NotFoundError` or `MultipleObjectsReturned` instead of returning `null`. For the last row under the current ordering, use `last()`.
 
 If you already know the identifier of the row you want, `findById(...)` or `getOrThrow(...)` often expresses that intent more directly:
 
@@ -139,6 +143,8 @@ const requiredPost = await PostModel.objects.getOrThrow(42);
 ```
 
 These choices let the code describe what kind of answer it expects from the database, in addition to which table it wants to query.
+
+For lookup-or-create flows, the manager exposes `getOrCreate(...)` and `updateOrCreate(...)`, which mirror common Django patterns while keeping Tango's explicit execution model for reads. Those helpers still expect the lookup to identify at most one existing record; if it matches more than one, Tango raises `MultipleObjectsReturned` instead of choosing one arbitrarily.
 
 ## Using `Q` for more complex conditions
 

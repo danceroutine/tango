@@ -20,9 +20,9 @@ Do not use this skill for contributor-only code changes that do not touch techni
 
 1. State `Executing tango-technical-writing` before doing any other work.
 2. Treat this skill’s companion reference docs as the style and review source of truth when they are available:
-   - `references/principles.md`
-   - `references/anti-patterns.md`
-   These paths are relative to the skill directory (they are not expected to live at the repository root).
+    - `references/principles.md`
+    - `references/anti-patterns.md`
+      These paths are relative to the skill directory (they are not expected to live at the repository root).
 3. If those reference files cannot be located (for example, the skill was copied without its `references/` directory), continue using the embedded rules in this skill and note reduced certainty.
 4. Optimize first for reader clarity and contract accuracy, then for style polish.
 5. Verify behavior against current code or the current public contract before making claims about behavior, guarantees, names, or responsibilities.
