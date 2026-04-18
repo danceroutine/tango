@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TangoQueryParams } from '@danceroutine/tango-core';
 import { CursorPaginator } from '../CursorPaginator';
 import type { QuerySet } from '@danceroutine/tango-orm';
-import { aQuerySet } from '@danceroutine/tango-testing';
+import { aQueryResult, aQuerySet } from '@danceroutine/tango-testing';
 
 function query(input: string = ''): TangoQueryParams {
     return TangoQueryParams.fromURLSearchParams(new URLSearchParams(input));
@@ -11,7 +11,7 @@ function query(input: string = ''): TangoQueryParams {
 describe(CursorPaginator, () => {
     const makeQuerySet = (results: Array<Record<string, unknown>>) => {
         const qs = aQuerySet<Record<string, unknown>>({
-            fetch: vi.fn().mockResolvedValue({ results, nextCursor: null }),
+            fetch: vi.fn().mockResolvedValue(aQueryResult({ items: results, nextCursor: null })),
             count: vi.fn().mockResolvedValue(results.length),
         });
 

@@ -1,10 +1,8 @@
 # ORM query API
 
-`@danceroutine/tango-orm` provides the model manager and queryset surface behind `Model.objects`.
+This reference describes `Model.objects`, `QuerySet`, materialized fetch results (`QueryResult`), and related ORM exports from `@danceroutine/tango-orm`. It assumes you already use models and queries at a high level; for narrative introduction, see [ORM and QuerySets](/topics/orm-and-querysets).
 
-Application code usually starts with `Model.objects`. The manager owns lookups and writes for one model. Calling `query()` returns a `QuerySet`, which is the immutable builder for model-backed reads. After those core surfaces, this page covers the lower-level exports that startup code, tests, and tooling may use directly.
-
-The examples below use a blog application with `PostModel`, `UserModel`, and `CommentModel`. A post belongs to one author through the relation name `author`, and a user exposes authored posts through the reverse relation name `posts`.
+Throughout this reference the examples use a blog domain: `PostModel`, `UserModel`, and `CommentModel`. Posts relate to authors through `author`; users expose authored posts through the reverse name `posts`.
 
 ## `Model.objects` and `ModelManager<TModelRow>`
 
@@ -253,11 +251,50 @@ SQLite supports `transaction.atomic(...)` only on file-backed databases in this 
 
 Concurrent outer SQLite transactions still follow normal SQLite file-locking semantics, so overlapping write transactions are not guaranteed to succeed together.
 
+## `QueryResult<T>`
+
+`QueryResult<T>` is the type returned by `QuerySet.fetch(...)`. It holds one materialized page of values for that execution, implements `Iterable<T>`, and exposes `length`, `map`, `at`, `toArray`, and `for...of` / spread / destructuring similar to a read-only array.
+
+### Attributes
+
+#### `items`
+
+Read-only array of the values for this execution, in database order unless the queryset applied `orderBy(...)`.
+
+#### `nextCursor`
+
+Optional opaque cursor token for pagination flows that construct a `QueryResult` with cursor metadata. When you evaluate a queryset with `fetch()`, this field is `null`; cursor envelopes are composed in the resources layer.
+
+### Methods
+
+#### `toArray(): T[]`
+
+Returns a shallow copy as a mutable `T[]` for APIs that expect a plain array.
+
+#### `toJSON(): { results: readonly T[]; nextCursor?: string | null }`
+
+JSON shape aligned with historical `{ results, nextCursor }` payloads.
+
+### Deprecated
+
+#### `results`
+
+Returns the same backing list as `items`. Access emits a **one-time** deprecation warning per process. Prefer `items`, iteration, `length`, `map`, or `toArray`.
+
 ## `QuerySet<TModel, TBaseResult = TModel, TSourceModel = unknown, THydrated = Record<never, never>>`
 
-`QuerySet` represents a database query against one model. Each refinement returns a new queryset, leaving the earlier one unchanged. A queryset refinement only describes work. An execution method is a terminal call that sends SQL to the database and returns a promise, such as `fetch(...)`, `fetchOne(...)`, `count()`, or `exists()`.
+`QuerySet` describes a single-model read query. Refinement methods return a **new** queryset and do not mutate the previous one. Nothing hits the database until you call an execution method (`fetch`, `fetchOne`, `count`, `exists`, or async iteration over the queryset).
 
-The generic parameters track the full model record type, the current base projection, the source model used for relation typing, and any hydrated relation properties that should be attached when a row-returning execution method runs.
+The type parameters model, in order: the full row type for the table, the current projected base row, the source model used for relation metadata, and hydrated relation fields accumulated through `selectRelated` / `prefetchRelated`.
+
+### When a `QuerySet` evaluates
+
+You evaluate a queryset by calling an execution method or by driving async iteration:
+
+- **`fetch(...)`** runs the compiled SQL (and relation hydration) and returns `QueryResult`.
+- **`fetchOne(...)`** applies `limit(1)` internally and returns the first row or `null`.
+- **`count()`** and **`exists()`** run appropriate aggregate or existence queries.
+- **`for await (const x of queryset)`** calls `fetch()` once for that queryset state and yields each element from the resulting `QueryResult`. Starting a **second** async iteration issues a **second** `fetch()` (another round-trip). Hold on to the `QueryResult` from `fetch()` if you need to iterate the same materialized result more than once.
 
 ### `filter(q)` and `exclude(q)`
 
@@ -307,7 +344,9 @@ const postCards = await PostModel.objects
     .select(['id', 'title'] as const)
     .fetch();
 
-postCards.results[0].title;
+const [first] = postCards;
+first?.id;
+first?.title;
 ```
 
 When Tango compiles the query, model fields become database columns:
@@ -327,7 +366,10 @@ Use `selectRelated(...)` when the requested path stays single-valued from hop to
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts.results[0].author?.profile?.displayName;
+const firstPost = posts.at(0);
+firstPost?.id;
+firstPost?.author?.email;
+firstPost?.author?.profile?.displayName;
 ```
 
 `selectRelated(...)` accepts nested paths such as `author__profile`, but it rejects any path that crosses a collection edge. A path like `posts__author` belongs in `prefetchRelated(...)`, not `selectRelated(...)`.
@@ -365,8 +407,14 @@ In contrast, use `prefetchRelated(...)` when the requested path includes a colle
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users.results[0].posts[0]?.author?.email;
-users.results[0].posts[0]?.comments[0]?.body;
+const firstUser = users.at(0);
+const firstPost = firstUser?.posts.at(0);
+const firstComment = firstPost?.comments.at(0);
+
+firstUser?.id;
+firstPost?.title;
+firstPost?.author?.email;
+firstComment?.body;
 ```
 
 `prefetchRelated(...)` runs the base query first, then runs batched follow-up queries for the planned collection edges. A user record with no matching posts still receives `posts: []`, and a post record with no matching comments receives `comments: []`.
@@ -408,21 +456,48 @@ const postCards = withAuthor.select(['id', 'title'] as const);
 
 const page = await postCards.fetch();
 
-page.results[0].title;
-page.results[0].author?.email;
+const [first] = page;
+first?.id;
+first?.title;
+first?.author?.email;
 ```
 
 The result contains the selected `PostModel` fields and the hydrated `author` model. The stored `authorId` field is not part of the base projection unless it is selected explicitly.
 
 ### `fetch(shape?)`
 
-Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` object with `results` and `nextCursor`.
+Returns `QueryResult<Out>` for the current queryset state. Without a `shape` argument, `Out` is the hydrated row type. With a function or parser `shape`, each row is mapped or parsed after hydration.
 
 ```ts
-const page = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetch();
+const page = await PostModel.objects.query().filter({ published: true }).fetch();
+page.map((post) => post.id);
 ```
 
-At the queryset level, `nextCursor` is currently `null`. Cursor pagination belongs to resource paginators rather than the queryset contract itself.
+Call `toArray()` when you need a mutable array value:
+
+```ts
+const page = await PostModel.objects.query().filter({ published: true }).fetch();
+const posts = page.toArray();
+posts.map((post) => post.id);
+```
+
+Complete `fetch()` first, then iterate if you want evaluation to be explicit:
+
+```ts
+const page = await PostModel.objects.query().filter({ published: true }).fetch();
+for (const post of page) {
+    post.title;
+}
+```
+
+You can also iterate the queryset directly; that path evaluates the queryset:
+
+```ts
+const queryset = PostModel.objects.query().filter({ published: true });
+for await (const post of queryset) {
+    post.title;
+}
+```
 
 ### `fetchOne(shape?)`
 

@@ -3,11 +3,11 @@ import type { Dialect } from './domain/Dialect';
 import type { QuerySetState } from './domain/QuerySetState';
 import type { TableMeta } from './domain/TableMeta';
 import type { QNode } from './domain/QNode';
-import type { QueryResult } from './domain/QueryResult';
 import type { OrderToken } from './domain/OrderToken';
 import type { FilterInput } from './domain/FilterInput';
 import type { CompiledQuery } from './domain/CompiledQuery';
 import type { CompiledHydrationNode } from './domain/CompiledQuery';
+import { QueryResult } from './domain/QueryResult';
 import type {
     GeneratedHydratedRelationMap,
     GeneratedPrefetchRelatedPathKeys,
@@ -71,6 +71,8 @@ type ProjectedResult<
  * Provides a fluent API for filtering, ordering, pagination, projection, and
  * nested relation hydration.
  *
+ * Refinements such as `filter`, `orderBy`, `select`, and relation loaders build query state only. SQL runs when you call an evaluation method (`fetch`, `fetchOne`, `count`, `exists`, or `for await` over this queryset). Passing a queryset between functions without evaluating it does not query the database.
+ *
  * @template TModel - The full model row type used for query composition
  * @template TBaseResult - The selected base-row shape returned by execution methods
  * @template TSourceModel - The source Tango model used for typed relation metadata
@@ -92,7 +94,8 @@ export class QuerySet<
     TBaseResult extends Record<string, unknown> = TModel,
     TSourceModel = unknown,
     THydrated extends Record<string, unknown> = Record<never, never>,
-> {
+> implements AsyncIterable<HydratedQueryResult<TBaseResult, THydrated>>
+{
     static readonly BRAND = 'tango.orm.query_set' as const;
     readonly __tangoBrand: typeof QuerySet.BRAND = QuerySet.BRAND;
 
@@ -300,10 +303,22 @@ export class QuerySet<
               ? projectedRows.map(shape)
               : projectedRows.map((r) => shape.parse(r));
 
-        return {
-            results,
-            nextCursor: null,
-        };
+        return new QueryResult(results, { nextCursor: null });
+    }
+
+    /**
+     * Async iterable surface for `for await (... of queryset)`.
+     *
+     * Evaluates this queryset exactly **once**: it awaits {@link QuerySet.fetch} without arguments,
+     * then yields each element from that {@link QueryResult}. Re-entering the async iterator starts a
+     * **new** evaluation (a second database round-trip). Use {@link QuerySet.fetch} first and iterate
+     * the returned {@link QueryResult} if you need to walk the same materialized result multiple times.
+     */
+    async *[Symbol.asyncIterator](): AsyncIterator<HydratedQueryResult<TBaseResult, THydrated>> {
+        const result = await this.fetch();
+        for (const row of result as QueryResult<HydratedQueryResult<TBaseResult, THydrated>>) {
+            yield row;
+        }
     }
 
     /**
@@ -335,7 +350,10 @@ export class QuerySet<
             : typeof shape === 'function'
               ? await limited.fetch(shape)
               : await limited.fetch(shape);
-        return result.results[0] ?? null;
+        for (const row of result) {
+            return row;
+        }
+        return null;
     }
 
     /**

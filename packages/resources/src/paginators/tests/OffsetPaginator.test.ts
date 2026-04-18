@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TangoQueryParams } from '@danceroutine/tango-core';
 import { OffsetPaginator } from '../OffsetPaginator';
-import { aQuerySet } from '@danceroutine/tango-testing';
+import { aQueryResult, aQuerySet } from '@danceroutine/tango-testing';
 
 function query(input: string = ''): TangoQueryParams {
     return TangoQueryParams.fromURLSearchParams(new URLSearchParams(input));
@@ -138,10 +138,9 @@ describe(OffsetPaginator, () => {
 
         it('getPage computes offsets and exposes page helpers', async () => {
             const qs = aQuerySet<Record<string, unknown>>({
-                fetch: vi.fn().mockResolvedValue({
-                    results: [{ id: 3 }, { id: 4 }],
-                    nextCursor: null,
-                }),
+                fetch: vi.fn().mockResolvedValue(
+                    aQueryResult({ items: [{ id: 3 }, { id: 4 }], nextCursor: null })
+                ),
                 count: vi.fn().mockResolvedValue(5),
             });
             qs.offset = vi.fn().mockReturnValue(qs);
@@ -174,10 +173,7 @@ describe(OffsetPaginator, () => {
 
         it('treats pages with undefined total count as not having next page', async () => {
             const qs = aQuerySet<Record<string, unknown>>({
-                fetch: vi.fn().mockResolvedValue({
-                    results: [{ id: 1 }],
-                    nextCursor: null,
-                }),
+                fetch: vi.fn().mockResolvedValue(aQueryResult({ items: [{ id: 1 }], nextCursor: null })),
                 count: vi.fn().mockResolvedValue(undefined),
             });
             qs.offset = vi.fn().mockReturnValue(qs);

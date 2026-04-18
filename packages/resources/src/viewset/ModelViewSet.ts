@@ -224,7 +224,7 @@ export abstract class ModelViewSet<
             const [result, totalCount] = await Promise.all([resultPromise, totalCountPromise]);
             const serializer = this.getSerializer();
             const response = paginator.toResponse(
-                result.results.map((row) => serializer.toRepresentation(row)) as SerializerOutput<TSerializer>[],
+                result.map((row) => serializer.toRepresentation(row)) as SerializerOutput<TSerializer>[],
                 { totalCount }
             );
 

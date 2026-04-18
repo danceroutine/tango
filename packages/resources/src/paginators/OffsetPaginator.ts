@@ -1,5 +1,6 @@
 import { TangoQueryParams } from '@danceroutine/tango-core';
-import type { QuerySet } from '@danceroutine/tango-orm';
+import type { QueryResult, QuerySet } from '@danceroutine/tango-orm';
+import { BasePaginator } from '../pagination/BasePaginator';
 import type { Paginator, Page } from '../pagination/Paginator';
 import type { OffsetPaginatedResponse } from '../pagination/PaginatedResponse';
 import { OffsetPaginationInput } from '../pagination/OffsetPaginationInput';
@@ -70,7 +71,10 @@ class OffsetPage<T> implements Page<T> {
  * const response = paginator.getPaginatedResponse(results, totalCount);
  * ```
  */
-export class OffsetPaginator<T extends Record<string, unknown>> implements Paginator<T, T, OffsetPaginatedResponse<T>> {
+export class OffsetPaginator<T extends Record<string, unknown>>
+    extends BasePaginator
+    implements Paginator<T, T, OffsetPaginatedResponse<T>>
+{
     static readonly BRAND = 'tango.resources.offset_paginator' as const;
     readonly __tangoBrand: typeof OffsetPaginator.BRAND = OffsetPaginator.BRAND;
     private limit = 25;
@@ -80,6 +84,7 @@ export class OffsetPaginator<T extends Record<string, unknown>> implements Pagin
         private queryset: QuerySet<T>,
         private perPage: number = 25
     ) {
+        super();
         this.limit = perPage;
     }
 
@@ -133,11 +138,11 @@ export class OffsetPaginator<T extends Record<string, unknown>> implements Pagin
     }
 
     toResponse<TResult>(
-        results: TResult[],
+        results: readonly TResult[] | QueryResult<TResult>,
         context?: { totalCount?: number; params?: TangoQueryParams }
     ): OffsetPaginatedResponse<TResult> {
         const totalCount = context?.totalCount;
-        const response: OffsetPaginatedResponse<TResult> = { results };
+        const response: OffsetPaginatedResponse<TResult> = { results: this.resolveQueryResultRows(results) };
 
         if (totalCount !== undefined) {
             response.count = totalCount;
@@ -159,7 +164,7 @@ export class OffsetPaginator<T extends Record<string, unknown>> implements Pagin
      * Backward-compatible alias for `toResponse`.
      */
     getPaginatedResponse<TResult>(
-        results: TResult[],
+        results: readonly TResult[] | QueryResult<TResult>,
         totalCount?: number,
         params?: TangoQueryParams
     ): OffsetPaginatedResponse<TResult> {
@@ -191,7 +196,7 @@ export class OffsetPaginator<T extends Record<string, unknown>> implements Pagin
 
         const totalCount = await this.count();
 
-        return new OffsetPage(results.results, page, this.perPage, totalCount);
+        return new OffsetPage(this.resolveQueryResultRows(results), page, this.perPage, totalCount);
     }
 
     /**

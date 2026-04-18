@@ -3,6 +3,7 @@ import { aQueryExecutor, aRelationMeta } from '@danceroutine/tango-testing';
 import { Model, t, type PersistedModelOutput } from '@danceroutine/tango-schema';
 import { z } from 'zod';
 import { QuerySet } from '../QuerySet';
+import type { QueryResult } from '../domain/QueryResult';
 import { QBuilder as Q } from '../QBuilder';
 import type { HydratedQueryResult } from '../domain/RelationTyping';
 import type { TableMeta } from '../domain/TableMeta';
@@ -166,11 +167,41 @@ describe(QuerySet, () => {
             .prefetchRelated('posts')
             .fetch();
 
-        expect(result.results).toEqual([{ id: 1, email: 'a@a.com', team: null, posts: [] }]);
+        expect(result.items).toEqual([{ id: 1, email: 'a@a.com', team: null, posts: [] }]);
         expect(result.nextCursor).toBeNull();
         expect(run).toHaveBeenCalledOnce();
         expect(QuerySet.isQuerySet(qs)).toBe(true);
         expect(QuerySet.isQuerySet({})).toBe(false);
+    });
+
+    it('yields fetched rows when async-iterating a queryset', async () => {
+        const { queryExecutor } = createQueryExecutorFixture(
+            [{ id: 1, email: 'a@a.com', active: true } as User, { id: 2, email: 'b@a.com', active: false } as User],
+            'postgres',
+            relatedMeta
+        );
+        const qs = new QuerySet<User>(queryExecutor).orderBy('id');
+        const collected: User[] = [];
+        for await (const record of qs) {
+            collected.push(record);
+        }
+        expect(collected).toEqual([
+            { id: 1, email: 'a@a.com', active: true },
+            { id: 2, email: 'b@a.com', active: false },
+        ]);
+    });
+
+    it('issues a single database read per async-iteration of a queryset', async () => {
+        const { queryExecutor, run } = createQueryExecutorFixture(
+            [{ id: 1, email: 'a@a.com', active: true } as User],
+            'postgres',
+            relatedMeta
+        );
+        const qs = new QuerySet<User>(queryExecutor);
+        for await (const _ of qs) {
+            break;
+        }
+        expect(run).toHaveBeenCalledTimes(1);
     });
 
     it('hydrates single-valued selectRelated rows from aliased target columns', async () => {
@@ -194,7 +225,7 @@ describe(QuerySet, () => {
 
         const result = await new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('team').fetch();
 
-        expect(result.results).toEqual([
+        expect(result.items).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -208,7 +239,7 @@ describe(QuerySet, () => {
                 team: null,
             },
         ]);
-        expect(Object.keys(result.results[0]!)).not.toContain('__tango_hydrate_team_id');
+        expect(Object.keys(result.items[0]!)).not.toContain('__tango_hydrate_team_id');
     });
 
     it('hydrates hasMany prefetch rows with stable grouping and base row order', async () => {
@@ -228,7 +259,7 @@ describe(QuerySet, () => {
 
         const result = await new QuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('posts').fetch();
 
-        expect(result.results).toEqual([
+        expect(result.items).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -273,7 +304,7 @@ describe(QuerySet, () => {
 
         const result = await new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('team').fetch();
 
-        expect(result.results[0]!.team).toBe(result.results[1]!.team);
+        expect(result.items[0]!.team).toBe(result.items[1]!.team);
     });
 
     it('normalizes sqlite target booleans during relation hydration', async () => {
@@ -320,7 +351,7 @@ describe(QuerySet, () => {
             .prefetchRelated('posts')
             .fetch({ parse: (row) => row });
 
-        expect(result.results).toEqual([
+        expect(result.items).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -344,7 +375,7 @@ describe(QuerySet, () => {
             .prefetchRelated('posts')
             .fetch();
 
-        expect(result.results).toEqual([{ email: 'a@a.com', posts: [] }]);
+        expect(result.items).toEqual([{ email: 'a@a.com', posts: [] }]);
         expect(query).toHaveBeenCalledWith(expect.stringContaining('author_id IN'), [1]);
     });
 
@@ -368,14 +399,14 @@ describe(QuerySet, () => {
             .prefetchRelated('posts', 'articles')
             .fetch();
 
-        expect(result.results).toEqual([
+        expect(result.items).toEqual([
             {
                 email: 'a@a.com',
                 posts: [{ id: 100, author_id: 1, title: 'Hydration' }],
                 articles: [{ id: 200, author_id: 1, headline: 'Type-safe relations' }],
             },
         ]);
-        expect(result.results[0]).not.toHaveProperty('__tango_prefetch_posts_id');
+        expect(result.items[0]).not.toHaveProperty('__tango_prefetch_posts_id');
         expect(query).toHaveBeenCalledTimes(2);
         expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('author_id IN'), [1]);
         expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('author_id IN'), [1]);
@@ -420,7 +451,7 @@ describe(QuerySet, () => {
             .prefetchRelated('posts__comments')
             .fetch();
 
-        expect(result.results).toEqual([
+        expect(result.items).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -489,7 +520,7 @@ describe(QuerySet, () => {
             .prefetchRelated('team__posts')
             .fetch();
 
-        expect(result.results).toEqual([
+        expect(result.items).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -538,7 +569,7 @@ describe(QuerySet, () => {
 
         const result = await new QuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('posts').fetch();
 
-        expect(result.results).toEqual([{ email: 'a@a.com', posts: [] }]);
+        expect(result.items).toEqual([{ email: 'a@a.com', posts: [] }]);
         expect(query).not.toHaveBeenCalled();
     });
 
@@ -568,7 +599,7 @@ describe(QuerySet, () => {
 
         const result = await new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('author').fetch();
 
-        expect(result.results).toEqual([{ id: 1, author: { id: 99, email: 'a@a.com' } }]);
+        expect(result.items).toEqual([{ id: 1, author: { id: 99, email: 'a@a.com' } }]);
     });
 
     it('skips join nodes without compiled join descriptors and no-ops empty prefetch owner batches', async () => {
@@ -709,7 +740,7 @@ describe(QuerySet, () => {
             .prefetchRelated('posts', 'posts')
             .fetch();
 
-        expect(result.results).toEqual([{ id: 1, email: 'a@a.com', active: true, posts: [] }]);
+        expect(result.items).toEqual([{ id: 1, email: 'a@a.com', active: true, posts: [] }]);
         expect(query).toHaveBeenCalledOnce();
         await expect(
             new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('missing').fetch()
@@ -728,7 +759,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User, Pick<User, 'id' | 'email'>>>();
-        expectTypeOf(result.results).toEqualTypeOf<Array<Pick<User, 'id' | 'email'>>>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<Pick<User, 'id' | 'email'>>>();
     });
 
     it('resets empty select projections back to the full row type', async () => {
@@ -737,7 +768,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User>>();
-        expectTypeOf(result.results).toEqualTypeOf<User[]>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<User>>();
     });
 
     it('replaces prior projections when select is called again', async () => {
@@ -746,7 +777,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User, Pick<User, 'email'>>>();
-        expectTypeOf(result.results).toEqualTypeOf<Array<Pick<User, 'email'>>>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<Pick<User, 'email'>>>();
     });
 
     it('types one-level relation hydration from field-authored relation metadata', () => {
@@ -838,7 +869,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User>>();
-        expectTypeOf(result.results).toEqualTypeOf<User[]>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<User>>();
     });
 
     it('rejects non-key select arrays at compile time', () => {
@@ -876,8 +907,8 @@ describe(QuerySet, () => {
         const byFunction = await qs.fetch((row) => row.email);
         const byParser = await qs.fetch({ parse: (row) => ({ id: row.id }) });
 
-        expect(byFunction.results).toEqual(['b@a.com']);
-        expect(byParser.results).toEqual([{ id: 2 }]);
+        expect(byFunction.items).toEqual(['b@a.com']);
+        expect(byParser.items).toEqual([{ id: 2 }]);
     });
 
     it('accepts wrapper-forwarded optional shape unions', async () => {
@@ -889,7 +920,7 @@ describe(QuerySet, () => {
         const fetched = await qs.fetch(shape);
         const fetchedOne = await qs.fetchOne(shape);
 
-        const fetchedResults: Array<User | string | { id: number }> = fetched.results;
+        const fetchedResults: Array<User | string | { id: number }> = [...fetched];
         const fetchedOneResult: User | string | { id: number } | null = fetchedOne;
         expect(fetchedResults).toHaveLength(1);
         expect(fetchedOneResult).toBeTruthy();
@@ -906,7 +937,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User, Pick<User, 'id'>>>();
-        expectTypeOf(result.results).toEqualTypeOf<Array<Pick<User, 'id'>>>();
+        expectTypeOf(result).toEqualTypeOf<QueryResult<Pick<User, 'id'>>>();
     });
 
     it('returns first row or null in fetchOne', async () => {
@@ -967,7 +998,7 @@ describe(QuerySet, () => {
             parse: vi.fn((row: User) => row),
         };
         const result = await new QuerySet<User>(queryExecutor).fetch(parser);
-        expect(result.results[0]?.active).toBe(true);
+        expect(result.items[0]?.active).toBe(true);
         expect(parser.parse).toHaveBeenCalledWith({ id: 4, email: 'bool@a.com', active: true });
     });
 
@@ -977,7 +1008,7 @@ describe(QuerySet, () => {
             'sqlite'
         );
         const result = await new QuerySet<User>(queryExecutor).fetch((row) => row.active);
-        expect(result.results).toEqual([0]);
+        expect(result.items).toEqual([0]);
     });
 
     it('normalizes sqlite bool zero values to false for parser-based schema reads', async () => {
@@ -989,7 +1020,7 @@ describe(QuerySet, () => {
             parse: vi.fn((row: User) => row),
         };
         const result = await new QuerySet<User>(queryExecutor).fetch(parser);
-        expect(result.results[0]?.active).toBe(false);
+        expect(result.items[0]?.active).toBe(false);
         expect(parser.parse).toHaveBeenCalledWith({ id: 6, email: 'zero@a.com', active: false });
     });
 
@@ -1006,7 +1037,7 @@ describe(QuerySet, () => {
 
         const result = await new QuerySet<User>(queryExecutor).fetch(parser);
 
-        expect(result.results[0]?.active).toBe(1);
+        expect(result.items[0]?.active).toBe(1);
         expect(parser.parse).toHaveBeenCalledWith({ id: 7, email: 'nobool@a.com', active: 1 });
     });
 
@@ -1017,7 +1048,7 @@ describe(QuerySet, () => {
         );
         const parser = { parse: vi.fn((row: User) => row) };
         const result = await new QuerySet<User>(queryExecutor).fetch(parser);
-        expect(result.results[0]?.active).toBe(2);
+        expect(result.items[0]?.active).toBe(2);
         expect(parser.parse).toHaveBeenCalledWith({ id: 8, email: 'other@a.com', active: 2 });
     });
 
@@ -1029,7 +1060,7 @@ describe(QuerySet, () => {
 
         const result = await new QuerySet<User>(queryExecutor).select(['id', 'email'] as const).fetch(parser);
 
-        expect(result.results[0]).toEqual({ id: 10, email: 'skip@a.com' });
+        expect(result.items[0]).toEqual({ id: 10, email: 'skip@a.com' });
         expect(parser.parse).toHaveBeenCalledWith({ id: 10, email: 'skip@a.com' });
     });
 
@@ -1048,7 +1079,7 @@ describe(QuerySet, () => {
 
         const result = await new QuerySet<MultiBoolUser>(queryExecutor).fetch(parser);
 
-        expect(result.results[0]).toEqual({ id: 9, email: 'multi@a.com', active: true, verified: false });
+        expect(result.items[0]).toEqual({ id: 9, email: 'multi@a.com', active: true, verified: false });
         expect(parser.parse).toHaveBeenCalledWith({ id: 9, email: 'multi@a.com', active: true, verified: false });
     });
 });

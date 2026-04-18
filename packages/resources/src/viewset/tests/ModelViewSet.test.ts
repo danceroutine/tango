@@ -6,7 +6,7 @@ import { RequestContext } from '../../context';
 import { FilterSet } from '../../filters';
 import { CursorPaginator } from '../../paginators/CursorPaginator';
 import { ModelSerializer, type AnyModelSerializerClass } from '../../serializer/index';
-import { aManager, aQuerySet, aRequestContext } from '@danceroutine/tango-testing';
+import { aManager, aQueryResult, aQuerySet, aRequestContext } from '@danceroutine/tango-testing';
 import type { ManagerLike } from '@danceroutine/tango-orm';
 import type { ResourceModelLike } from '../../resource/index';
 
@@ -124,7 +124,7 @@ describe(ModelViewSet, () => {
 
     beforeEach(() => {
         querySetDouble = aQuerySet<UserRecord>();
-        vi.mocked(querySetDouble.fetch).mockResolvedValue({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(aQueryResult({ items: [], nextCursor: null }));
         vi.mocked(querySetDouble.fetchOne).mockResolvedValue(null);
         vi.mocked(querySetDouble.count).mockResolvedValue(0);
 
@@ -160,10 +160,12 @@ describe(ModelViewSet, () => {
     });
 
     it('lists records with search and ordering', async () => {
-        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce({
-            results: [{ id: 1, email: 'user@example.com', name: 'User' }],
-            nextCursor: null,
-        });
+        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce(
+            aQueryResult({
+                items: [{ id: 1, email: 'user@example.com', name: 'User' }],
+                nextCursor: null,
+            })
+        );
         vi.mocked(querySetDouble.count).mockResolvedValueOnce(1);
 
         const response = await viewset.list(
@@ -211,7 +213,7 @@ describe(ModelViewSet, () => {
             }),
             paginatorFactory: (queryset) => new CursorPaginator(queryset),
         });
-        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce({ results: [], nextCursor: 'next' });
+        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce(aQueryResult({ items: [], nextCursor: 'next' }));
 
         const response = await withFilters.list(
             aResourcesRequestContext('GET', 'https://example.test/users?email=a@example.com')
@@ -229,7 +231,7 @@ describe(ModelViewSet, () => {
                 },
             }),
         });
-        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce(aQueryResult({ items: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValueOnce(0);
 
         const response = await withFilters.list(
@@ -252,7 +254,7 @@ describe(ModelViewSet, () => {
                 },
             }),
         });
-        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce(aQueryResult({ items: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValueOnce(0);
 
         const response = await withFilters.list(
@@ -282,7 +284,7 @@ describe(ModelViewSet, () => {
             }),
             orderingFields: ['email'],
         });
-        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce({ results: [], nextCursor: null });
+        vi.mocked(querySetDouble.fetch).mockResolvedValueOnce(aQueryResult({ items: [], nextCursor: null }));
         vi.mocked(querySetDouble.count).mockResolvedValueOnce(0);
 
         const response = await withFilters.list(
