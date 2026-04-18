@@ -30,6 +30,16 @@ ORDER BY posts.id ASC
 
 Every queryset refinement returns a new queryset, so application code can keep base queries around and derive narrower versions from them.
 
+### `all()`
+
+Use `all()` when you want the same queryset entrypoint as `query()` but prefer Django-style naming.
+
+```ts
+const posts = PostModel.objects.all();
+```
+
+`ModelManager.all()` delegates to `query()`, so it produces the same lazy queryset state.
+
 ### `findById(id)`
 
 Use `findById(id)` when you want one model record by primary key and `null` is an acceptable result.
@@ -110,6 +120,29 @@ The persistence layer receives a delete statement scoped to the primary key:
 ```sql
 DELETE FROM posts
 WHERE id = ?
+```
+
+### `getOrCreate({ where, defaults? })`
+
+Use `getOrCreate` when one call should return an existing record that matches `where` or create a new one. Tango derives create values from plain filter fields, from `defaults`, and (for `Q` trees) from unambiguous `Q` leaves. If the `where` filter is a `Q` node, you must pass `defaults` with at least one non-primary-key field so the insert is fully specified.
+
+```ts
+const { record, created } = await UserModel.objects.getOrCreate({
+    where: { email: 'user@example.com' },
+    defaults: { name: 'User' },
+});
+```
+
+### `updateOrCreate({ where, defaults?, update? })`
+
+Use `updateOrCreate` when a record may already match `where`. If no row matches, Tango creates one (using the same payload rules as `getOrCreate`). If a row matches, Tango applies `update` when it is present, otherwise it applies `defaults` as the patch. An empty patch does not run an update.
+
+```ts
+const { record, created, updated } = await UserModel.objects.updateOrCreate({
+    where: { email: 'user@example.com' },
+    defaults: { name: 'User' },
+    update: { name: 'Updated' },
+});
 ```
 
 ### `bulkCreate(inputs)`
@@ -253,11 +286,32 @@ SQLite supports `transaction.atomic(...)` only on file-backed databases in this 
 
 Concurrent outer SQLite transactions still follow normal SQLite file-locking semantics, so overlapping write transactions are not guaranteed to succeed together.
 
+## `QueryResult<T>`
+
+`fetch()` returns a `QueryResult<T>` value. Application code treats it like a small read surface over the materialized rows: sync `for...of`, `length`, `map(...)`, `at(...)`, spread, and destructuring behave like ordinary arrays.
+
+`items` lists the hydrated rows for this execution. `nextCursor` carries opaque pagination state when a higher layer supplies it; materializing a queryset through `fetch()` sets `nextCursor` to `null` today because cursor pagination lives in the resource layer.
+
+`toArray()` returns a shallow copy when application code needs a plain `T[]` value for APIs that expect arrays.
+
+The deprecated `results` getter still returns the same backing list and logs a one-time warning at access time.
+
 ## `QuerySet<TModel, TBaseResult = TModel, TSourceModel = unknown, THydrated = Record<never, never>>`
 
 `QuerySet` represents a database query against one model. Each refinement returns a new queryset, leaving the earlier one unchanged. A queryset refinement only describes work. An execution method is a terminal call that sends SQL to the database and returns a promise, such as `fetch(...)`, `fetchOne(...)`, `count()`, or `exists()`.
 
+Django's `QuerySet` is evaluated when the result is needed; in Tango, that moment is an explicit async call such as `fetch()`, a scalar terminal such as `get()`, or async iteration: `for await...of` over a queryset runs one `fetch()` for that queryset state and yields each row from the returned `QueryResult`. Page-oriented callers still reach for `fetch()` first; it is not deprecated.
+
 The generic parameters track the full model record type, the current base projection, the source model used for relation typing, and any hydrated relation properties that should be attached when a row-returning execution method runs.
+
+### `all()`
+
+Call `all()` on a queryset to return a new queryset with the same state. It is a no-op clone, similar to Django's `all()`.
+
+```ts
+const base = PostModel.objects.query();
+const same = base.all();
+```
 
 ### `filter(q)` and `exclude(q)`
 
@@ -307,7 +361,9 @@ const postCards = await PostModel.objects
     .select(['id', 'title'] as const)
     .fetch();
 
-postCards.results[0].title;
+const [first] = postCards;
+first?.id;
+first?.title;
 ```
 
 When Tango compiles the query, model fields become database columns:
@@ -327,7 +383,10 @@ Use `selectRelated(...)` when the requested path stays single-valued from hop to
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts.results[0].author?.profile?.displayName;
+const firstPost = posts.at(0);
+firstPost?.id;
+firstPost?.author?.email;
+firstPost?.author?.profile?.displayName;
 ```
 
 `selectRelated(...)` accepts nested paths such as `author__profile`, but it rejects any path that crosses a collection edge. A path like `posts__author` belongs in `prefetchRelated(...)`, not `selectRelated(...)`.
@@ -365,8 +424,14 @@ In contrast, use `prefetchRelated(...)` when the requested path includes a colle
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users.results[0].posts[0]?.author?.email;
-users.results[0].posts[0]?.comments[0]?.body;
+const firstUser = users.at(0);
+const firstPost = firstUser?.posts.at(0);
+const firstComment = firstPost?.comments.at(0);
+
+firstUser?.id;
+firstPost?.title;
+firstPost?.author?.email;
+firstComment?.body;
 ```
 
 `prefetchRelated(...)` runs the base query first, then runs batched follow-up queries for the planned collection edges. A user record with no matching posts still receives `posts: []`, and a post record with no matching comments receives `comments: []`.
@@ -408,21 +473,50 @@ const postCards = withAuthor.select(['id', 'title'] as const);
 
 const page = await postCards.fetch();
 
-page.results[0].title;
-page.results[0].author?.email;
+const [first] = page;
+first?.id;
+first?.title;
+first?.author?.email;
 ```
 
 The result contains the selected `PostModel` fields and the hydrated `author` model. The stored `authorId` field is not part of the base projection unless it is selected explicitly.
 
 ### `fetch(shape?)`
 
-Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` object with `results` and `nextCursor`.
+Use `fetch(shape?)` when application code wants all records for the current query. The return type is `QueryResult<Out>`; see [`QueryResult<T>`](#queryresultt) for iteration and array-like helpers.
+
+At the queryset level, `nextCursor` on the returned value is `null`. Cursor pagination belongs to resource paginators rather than the queryset contract itself.
 
 ```ts
-const page = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetch();
+const page = await PostModel.objects.query().filter({ published: true }).fetch();
+page.map((post) => post.id);
 ```
 
-At the queryset level, `nextCursor` is currently `null`. Cursor pagination belongs to resource paginators rather than the queryset contract itself.
+Call `toArray()` when you need a plain array value:
+
+```ts
+const page = await PostModel.objects.query().filter({ published: true }).fetch();
+const posts = page.toArray();
+posts.map((post) => post.id);
+```
+
+### Iterating a completed fetch
+
+```ts
+const page = await PostModel.objects.query().filter({ published: true }).fetch();
+for (const post of page) {
+    post.title;
+}
+```
+
+### Iterating a queryset
+
+```ts
+const queryset = PostModel.objects.query().filter({ published: true });
+for await (const post of queryset) {
+    post.title;
+}
+```
 
 ### `fetchOne(shape?)`
 
@@ -432,6 +526,8 @@ Use `fetchOne(shape?)` when application code only needs the first model record t
 const first = await PostModel.objects.query().orderBy('title').fetchOne();
 ```
 
+`first(shape?)` is an alias for `fetchOne(shape?)`.
+
 The SQL is the current query with a one-record limit:
 
 ```sql
@@ -439,6 +535,22 @@ SELECT posts.*
 FROM posts
 ORDER BY posts.title ASC
 LIMIT 1
+```
+
+### `last(shape?)`
+
+Use `last(shape?)` when application code wants the last row in the sense of "reverse the current `orderBy` spec and take one." If the queryset has no ordering, Tango orders by primary key descending before applying `limit(1)`.
+
+```ts
+const newest = await PostModel.objects.all().orderBy('createdAt').last();
+```
+
+### `get(q, shape?)`
+
+Use `get(q, shape?)` when exactly one row must match. It applies `filter(q)`, limits internally to detect ambiguity, and throws `NotFoundError` when no row matches or `MultipleObjectsReturned` when more than one row matches.
+
+```ts
+const post = await PostModel.objects.all().get({ slug: 'hello' });
 ```
 
 ### `count()`

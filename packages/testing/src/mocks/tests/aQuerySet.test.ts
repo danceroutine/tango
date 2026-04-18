@@ -15,7 +15,7 @@ describe(aQuerySet, () => {
         const selectRelatedOverride: QuerySet<Model>['selectRelated'] = vi.fn(() => qs);
         const prefetchRelatedOverride: QuerySet<Model>['prefetchRelated'] = vi.fn(() => qs);
         const fetchOverride: QuerySet<Model>['fetch'] = async <Out = Model>() =>
-            aQueryResult<Out>({ results: [{ id: 1 } as unknown as Out], nextCursor: 'next-cursor' });
+            aQueryResult<Out>({ items: [{ id: 1 } as unknown as Out], nextCursor: 'next-cursor' });
         const fetchOneOverride: QuerySet<Model>['fetchOne'] = async <Out = Model>() => ({ id: 1 }) as Out;
         const countOverride: QuerySet<Model>['count'] = vi.fn(async () => 9);
         const existsOverride: QuerySet<Model>['exists'] = vi.fn(async () => true);
@@ -40,7 +40,7 @@ describe(aQuerySet, () => {
         expect(qs.select(['id'])).toBe(qs);
         expect(qs.selectRelated('comments')).toBe(qs);
         expect(qs.prefetchRelated('comments')).toBe(qs);
-        await expect(qs.fetch()).resolves.toEqual({ results: [{ id: 1 }], nextCursor: 'next-cursor' });
+        await expect(qs.fetch()).resolves.toMatchObject({ items: [{ id: 1 }], nextCursor: 'next-cursor' });
         await expect(qs.fetchOne()).resolves.toEqual({ id: 1 });
         await expect(qs.count()).resolves.toBe(9);
         await expect(qs.exists()).resolves.toBe(true);
@@ -56,7 +56,7 @@ describe(aQuerySet, () => {
         expect(qs.select(['id'])).toBe(qs);
         expect(qs.selectRelated('comments')).toBe(qs);
         expect(qs.prefetchRelated('comments')).toBe(qs);
-        await expect(qs.fetch()).resolves.toEqual({ results: [], nextCursor: null });
+        await expect(qs.fetch()).resolves.toMatchObject({ items: [], nextCursor: null });
         await expect(qs.fetchOne()).resolves.toBeNull();
         await expect(qs.count()).resolves.toBe(0);
         await expect(qs.exists()).resolves.toBe(false);
@@ -66,11 +66,11 @@ describe(aQuerySet, () => {
         type Model = { id: number; email: string };
         type Selected = Pick<Model, 'id'>;
         const qs = aQuerySet<Model, Selected>({
-            fetch: async () => aQueryResult<Selected>({ results: [{ id: 1 }], nextCursor: null }),
+            fetch: async () => aQueryResult<Selected>({ items: [{ id: 1 }], nextCursor: null }),
             fetchOne: async () => ({ id: 1 }),
         });
 
-        await expect(qs.fetch()).resolves.toEqual({ results: [{ id: 1 }], nextCursor: null });
+        await expect(qs.fetch()).resolves.toMatchObject({ items: [{ id: 1 }], nextCursor: null });
         await expect(qs.fetchOne()).resolves.toEqual({ id: 1 });
         expectTypeOf(qs).toEqualTypeOf<QuerySet<Model, Selected>>();
     });

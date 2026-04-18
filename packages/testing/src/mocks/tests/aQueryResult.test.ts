@@ -3,13 +3,19 @@ import { aQueryResult } from '../aQueryResult';
 
 describe(aQueryResult, () => {
     it('returns default query-result shape', () => {
-        expect(aQueryResult()).toEqual({ results: [], nextCursor: null });
+        const result = aQueryResult();
+        expect(result.toJSON()).toEqual({ results: [], nextCursor: null });
+        expect(result.length).toBe(0);
     });
 
     it('applies provided overrides', () => {
-        expect(aQueryResult<number>({ results: [1, 2], nextCursor: 'abc' })).toEqual({
+        const result = aQueryResult<number>({ results: [1, 2], nextCursor: 'abc' });
+        expect(result.toJSON()).toEqual({
             results: [1, 2],
             nextCursor: 'abc',
         });
+        expect(result.length).toBe(2);
+        expect(result.at(0)).toBe(1);
+        expect(result.at(1)).toBe(2);
     });
 });

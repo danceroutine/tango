@@ -3,11 +3,11 @@ import type { Dialect } from './domain/Dialect';
 import type { QuerySetState } from './domain/QuerySetState';
 import type { TableMeta } from './domain/TableMeta';
 import type { QNode } from './domain/QNode';
-import type { QueryResult } from './domain/QueryResult';
 import type { OrderToken } from './domain/OrderToken';
 import type { FilterInput } from './domain/FilterInput';
 import type { CompiledQuery } from './domain/CompiledQuery';
 import type { CompiledHydrationNode } from './domain/CompiledQuery';
+import { QueryResult } from './domain/QueryResult';
 import type {
     GeneratedHydratedRelationMap,
     GeneratedPrefetchRelatedPathKeys,
@@ -24,6 +24,7 @@ import { InternalRelationHydrationCardinality } from './domain/RelationTyping';
 import { InternalQNodeType } from './domain/internal/InternalQNodeType';
 import { InternalDirection } from './domain/internal/InternalDirection';
 import { InternalDialect } from './domain/internal/InternalDialect';
+import { NotFoundError, MultipleObjectsReturned } from '@danceroutine/tango-core';
 import { QBuilder as Q } from './QBuilder';
 import { QueryCompiler } from './compiler';
 
@@ -92,7 +93,8 @@ export class QuerySet<
     TBaseResult extends Record<string, unknown> = TModel,
     TSourceModel = unknown,
     THydrated extends Record<string, unknown> = Record<never, never>,
-> {
+> implements AsyncIterable<HydratedQueryResult<TBaseResult, THydrated>>
+{
     static readonly BRAND = 'tango.orm.query_set' as const;
     readonly __tangoBrand: typeof QuerySet.BRAND = QuerySet.BRAND;
 
@@ -261,6 +263,10 @@ export class QuerySet<
         return new QuerySet(this.executor, { ...this.state, prefetchRelated: [...rels] });
     }
 
+    all(): QuerySet<TModel, TBaseResult, TSourceModel, THydrated> {
+        return new QuerySet(this.executor, { ...this.state });
+    }
+
     /**
      * Execute the query and optionally shape each row.
      *
@@ -300,10 +306,17 @@ export class QuerySet<
               ? projectedRows.map(shape)
               : projectedRows.map((r) => shape.parse(r));
 
-        return {
-            results,
-            nextCursor: null,
-        };
+        return new QueryResult(results, { nextCursor: null });
+    }
+
+    /**
+     * Async iteration runs `fetch()` once and yields each row from that materialized result.
+     */
+    async *[Symbol.asyncIterator](): AsyncIterator<HydratedQueryResult<TBaseResult, THydrated>> {
+        const result = await this.fetch();
+        for (const row of result as QueryResult<HydratedQueryResult<TBaseResult, THydrated>>) {
+            yield row;
+        }
     }
 
     /**
@@ -335,7 +348,83 @@ export class QuerySet<
             : typeof shape === 'function'
               ? await limited.fetch(shape)
               : await limited.fetch(shape);
-        return result.results[0] ?? null;
+        for (const row of result) {
+            return row;
+        }
+        return null;
+    }
+
+    async first(): Promise<HydratedQueryResult<TBaseResult, THydrated> | null>;
+    async first<Out>(
+        shape: QueryShapeFunction<HydratedQueryResult<TBaseResult, THydrated>, Out>
+    ): Promise<Out | null>;
+    async first<Out>(
+        shape: QueryShapeParser<HydratedQueryResult<TBaseResult, THydrated>, Out>
+    ): Promise<Out | null>;
+    async first<TShape extends QueryShape<HydratedQueryResult<TBaseResult, THydrated>> | undefined>(
+        shape?: TShape
+    ): Promise<
+        | HydratedQueryResult<TBaseResult, THydrated>
+        | QueryShapeOutput<HydratedQueryResult<TBaseResult, THydrated>, NonNullable<TShape>>
+        | null
+    > {
+        return this.fetchOne(shape as never);
+    }
+
+    async last(): Promise<HydratedQueryResult<TBaseResult, THydrated> | null>;
+    async last<Out>(
+        shape: QueryShapeFunction<HydratedQueryResult<TBaseResult, THydrated>, Out>
+    ): Promise<Out | null>;
+    async last<Out>(
+        shape: QueryShapeParser<HydratedQueryResult<TBaseResult, THydrated>, Out>
+    ): Promise<Out | null>;
+    async last<TShape extends QueryShape<HydratedQueryResult<TBaseResult, THydrated>> | undefined>(
+        shape?: TShape
+    ): Promise<
+        | HydratedQueryResult<TBaseResult, THydrated>
+        | QueryShapeOutput<HydratedQueryResult<TBaseResult, THydrated>, NonNullable<TShape>>
+        | null
+    > {
+        const invertedOrder = QuerySet.invertOrderSpec(this.state.order);
+        const effectiveOrder =
+            invertedOrder.length > 0
+                ? invertedOrder
+                : [{ by: this.executor.meta.pk as keyof TModel, dir: InternalDirection.DESC }];
+        const qs = new QuerySet(this.executor, { ...this.state, order: effectiveOrder });
+        return qs.limit(1).fetchOne(shape as never);
+    }
+
+    async get(q: FilterInput<TModel> | QNode<TModel>): Promise<HydratedQueryResult<TBaseResult, THydrated>>;
+    async get<Out>(
+        q: FilterInput<TModel> | QNode<TModel>,
+        shape: QueryShapeFunction<HydratedQueryResult<TBaseResult, THydrated>, Out>
+    ): Promise<Out>;
+    async get<Out>(
+        q: FilterInput<TModel> | QNode<TModel>,
+        shape: QueryShapeParser<HydratedQueryResult<TBaseResult, THydrated>, Out>
+    ): Promise<Out>;
+    async get<TShape extends QueryShape<HydratedQueryResult<TBaseResult, THydrated>> | undefined>(
+        q: FilterInput<TModel> | QNode<TModel>,
+        shape?: TShape
+    ): Promise<
+        | HydratedQueryResult<TBaseResult, THydrated>
+        | QueryShapeOutput<HydratedQueryResult<TBaseResult, THydrated>, NonNullable<TShape>>
+    > {
+        const limited = this.filter(q).limit(2);
+        const page = shape ? await limited.fetch(shape as never) : await limited.fetch();
+        const rows = page.items;
+
+        const count = rows.length;
+        if (count === 0) {
+            throw new NotFoundError(`${this.executor.meta.table}: no matching record`);
+        }
+        if (count > 1) {
+            throw new MultipleObjectsReturned(`${this.executor.meta.table}: more than one matching record`);
+        }
+
+        return rows[0]! as
+            | HydratedQueryResult<TBaseResult, THydrated>
+            | QueryShapeOutput<HydratedQueryResult<TBaseResult, THydrated>, NonNullable<TShape>>;
     }
 
     /**
@@ -355,6 +444,18 @@ export class QuerySet<
     async exists(): Promise<boolean> {
         const count = await this.count();
         return count > 0;
+    }
+
+    private static invertOrderSpec<T extends Record<string, unknown>>(
+        order: QuerySetState<T>['order']
+    ): NonNullable<QuerySetState<T>['order']> {
+        if (!order?.length) {
+            return [];
+        }
+        return order.map((spec) => ({
+            by: spec.by,
+            dir: spec.dir === InternalDirection.ASC ? InternalDirection.DESC : InternalDirection.ASC,
+        }));
     }
 
     private normalizeRowsForSchemaParsing<Out>(

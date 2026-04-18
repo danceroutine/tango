@@ -9,7 +9,7 @@ import { RetrieveUpdateAPIView } from '../generics/RetrieveUpdateAPIView';
 import { RetrieveUpdateDestroyAPIView } from '../generics/RetrieveUpdateDestroyAPIView';
 import { RequestContext } from '../../context/index';
 import { ModelSerializer } from '../../serializer/index';
-import { aQuerySet, aManager, aRequestContext } from '@danceroutine/tango-testing';
+import { aManager, aQueryResult, aQuerySet, aRequestContext } from '@danceroutine/tango-testing';
 import type { ResourceModelLike } from '../../resource/index';
 
 type UserRecord = {
@@ -96,10 +96,12 @@ describe('Generic class wrappers', () => {
     it('apply the generic wrappers to each supported view type', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
 
-        vi.mocked(querySetDouble.fetch).mockResolvedValue({
-            results: [{ id: 1, email: 'a@example.com', name: 'A' }],
-            nextCursor: null,
-        });
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(
+            aQueryResult({
+                items: [{ id: 1, email: 'a@example.com', name: 'A' }],
+                nextCursor: null,
+            })
+        );
         vi.mocked(querySetDouble.fetchOne).mockResolvedValue({ id: 1, email: 'a@example.com', name: 'A' });
         vi.mocked(querySetDouble.count).mockResolvedValue(1);
 

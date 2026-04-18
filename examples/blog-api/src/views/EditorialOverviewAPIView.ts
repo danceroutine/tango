@@ -48,8 +48,8 @@ export class EditorialOverviewAPIView extends APIView {
 
         return TangoResponse.json(
             EditorialOverviewResponseSchema.parse({
-                authorsWithRecentPosts: authorsWithRecentPosts.results,
-                recentPostsWithDiscussion: recentPostsWithDiscussion.results,
+                authorsWithRecentPosts: authorsWithRecentPosts.toArray(),
+                recentPostsWithDiscussion: recentPostsWithDiscussion.toArray(),
             })
         );
     }

@@ -11,7 +11,7 @@ export default async function HomePage({
     const params = TangoQueryParams.fromRecord(await searchParams);
     const search = params.getSearch();
 
-    let qs = PostModel.objects.query().orderBy('-createdAt').filter({ published: true });
+    let qs = PostModel.objects.all().orderBy('-createdAt').filter({ published: true });
 
     if (search) {
         const searchFilters: FilterInput<Post>[] = [{ title__icontains: search }, { content__icontains: search }];
@@ -20,11 +20,8 @@ export default async function HomePage({
 
     const paginator = new OffsetPaginator(qs, 20);
     const { limit, offset } = paginator.parseParams(params);
-    const [{ results: posts }, totalCount] = await Promise.all([
-        paginator.apply(qs.selectRelated('author')).fetch(),
-        qs.count(),
-    ]);
-    const pagination = paginator.toResponse(posts, { totalCount, params });
+    const [page, totalCount] = await Promise.all([paginator.apply(qs.selectRelated('author')).fetch(), qs.count()]);
+    const pagination = paginator.toResponse(page, { totalCount, params });
     const previousHref = pagination.previous ?? undefined;
     const nextHref = pagination.next ?? undefined;
 
@@ -52,10 +49,10 @@ export default async function HomePage({
             </form>
 
             <div className="space-y-6">
-                {posts.length === 0 ? (
+                {page.length === 0 ? (
                     <p className="text-gray-500">No published posts yet.</p>
                 ) : (
-                    posts.map((post) => (
+                    page.map((post) => (
                         <article key={post.id} className="border rounded-lg p-6 shadow-sm">
                             <div className="mb-3 flex items-center justify-between text-sm text-gray-500">
                                 <span>{new Date(post.createdAt).toLocaleDateString()}</span>
@@ -82,7 +79,7 @@ export default async function HomePage({
                 )}
 
                 <span>
-                    Showing {posts.length === 0 ? 0 : offset + 1}-{offset + posts.length} of {totalCount}
+                    Showing {page.length === 0 ? 0 : offset + 1}-{offset + page.length} of {totalCount}
                 </span>
 
                 {nextHref ? <a href={nextHref}>Next →</a> : <span className="text-gray-400">Next →</span>}

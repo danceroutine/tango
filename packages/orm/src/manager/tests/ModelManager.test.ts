@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotFoundError } from '@danceroutine/tango-core';
 import { aDBClient, aTangoRuntime, setupTestTangoRuntime } from '@danceroutine/tango-testing';
+import { InternalRelationKind } from '../../query/domain/internal/InternalRelationKind';
+import { InternalQNodeType } from '../../query/domain/internal/InternalQNodeType';
+import { Q } from '../../query/index';
 import { ModelManager } from '../ModelManager';
 import { getTangoRuntime } from '../../runtime/index';
 import { atomic } from '../../transaction';
@@ -74,6 +77,7 @@ describe(ModelManager, () => {
         const manager = new ModelManager(UserModel, getTangoRuntime());
 
         expect(ModelManager.isModelManager(manager)).toBe(true);
+        expect(ModelManager.isModelManager(null)).toBe(false);
         expect(ModelManager.isModelManager({})).toBe(false);
         expect(manager.meta).toEqual({
             table: 'users',
@@ -82,10 +86,53 @@ describe(ModelManager, () => {
         });
     });
 
+    it('copies planner relation metadata onto the validated table meta when TableMetaFactory supplies relations', async () => {
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+        await client.query('CREATE TABLE profiles (id INTEGER PRIMARY KEY, userId INTEGER)');
+
+        const relationMeta = {
+            edgeId: 'edge',
+            sourceModelKey: 'src',
+            targetModelKey: 'tgt',
+            kind: InternalRelationKind.HAS_ONE,
+            cardinality: 'single' as const,
+            capabilities: {
+                queryable: true,
+                hydratable: true,
+                joinable: true,
+                prefetchable: true,
+            },
+            table: 'profiles',
+            sourceKey: 'id',
+            targetKey: 'userId',
+            targetPrimaryKey: 'id',
+            targetColumns: { id: 'int', userId: 'int' },
+            alias: 'profile',
+        };
+
+        const factory = await import('../../query/domain/TableMetaFactory');
+        const spy = vi.spyOn(factory.TableMetaFactory, 'create').mockReturnValue({
+            table: 'users',
+            pk: 'id',
+            columns: { id: 'int', email: 'text', active: 'bool' },
+            relations: { profile: relationMeta },
+        });
+
+        try {
+            const manager = new ModelManager(UserModel, getTangoRuntime());
+            expect(manager.meta.relations?.profile).toMatchObject({ table: 'profiles', kind: InternalRelationKind.HAS_ONE });
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
     it('supports CRUD, query, and getOrThrow operations through the runtime-backed manager', async () => {
         const manager = new ModelManager(UserModel, getTangoRuntime());
         const client = await getTangoRuntime().getClient();
         await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        expect(manager.all()).not.toBe(manager.query());
 
         const created = await manager.create({ id: 1, email: 'user@example.com', active: true });
         expect(created).toEqual({ id: 1, email: 'user@example.com', active: 1 });
@@ -112,6 +159,251 @@ describe(ModelManager, () => {
         await manager.delete(1);
         expect(await manager.query().filter({ id: 1 }).fetchOne()).toBeNull();
         await expect(manager.getOrThrow(1)).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it('creates or returns an existing row from getOrCreate', async () => {
+        const manager = new ModelManager(UserModel, getTangoRuntime());
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        const first = await manager.getOrCreate({
+            where: { email: 'user@example.com' },
+            defaults: { id: 1, active: true },
+        });
+        expect(first.created).toBe(true);
+        expect(first.record).toEqual({ id: 1, email: 'user@example.com', active: 1 });
+
+        const second = await manager.getOrCreate({
+            where: { email: 'user@example.com' },
+            defaults: { id: 99, active: false },
+        });
+        expect(second.created).toBe(false);
+        expect(second.record).toEqual({ id: 1, email: 'user@example.com', active: 1 });
+    });
+
+    it('requires defaults when getOrCreate uses only Q composition', async () => {
+        const manager = new ModelManager(UserModel, getTangoRuntime());
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        await expect(manager.getOrCreate({ where: { id__gte: 1 } })).rejects.toThrow(
+            'Cannot create User from lookup-only filters without defaults.'
+        );
+
+        await expect(manager.getOrCreate({ where: { email__icontains: 'example' }, defaults: { id: 1 } })).rejects.toThrow(
+            'Cannot create User without any values.'
+        );
+
+        await expect(manager.getOrCreate({ where: Q.and({ active: true }) })).rejects.toThrow(
+            'Cannot create User from Q filters without defaults.'
+        );
+
+        await expect(manager.getOrCreate({ where: Q.and({ active: true }), defaults: {} })).rejects.toThrow(
+            'Cannot create User from Q filters without defaults.'
+        );
+
+        await expect(
+            manager.getOrCreate({
+                where: Q.and<UserRecord>({ active: true }),
+            })
+        ).rejects.toThrow('Cannot create User from Q filters without defaults.');
+
+        await expect(
+            manager.getOrCreate({
+                where: Q.and<UserRecord>({ active: true }),
+                get defaults() {
+                    return undefined;
+                },
+            } as Parameters<ModelManager<UserRecord>['getOrCreate']>[0])
+        ).rejects.toThrow('Cannot create User from Q filters without defaults.');
+    });
+
+    it('creates or updates through getOrCreate and updateOrCreate when the filter is a Q tree', async () => {
+        const manager = new ModelManager(UserModel, getTangoRuntime());
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        const created = await manager.getOrCreate({
+            where: Q.and<UserRecord>({ email: 'q@example.com' }),
+            defaults: { id: 1, active: true },
+        });
+        expect(created.created).toBe(true);
+        expect(created.record).toEqual({ id: 1, email: 'q@example.com', active: 1 });
+
+        const existing = await manager.getOrCreate({
+            where: Q.and<UserRecord>({ email: 'q@example.com' }),
+            defaults: { id: 99, active: false },
+        });
+        expect(existing.created).toBe(false);
+        expect(existing.record).toEqual({ id: 1, email: 'q@example.com', active: 1 });
+
+        await client.query('DELETE FROM users');
+
+        const upInsert = await manager.updateOrCreate({
+            where: Q.and<UserRecord>({ email: 'up@example.com' }),
+            defaults: { id: 2, active: true },
+            update: { active: false },
+        });
+        expect(upInsert.created).toBe(true);
+        expect(upInsert.updated).toBe(false);
+        expect(upInsert.record).toEqual({ id: 2, email: 'up@example.com', active: 1 });
+
+        const upUpdate = await manager.updateOrCreate({
+            where: Q.and<UserRecord>({ email: 'up@example.com' }),
+            defaults: { id: 99, active: true },
+            update: { active: false },
+        });
+        expect(upUpdate.created).toBe(false);
+        expect(upUpdate.updated).toBe(true);
+        expect(upUpdate.record).toEqual({ id: 2, email: 'up@example.com', active: 0 });
+
+        await expect(
+            manager.getOrCreate({
+                where: Q.or<UserRecord>({ email: 'a@example.com' }, { email: 'b@example.com' }),
+                defaults: { id: 3, active: true },
+            })
+        ).rejects.toThrow('Cannot derive a create payload from User OR filters with multiple predicates');
+
+        await expect(
+            manager.getOrCreate({
+                where: Q.or<UserRecord>({ email: 'same@example.com' }, { email: 'same@example.com' }),
+                defaults: { id: 4, active: true },
+            })
+        ).rejects.toThrow('Cannot derive a create payload from User OR filters with multiple predicates');
+
+        await client.query('DELETE FROM users');
+
+        const orLookupOnly = await manager.getOrCreate({
+            where: Q.or<UserRecord>({ email__icontains: 'a' }, { email__icontains: 'b' }),
+            defaults: { id: 8, email: 'orlookup@example.com', active: true },
+        });
+        expect(orLookupOnly.created).toBe(true);
+        expect(orLookupOnly.record).toEqual({ id: 8, email: 'orlookup@example.com', active: 1 });
+
+        await client.query('DELETE FROM users');
+
+        const orMixed = await manager.getOrCreate({
+            where: Q.or<UserRecord>({ email: 'single-or@example.com' }, { email__icontains: 'unused' }),
+            defaults: { id: 9, active: true },
+        });
+        expect(orMixed.created).toBe(true);
+        expect(orMixed.record).toEqual({ id: 9, email: 'single-or@example.com', active: 1 });
+
+        await client.query('DELETE FROM users');
+
+        await manager.getOrCreate({
+            where: Q.not<UserRecord>({ active: false }),
+            defaults: { id: 5, email: 'not@example.com', active: true },
+        });
+
+        await client.query('DELETE FROM users');
+
+        await manager.getOrCreate({
+            where: { kind: 'wat', nodes: [] } as unknown as Parameters<ModelManager<UserRecord>['getOrCreate']>[0]['where'],
+            defaults: { id: 6, email: 'wat@example.com', active: true },
+        });
+
+        await client.query('DELETE FROM users');
+
+        await expect(
+            manager.getOrCreate({
+                where: { kind: 'wat', nodes: [] } as unknown as Parameters<ModelManager<UserRecord>['getOrCreate']>[0]['where'],
+                defaults: { id: 7 },
+            })
+        ).rejects.toThrow('Cannot create User without any values.');
+
+        await expect(
+            manager.getOrCreate({
+                where: Q.and<UserRecord>({ email: 'x@example.com' }, { email: 'y@example.com' }),
+                defaults: { id: 10, active: true },
+            })
+        ).rejects.toThrow("Conflicting values for 'email'");
+
+        await client.query('DELETE FROM users');
+
+        const emptyAnd = await manager.getOrCreate({
+            where: { kind: InternalQNodeType.AND } as Parameters<ModelManager<UserRecord>['getOrCreate']>[0]['where'],
+            defaults: { id: 11, email: 'empty-and@example.com', active: true },
+        });
+        expect(emptyAnd.created).toBe(true);
+        expect(emptyAnd.record).toEqual({ id: 11, email: 'empty-and@example.com', active: 1 });
+
+        await client.query('DELETE FROM users');
+
+        const emptyOr = await manager.getOrCreate({
+            where: { kind: InternalQNodeType.OR } as Parameters<ModelManager<UserRecord>['getOrCreate']>[0]['where'],
+            defaults: { id: 12, email: 'empty-or@example.com', active: true },
+        });
+        expect(emptyOr.created).toBe(true);
+        expect(emptyOr.record).toEqual({ id: 12, email: 'empty-or@example.com', active: 1 });
+
+    });
+
+    it('creates, updates, or returns from updateOrCreate', async () => {
+        const manager = new ModelManager(UserModel, getTangoRuntime());
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        const created = await manager.updateOrCreate({
+            where: { email: 'user@example.com' },
+            defaults: { id: 1, active: true },
+            update: { active: false },
+        });
+        expect(created.created).toBe(true);
+        expect(created.updated).toBe(false);
+        expect(created.record).toEqual({ id: 1, email: 'user@example.com', active: 1 });
+
+        const updated = await manager.updateOrCreate({
+            where: { email: 'user@example.com' },
+            defaults: { id: 99, active: true },
+            update: { active: false },
+        });
+        expect(updated.created).toBe(false);
+        expect(updated.updated).toBe(true);
+        expect(updated.record).toEqual({ id: 1, email: 'user@example.com', active: 0 });
+
+        const noop = await manager.updateOrCreate({
+            where: { email: 'user@example.com' },
+            update: {},
+        });
+        expect(noop.created).toBe(false);
+        expect(noop.updated).toBe(false);
+        expect(noop.record).toEqual({ id: 1, email: 'user@example.com', active: 0 });
+
+        const noopBare = await manager.updateOrCreate({
+            where: { email: 'user@example.com' },
+        });
+        expect(noopBare.created).toBe(false);
+        expect(noopBare.updated).toBe(false);
+        expect(noopBare.record).toEqual({ id: 1, email: 'user@example.com', active: 0 });
+
+        await client.query('DELETE FROM users');
+
+        await client.query(
+            "INSERT INTO users (id, email, active) VALUES (2, 'defaults-only@example.com', 1)"
+        );
+
+        const patchedByDefaults = await manager.updateOrCreate({
+            where: { email: 'defaults-only@example.com' },
+            defaults: { active: false },
+        });
+        expect(patchedByDefaults.created).toBe(false);
+        expect(patchedByDefaults.updated).toBe(true);
+        expect(patchedByDefaults.record).toEqual({ id: 2, email: 'defaults-only@example.com', active: 0 });
+
+        await client.query('DELETE FROM users');
+
+        const insertedWithDefaultsOnly = await manager.updateOrCreate({
+            where: { email: 'insert-no-update-key@example.com' },
+            defaults: { id: 3, active: false },
+        });
+        expect(insertedWithDefaultsOnly.created).toBe(true);
+        expect(insertedWithDefaultsOnly.updated).toBe(false);
+        expect(insertedWithDefaultsOnly.record).toEqual({
+            id: 3,
+            email: 'insert-no-update-key@example.com',
+            active: 0,
+        });
     });
 
     it('uses postgres placeholders for create, update, delete, and bulkCreate when the runtime dialect is postgres', async () => {

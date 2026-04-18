@@ -7,6 +7,7 @@ import * as factories from './factories/index';
 import { TangoError, type ErrorDetails, type ErrorEnvelope, type ProblemDetails } from './TangoError';
 import { ConflictError } from './ConflictError';
 import { ValidationError } from './ValidationError';
+import { MultipleObjectsReturned } from './MultipleObjectsReturned';
 import { NotFoundError } from './NotFoundError';
 import { PermissionDenied } from './PermissionDenied';
 import { AuthenticationError } from './AuthenticationError';
@@ -16,6 +17,7 @@ export {
     AuthenticationError,
     ConflictError,
     HttpErrorFactory,
+    MultipleObjectsReturned,
     NotFoundError,
     PermissionDenied,
     TangoError,

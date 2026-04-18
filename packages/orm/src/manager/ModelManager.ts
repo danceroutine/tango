@@ -1,4 +1,6 @@
 import { NotFoundError } from '@danceroutine/tango-core';
+import type { QNode } from '../query/domain/QNode';
+import { InternalQNodeType } from '../query/domain/internal/InternalQNodeType';
 import type { ModelWriteHooks } from '@danceroutine/tango-schema';
 import type { Model as SchemaModel } from '@danceroutine/tango-schema/domain';
 import type { FilterInput, TableMeta } from '../query/domain/index';
@@ -99,6 +101,56 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
 
     query(): QuerySet<TModelRow, TModelRow, TSourceModel> {
         return new QuerySetClass<TModelRow, TModelRow, TSourceModel>(this.queryExecutor, {});
+    }
+
+    all(): QuerySet<TModelRow, TModelRow, TSourceModel> {
+        return this.query();
+    }
+
+    async getOrCreate(args: {
+        where: FilterInput<TModelRow> | QNode<TModelRow>;
+        defaults?: Partial<TModelRow>;
+    }): Promise<{ record: TModelRow; created: boolean }> {
+        const existing = await this.query().filter(args.where).fetchOne();
+        if (existing) {
+            return { record: existing, created: false };
+        }
+        const merged = ModelManager.mergeCreatePayloadFromWhere(
+            this.model.metadata.name,
+            this.meta.pk,
+            args.where,
+            args.defaults
+        );
+        const record = await this.create(merged);
+        return { record, created: true };
+    }
+
+    async updateOrCreate(args: {
+        where: FilterInput<TModelRow> | QNode<TModelRow>;
+        defaults?: Partial<TModelRow>;
+        update?: Partial<TModelRow>;
+    }): Promise<{ record: TModelRow; created: boolean; updated: boolean }> {
+        const existing = await this.query().filter(args.where).fetchOne();
+        if (!existing) {
+            const merged = ModelManager.mergeCreatePayloadFromWhere(
+                this.model.metadata.name,
+                this.meta.pk,
+                args.where,
+                args.defaults
+            );
+            const record = await this.create(merged);
+            return { record, created: true, updated: false };
+        }
+
+        const patch = args.update ?? args.defaults ?? {};
+        const patchKeys = Object.keys(patch);
+        if (patchKeys.length === 0) {
+            return { record: existing, created: false, updated: false };
+        }
+
+        const id = existing[this.meta.pk as keyof TModelRow] as TModelRow[keyof TModelRow];
+        const record = await this.update(id, patch);
+        return { record, created: false, updated: true };
     }
 
     async findById(id: TModelRow[keyof TModelRow]): Promise<TModelRow | null> {
@@ -273,4 +325,127 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
     private getHookTransaction() {
         return TransactionEngine.forRuntime(this.runtime).getActiveTransaction();
     }
+
+    private static mergeCreatePayloadFromWhere<TModelRow extends Record<string, unknown>>(
+        modelName: string,
+        pkColumn: string,
+        where: FilterInput<TModelRow> | QNode<TModelRow>,
+        defaults?: Partial<TModelRow>
+    ): Partial<TModelRow> {
+        const hasDefaultsArg = defaults !== undefined;
+        const providedDefaults =
+            defaults !== undefined ? ({ ...defaults } as Partial<TModelRow>) : undefined;
+
+        if (ModelManager.isQNodeLike(where)) {
+            if (!hasDefaultsArg) {
+                throw new Error(`Cannot create ${modelName} from Q filters without defaults.`);
+            }
+            if (!providedDefaults || Object.keys(providedDefaults).length === 0) {
+                throw new Error(`Cannot create ${modelName} from Q filters without defaults.`);
+            }
+            const fromQ = ModelManager.collectPlainFieldsFromQNode(modelName, where);
+            const merged = { ...fromQ, ...providedDefaults };
+            const keys = Object.keys(merged).filter((key) => merged[key as keyof TModelRow] !== undefined);
+            const nonPkKeys = keys.filter((key) => key !== pkColumn);
+            if (nonPkKeys.length === 0) {
+                throw new Error(`Cannot create ${modelName} without any values.`);
+            }
+            return merged;
+        }
+
+        const atom = where as FilterInput<TModelRow>;
+        const entries = Object.entries(atom as Record<string, unknown>);
+        const plainEntries = entries.filter(([key]) => !String(key).includes('__'));
+        const lookupOnly = entries.length > 0 && plainEntries.length === 0;
+
+        const fromAtom =
+            plainEntries.length > 0 ? (Object.fromEntries(plainEntries) as Partial<TModelRow>) : undefined;
+        const mergeBase = { ...fromAtom, ...providedDefaults };
+
+        if (lookupOnly && ModelManager.countNonPkValues(mergeBase) === 0) {
+            throw new Error(`Cannot create ${modelName} from lookup-only filters without defaults.`);
+        }
+
+        const cleanedAtom =
+            plainEntries.length > 0 ? (Object.fromEntries(plainEntries) as Partial<TModelRow>) : ({} as Partial<TModelRow>);
+        const merged = { ...cleanedAtom, ...mergeBase };
+        const keys = Object.keys(merged).filter((key) => merged[key as keyof TModelRow] !== undefined);
+        const nonPkKeys = keys.filter((key) => key !== pkColumn);
+        if (nonPkKeys.length === 0) {
+            throw new Error(`Cannot create ${modelName} without any values.`);
+        }
+        return merged;
+    }
+
+    private static countNonPkValues<TModelRow extends Record<string, unknown>>(payload: Partial<TModelRow>): number {
+        return Object.entries(payload as Record<string, unknown>).filter(([, value]) => value !== undefined).length;
+    }
+
+    private static isQNodeLike<TModelRow extends Record<string, unknown>>(
+        value: FilterInput<TModelRow> | QNode<TModelRow>
+    ): value is QNode<TModelRow> {
+        return (
+            typeof value === 'object' &&
+            value !== null &&
+            'kind' in value &&
+            typeof (value as { kind: unknown }).kind === 'string' &&
+            !('__tangoBrand' in value)
+        );
+    }
+
+    private static collectPlainFieldsFromQNode<TModelRow extends Record<string, unknown>>(
+        modelName: string,
+        node: QNode<TModelRow>
+    ): Partial<TModelRow> {
+        switch (node.kind) {
+            case InternalQNodeType.ATOM: {
+                const atom = node.where as FilterInput<TModelRow>;
+                return ModelManager.omitLookupKeysFromAtom(atom);
+            }
+            case InternalQNodeType.AND: {
+                const partials = (node.nodes ?? []).map((child) =>
+                    ModelManager.collectPlainFieldsFromQNode(modelName, child)
+                );
+                return ModelManager.mergeCompatiblePartials(partials);
+            }
+            case InternalQNodeType.OR: {
+                const partials = (node.nodes ?? []).map((child) =>
+                    ModelManager.collectPlainFieldsFromQNode(modelName, child)
+                );
+                const nonEmpty = partials.filter((p) => Object.keys(p as Record<string, unknown>).length > 0);
+                if (nonEmpty.length > 1) {
+                    throw new Error(
+                        `Cannot derive a create payload from ${modelName} OR filters with multiple predicates. Supply defaults that fully describe the insert.`
+                    );
+                }
+                return nonEmpty.length === 1 ? nonEmpty[0]! : {};
+            }
+            case InternalQNodeType.NOT:
+                return {};
+        }
+    }
+
+    private static omitLookupKeysFromAtom<TModelRow extends Record<string, unknown>>(
+        atom: FilterInput<TModelRow>
+    ): Partial<TModelRow> {
+        const entries = Object.entries(atom as Record<string, unknown>).filter(([key]) => !String(key).includes('__'));
+        return Object.fromEntries(entries) as Partial<TModelRow>;
+    }
+
+    private static mergeCompatiblePartials<TModelRow extends Record<string, unknown>>(
+        partials: Array<Partial<TModelRow>>
+    ): Partial<TModelRow> {
+        const merged: Partial<TModelRow> = {};
+        for (const partial of partials) {
+            for (const [key, value] of Object.entries(partial as Record<string, unknown>)) {
+                const existing = merged[key as keyof TModelRow];
+                if (existing !== undefined && existing !== value) {
+                    throw new Error(`Conflicting values for '${key}' while deriving create payload from Q filters.`);
+                }
+                (merged as Record<string, unknown>)[key] = value;
+            }
+        }
+        return merged;
+    }
+
 }
