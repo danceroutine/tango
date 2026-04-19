@@ -2,6 +2,10 @@
 
 This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
 
+## 1.6.0 - 2026-04-19
+
+Adds iterable `QueryResult` values from `QuerySet.fetch()`, async iteration over `QuerySet`, and Django-style caching for repeated row-returning evaluation of the same queryset instance. Paginator builders now accept either arrays or `QueryResult` values. The legacy `QueryResult.results` getter remains available for compatibility and now emits a one-time deprecation warning.
+
 ## 1.5.0 - 2026-04-17
 
 Tango's relation workflow now extends from first-hop hydration into deeper generated relation-aware contracts. Application code can traverse more of its related graph while keeping ORM results, generated surfaces, and runtime-facing contracts aligned.
