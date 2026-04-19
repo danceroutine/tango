@@ -127,7 +127,7 @@ describe.each(selectedDialects())('ORM integration (%s)', (dialect) => {
             });
 
             const published = await queryset.filter({ published: true }).orderBy('-id').fetch();
-            await expectQueryResult(Promise.resolve(published.results.map((row: PostRow) => row.id)), [3, 1]);
+            await expectQueryResult(Promise.resolve(published.items.map((row: PostRow) => row.id)), [3, 1]);
 
             const first = await queryset.filter({ slug: 'first' }).fetchOne();
             expect(first?.title).toBe('First');
@@ -137,7 +137,7 @@ describe.each(selectedDialects())('ORM integration (%s)', (dialect) => {
                 .orderBy('id')
                 .select(['id', 'slug'] as const)
                 .fetch();
-            expect(projected.results).toEqual([
+            expect(projected.items).toEqual([
                 { id: 1, slug: 'first' },
                 { id: 3, slug: 'third' },
             ]);
@@ -149,7 +149,7 @@ describe.each(selectedDialects())('ORM integration (%s)', (dialect) => {
                 .fetch({
                     parse: (row) => `${row.id}:${row.slug}`,
                 });
-            expect(shaped.results).toEqual(['1:first', '3:third']);
+            expect(shaped.items).toEqual(['1:first', '3:third']);
 
             const count = await queryset.count();
             expect(count).toBe(3);

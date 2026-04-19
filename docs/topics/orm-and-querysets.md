@@ -98,9 +98,12 @@ Queryset code becomes easier to reuse this way. One part of the application can 
 
 ## QuerySets are lazy
 
-Creating and refining a queryset does not execute a database query by itself.
+Internally, a queryset can be constructed, filtered, ordered, and passed around without hitting the database. No SQL runs until something evaluates the queryset.
 
-Tango waits until application code asks for results. In everyday use, that means the database is queried when code calls methods such as `fetch()`, `fetchOne()`, `count()`, or `exists()`.
+You evaluate a queryset when you:
+
+- Call **`fetch()`**, **`fetchOne()`**, **`count()`**, or **`exists()`**.
+- Run **`for await (const … of queryset)`**. That performs one **`fetch()`** for the current queryset state and yields each value from the returned result.
 
 ```ts
 const queryset = PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').limit(10);
@@ -108,7 +111,9 @@ const queryset = PostModel.objects.query().filter({ published: true }).orderBy('
 const posts = await queryset.fetch();
 ```
 
-The earlier `filter(...)`, `orderBy(...)`, and `limit(...)` calls only build the query. `fetch()` is the point where Tango actually asks the database for rows.
+The `filter(...)`, `orderBy(...)`, and `limit(...)` calls only refine the query. `fetch()` is where Tango sends SQL.
+
+After the first row-returning evaluation, the same queryset instance reuses its cached materialized result on later `fetch()` or async-iteration calls. Build a refined queryset when you want a different SQL query and a separate cache.
 
 ## Retrieving records
 
@@ -174,7 +179,7 @@ const postHeaders = await PostModel.objects
     .fetch();
 ```
 
-In that example, each row in `postHeaders.results` is typed as `{ id, title, slug }`.
+In that example, each object in `postHeaders` is typed as `{ id, title, slug }`.
 
 Widened arrays still work for SQL projection, but they fall back to the full row type because TypeScript can no longer prove which exact keys are present:
 
@@ -206,7 +211,8 @@ Use `selectRelated(...)` when the path stays single-valued from hop to hop. In t
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts.results[0].author?.profile?.displayName;
+const [firstPost] = posts;
+firstPost?.author?.profile?.displayName;
 ```
 
 `selectRelated(...)` is for single-valued relations such as `belongsTo`, `hasOne`, and reverse one-to-one paths. A missing related row is returned as `null` at the point where the path stops matching.
@@ -216,8 +222,9 @@ In contrast, use `prefetchRelated(...)` when the path includes a collection edge
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users.results[0].posts[0]?.author?.email;
-users.results[0].posts[0]?.comments[0]?.body;
+const [firstUser] = users;
+firstUser?.posts[0]?.author?.email;
+firstUser?.posts[0]?.comments[0]?.body;
 ```
 
 In that form, a user with no posts still receives `posts: []`, while a post with no comments receives `comments: []`.
@@ -231,7 +238,8 @@ const postCards = await PostModel.objects
     .select(['id', 'title'] as const)
     .fetch();
 
-postCards.results[0].author?.email;
+const [firstCard] = postCards;
+firstCard?.author?.email;
 ```
 
 The selected `PostModel` fields in that example are `id` and `title`, while the hydrated `author` model remains available.
