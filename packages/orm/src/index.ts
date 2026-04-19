@@ -15,7 +15,7 @@ export { PostgresAdapter, SqliteAdapter } from './connection/index';
 export { ModelManager } from './manager/index';
 export type { ManagerLike } from './manager/index';
 
-export { Q, QBuilder, QueryCompiler, QuerySet } from './query/index';
+export { Q, QBuilder, QueryCompiler, QueryResult, QuerySet } from './query/index';
 export type { QueryExecutor } from './query/index';
 export type {
     CompiledQuery,
@@ -28,7 +28,6 @@ export type {
     OrderSpec,
     OrderToken,
     QNode,
-    QueryResult,
     QuerySetState,
     RelationMeta,
     TableMeta,

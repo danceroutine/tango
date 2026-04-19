@@ -3,11 +3,11 @@ import type { Dialect } from './domain/Dialect';
 import type { QuerySetState } from './domain/QuerySetState';
 import type { TableMeta } from './domain/TableMeta';
 import type { QNode } from './domain/QNode';
-import type { QueryResult } from './domain/QueryResult';
 import type { OrderToken } from './domain/OrderToken';
 import type { FilterInput } from './domain/FilterInput';
 import type { CompiledQuery } from './domain/CompiledQuery';
 import type { CompiledHydrationNode } from './domain/CompiledQuery';
+import { QueryResult } from './domain/QueryResult';
 import type {
     GeneratedHydratedRelationMap,
     GeneratedPrefetchRelatedPathKeys,
@@ -71,6 +71,12 @@ type ProjectedResult<
  * Provides a fluent API for filtering, ordering, pagination, projection, and
  * nested relation hydration.
  *
+ * Refinements such as `filter`, `orderBy`, `select`, and relation loaders build
+ * query state only. SQL runs when you call an evaluation method (`fetch`,
+ * `fetchOne`, `count`, `exists`, or `for await` over this queryset). After the
+ * first row-returning evaluation, this queryset instance reuses its cached
+ * materialized result on later `fetch()` or async-iteration calls.
+ *
  * @template TModel - The full model row type used for query composition
  * @template TBaseResult - The selected base-row shape returned by execution methods
  * @template TSourceModel - The source Tango model used for typed relation metadata
@@ -92,9 +98,11 @@ export class QuerySet<
     TBaseResult extends Record<string, unknown> = TModel,
     TSourceModel = unknown,
     THydrated extends Record<string, unknown> = Record<never, never>,
-> {
+> implements AsyncIterable<HydratedQueryResult<TBaseResult, THydrated>>
+{
     static readonly BRAND = 'tango.orm.query_set' as const;
     readonly __tangoBrand: typeof QuerySet.BRAND = QuerySet.BRAND;
+    private evaluationCache?: Promise<QueryResult<HydratedQueryResult<TBaseResult, THydrated>>>;
 
     constructor(
         private executor: QueryExecutor<TModel>,
@@ -287,23 +295,31 @@ export class QuerySet<
             | QueryShapeFunction<HydratedQueryResult<TBaseResult, THydrated>, Out>
             | QueryShapeParser<HydratedQueryResult<TBaseResult, THydrated>, Out>
     ): Promise<QueryResult<HydratedQueryResult<TBaseResult, THydrated> | Out>> {
-        const compiler = new QueryCompiler(this.executor.meta, this.executor.dialect);
-        const compiled = compiler.compile(this.state);
-        const rows = await this.executor.run(compiled);
-        const normalizedRows = this.normalizeRowsForSchemaParsing(rows, shape);
-        const hydratedRows = await this.hydrateRows(normalizedRows as unknown as Record<string, unknown>[], compiled);
-        const projectedRows = hydratedRows as Array<HydratedQueryResult<TBaseResult, THydrated>>;
+        const baseResult = await this.getOrCreateEvaluationCache();
+        if (!shape) {
+            return baseResult;
+        }
 
-        const results: Array<HydratedQueryResult<TBaseResult, THydrated> | Out> = !shape
-            ? projectedRows
-            : typeof shape === 'function'
-              ? projectedRows.map(shape)
-              : projectedRows.map((r) => shape.parse(r));
+        const results: Array<HydratedQueryResult<TBaseResult, THydrated> | Out> =
+            typeof shape === 'function'
+                ? baseResult.items.map(shape)
+                : this.normalizeHydratedRowsForParserShape(baseResult.items).map((row) => shape.parse(row));
 
-        return {
-            results,
-            nextCursor: null,
-        };
+        return new QueryResult(results);
+    }
+
+    /**
+     * Async iterable surface for `for await (... of queryset)`.
+     *
+     * Evaluates this queryset on first use by awaiting {@link QuerySet.fetch} without arguments, then
+     * yields each element from that {@link QueryResult}. Later async iterations over the same queryset
+     * instance reuse the cached materialized result instead of issuing another database round-trip.
+     */
+    async *[Symbol.asyncIterator](): AsyncIterator<HydratedQueryResult<TBaseResult, THydrated>> {
+        const result = await this.fetch();
+        for (const row of result) {
+            yield row;
+        }
     }
 
     /**
@@ -335,7 +351,10 @@ export class QuerySet<
             : typeof shape === 'function'
               ? await limited.fetch(shape)
               : await limited.fetch(shape);
-        return result.results[0] ?? null;
+        for (const row of result) {
+            return row;
+        }
+        return null;
     }
 
     /**
@@ -357,14 +376,30 @@ export class QuerySet<
         return count > 0;
     }
 
-    private normalizeRowsForSchemaParsing<Out>(
-        rows: TModel[],
-        shape?:
-            | QueryShapeFunction<HydratedQueryResult<TBaseResult, THydrated>, Out>
-            | QueryShapeParser<HydratedQueryResult<TBaseResult, THydrated>, Out>
-    ): TModel[] {
-        if (!shape || typeof shape === 'function' || this.executor.dialect !== InternalDialect.SQLITE) {
-            return rows;
+    private getOrCreateEvaluationCache(): Promise<QueryResult<HydratedQueryResult<TBaseResult, THydrated>>> {
+        if (!this.evaluationCache) {
+            this.evaluationCache = this.evaluateRows().catch((error) => {
+                this.evaluationCache = undefined;
+                throw error;
+            });
+        }
+        return this.evaluationCache;
+    }
+
+    private async evaluateRows(): Promise<QueryResult<HydratedQueryResult<TBaseResult, THydrated>>> {
+        const compiler = new QueryCompiler(this.executor.meta, this.executor.dialect);
+        const compiled = compiler.compile(this.state);
+        const rows = await this.executor.run(compiled);
+        const hydratedRows = await this.hydrateRows(rows as unknown as Record<string, unknown>[], compiled);
+        const projectedRows = hydratedRows as Array<HydratedQueryResult<TBaseResult, THydrated>>;
+        return new QueryResult(projectedRows);
+    }
+
+    private normalizeHydratedRowsForParserShape(
+        rows: readonly HydratedQueryResult<TBaseResult, THydrated>[]
+    ): Array<HydratedQueryResult<TBaseResult, THydrated>> {
+        if (this.executor.dialect !== InternalDialect.SQLITE) {
+            return [...rows];
         }
 
         const booleanColumns = Object.entries(this.executor.meta.columns)
@@ -372,7 +407,7 @@ export class QuerySet<
             .map(([column]) => column);
 
         if (booleanColumns.length === 0) {
-            return rows;
+            return [...rows];
         }
 
         return rows.map((row) => this.normalizeBooleanColumns(row, booleanColumns));
@@ -624,8 +659,8 @@ export class QuerySet<
         return value;
     }
 
-    private normalizeBooleanColumns(row: TModel, columns: readonly string[]): TModel {
-        let normalized: TModel | null = null;
+    private normalizeBooleanColumns<TRow extends Record<string, unknown>>(row: TRow, columns: readonly string[]): TRow {
+        let normalized: TRow | null = null;
 
         for (const column of columns) {
             const current = (row as Record<string, unknown>)[column];

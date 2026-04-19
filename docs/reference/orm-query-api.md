@@ -1,10 +1,8 @@
 # ORM query API
 
-`@danceroutine/tango-orm` provides the model manager and queryset surface behind `Model.objects`.
+Use this page when application code already works at the ORM layer and you need the exact contracts for model-backed reads, writes, transactions, and relation hydration. For a narrative introduction to the same surface, see [ORM and QuerySets](/topics/orm-and-querysets).
 
-Application code usually starts with `Model.objects`. The manager owns lookups and writes for one model. Calling `query()` returns a `QuerySet`, which is the immutable builder for model-backed reads. After those core surfaces, this page covers the lower-level exports that startup code, tests, and tooling may use directly.
-
-The examples below use a blog application with `PostModel`, `UserModel`, and `CommentModel`. A post belongs to one author through the relation name `author`, and a user exposes authored posts through the reverse relation name `posts`.
+Throughout this reference the examples use a blog domain: `PostModel`, `UserModel`, and `CommentModel`. Posts relate to authors through `author`; users expose authored posts through the reverse name `posts`.
 
 ## `Model.objects` and `ModelManager<TModelRow>`
 
@@ -255,9 +253,20 @@ Concurrent outer SQLite transactions still follow normal SQLite file-locking sem
 
 ## `QuerySet<TModel, TBaseResult = TModel, TSourceModel = unknown, THydrated = Record<never, never>>`
 
-`QuerySet` represents a database query against one model. Each refinement returns a new queryset, leaving the earlier one unchanged. A queryset refinement only describes work. An execution method is a terminal call that sends SQL to the database and returns a promise, such as `fetch(...)`, `fetchOne(...)`, `count()`, or `exists()`.
+`QuerySet` describes a single-model read query. Refinement methods return a **new** queryset and do not mutate the previous one. Nothing hits the database until you call an execution method (`fetch`, `fetchOne`, `count`, `exists`, or async iteration over the queryset).
 
-The generic parameters track the full model record type, the current base projection, the source model used for relation typing, and any hydrated relation properties that should be attached when a row-returning execution method runs.
+The type parameters track, in order, the full model row, the current base projection, the source model used for relation typing, and hydrated relation fields added through `selectRelated(...)` or `prefetchRelated(...)`.
+
+### When a `QuerySet` evaluates
+
+You evaluate a queryset by calling an execution method or by driving async iteration:
+
+- **`fetch(...)`** runs the compiled SQL (and relation hydration) and returns `QueryResult`.
+- **`fetchOne(...)`** applies `limit(1)` internally and returns the first row or `null`.
+- **`count()`** and **`exists()`** run appropriate aggregate or existence queries.
+- **`for await (const x of queryset)`** evaluates the queryset on first use and yields each element from the resulting `QueryResult`.
+
+After the first row-returning evaluation, the same queryset instance reuses its cached materialized result on later `fetch()` or async-iteration calls. Refine the queryset first if you want a different SQL query or a different result cache.
 
 ### `filter(q)` and `exclude(q)`
 
@@ -307,7 +316,9 @@ const postCards = await PostModel.objects
     .select(['id', 'title'] as const)
     .fetch();
 
-postCards.results[0].title;
+const [first] = postCards;
+first?.id;
+first?.title;
 ```
 
 When Tango compiles the query, model fields become database columns:
@@ -327,7 +338,10 @@ Use `selectRelated(...)` when the requested path stays single-valued from hop to
 ```ts
 const posts = await PostModel.objects.query().filter({ published: true }).selectRelated('author__profile').fetch();
 
-posts.results[0].author?.profile?.displayName;
+const firstPost = posts.at(0);
+firstPost?.id;
+firstPost?.author?.email;
+firstPost?.author?.profile?.displayName;
 ```
 
 `selectRelated(...)` accepts nested paths such as `author__profile`, but it rejects any path that crosses a collection edge. A path like `posts__author` belongs in `prefetchRelated(...)`, not `selectRelated(...)`.
@@ -365,8 +379,14 @@ In contrast, use `prefetchRelated(...)` when the requested path includes a colle
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
 
-users.results[0].posts[0]?.author?.email;
-users.results[0].posts[0]?.comments[0]?.body;
+const firstUser = users.at(0);
+const firstPost = firstUser?.posts.at(0);
+const firstComment = firstPost?.comments.at(0);
+
+firstUser?.id;
+firstPost?.title;
+firstPost?.author?.email;
+firstComment?.body;
 ```
 
 `prefetchRelated(...)` runs the base query first, then runs batched follow-up queries for the planned collection edges. A user record with no matching posts still receives `posts: []`, and a post record with no matching comments receives `comments: []`.
@@ -406,23 +426,68 @@ const withAuthor = PostModel.objects.query().selectRelated('author');
 const postCards = withAuthor.select(['id', 'title'] as const);
 // QuerySet<Post, Pick<Post, 'id' | 'title'>, typeof PostModel, { author: User | null }>
 
-const page = await postCards.fetch();
+const result = await postCards.fetch();
 
-page.results[0].title;
-page.results[0].author?.email;
+const [first] = result;
+first?.id;
+first?.title;
+first?.author?.email;
 ```
 
 The result contains the selected `PostModel` fields and the hydrated `author` model. The stored `authorId` field is not part of the base projection unless it is selected explicitly.
 
 ### `fetch(shape?)`
 
-Use `fetch(shape?)` when application code wants all records for the current query. It returns a `QueryResult<Out>` object with `results` and `nextCursor`.
+Use `fetch(shape?)` when application code wants the materialized result for the current queryset state. `fetch()` runs the query, performs any relation hydration, and returns a `QueryResult`.
 
 ```ts
-const page = await PostModel.objects.query().filter({ published: true }).orderBy('-createdAt').fetch();
+const result = await PostModel.objects.query().filter({ published: true }).fetch();
+result.map((post) => post.id);
 ```
 
-At the queryset level, `nextCursor` is currently `null`. Cursor pagination belongs to resource paginators rather than the queryset contract itself.
+When you provide a shaping function or parser, Tango applies it after hydration and stores the shaped values in the returned `QueryResult`.
+
+### Returned `QueryResult<T>`
+
+`QueryResult<T>` is the materialized result object returned by `fetch(...)`. It preserves the execution order of the query and supports the common ways application code reads a materialized result: iteration, `length`, `map`, `at`, `items`, and `toArray()`.
+
+#### `items`
+
+Read-only array of the values for this execution, in database order unless the queryset applied `orderBy(...)`.
+
+#### `toArray(): T[]`
+
+Returns a shallow copy as a mutable `T[]` for APIs that expect a plain array.
+
+Call `toArray()` when application code needs a mutable array value:
+
+```ts
+const result = await PostModel.objects.query().filter({ published: true }).fetch();
+const posts = result.toArray();
+posts.map((post) => post.id);
+```
+
+Complete `fetch()` first, then iterate if you want evaluation to be explicit:
+
+```ts
+const result = await PostModel.objects.query().filter({ published: true }).fetch();
+for (const post of result) {
+    post.title;
+}
+```
+
+You can also iterate the queryset directly; that path evaluates the queryset:
+
+```ts
+const queryset = PostModel.objects.query().filter({ published: true });
+for await (const post of queryset) {
+    post.title;
+}
+```
+
+If that same queryset instance is iterated again later, Tango reuses the cached materialized result instead of issuing another database round-trip.
+
+Older code may still read `result.results`. That getter remains available for compatibility, but it emits a one-time deprecation warning per process. Prefer `result.items`, iteration, `length`, `map`, `at`, or `toArray()` in new code.
 
 ### `fetchOne(shape?)`
 
@@ -520,41 +585,13 @@ const visiblePosts = await PostModel.objects
     .fetch();
 ```
 
-## Adapter and connection exports
+## Lower-level entrypoints
 
-Most applications reach the database through the configured Tango runtime rather than constructing adapters directly. The root ORM package still exports the connection surface for code that needs to choose, register, or construct a concrete backend explicitly.
+Most application code stops at `Model.objects`, `QuerySet`, and `transaction`. Reach for the lower-level exports when startup code, tests, adapters, or query tooling need more control over runtime or SQL behavior.
 
-`AdapterRegistry`, `connectDB(...)`, and `getDefaultAdapterRegistry()` are the entrypoints for adapter selection and connection setup. Reach for them when startup code, tests, or tooling need to choose a backend directly instead of relying on the default runtime flow.
-
-`PostgresAdapter` and `SqliteAdapter` are the built-in SQL adapters shipped with Tango.
-
-`Adapter` and `AdapterConfig` are the types for code that wants to name the adapter contract directly.
-
-`DBClient` is the low-level client contract used beneath the ORM manager and queryset layers. Within the `connection` namespace, Tango also exposes `PostgresClient` and `SqliteClient` for code that needs the concrete built-in client implementations.
-
-## Runtime exports
-
-The runtime exports manage the active ORM runtime and the `objects` managers attached to models.
-
-Use `initializeTangoRuntime(...)` when application startup should initialize the process-default runtime from a config loader explicitly.
-
-Use `getTangoRuntime()` when code needs to access that process-default runtime, including the lazy default that loads Tango config from the project root on first use.
-
-Use `resetTangoRuntime()` when tests or tooling need to drop the current runtime and release its cached client.
-
-`TangoRuntime` is the concrete runtime class for code that needs to work with the runtime object directly.
-
-## Query-domain exports
-
-The query-domain exports are the lower-level types and helpers behind the public queryset surface.
-
-`FilterInput`, `OrderToken`, and `QNode` are the main types for code that needs to construct or inspect query conditions directly.
-
-`QueryResult`, `QueryExecutor`, `QueryCompiler`, and `CompiledQuery` are the execution-side contracts for code that needs to inspect compiled queries or participate in lower-level query execution.
-
-`TableMeta` and `RelationMeta` are the metadata contracts the compiler uses when it reasons about table shape and declared relations.
-
-These exports are most useful in adapter work, query tooling, and lower-level ORM tests.
+- Use the connection exports such as `connectDB(...)`, `AdapterRegistry`, `PostgresAdapter`, `SqliteAdapter`, and `DBClient` when code needs to choose or construct a backend explicitly.
+- Use the runtime exports such as `initializeTangoRuntime(...)`, `getTangoRuntime()`, `resetTangoRuntime()`, and `TangoRuntime` when startup or test code needs to manage the active ORM runtime directly.
+- Use query-domain contracts such as `FilterInput`, `OrderToken`, `QNode`, `QueryExecutor`, `QueryCompiler`, `CompiledQuery`, `TableMeta`, and `RelationMeta` when lower-level code needs to inspect or participate in query compilation.
 
 ## Related pages
 
