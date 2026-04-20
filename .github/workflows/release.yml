@@ -38,6 +38,7 @@ jobs:
         outputs:
             stable_release_mode: ${{ steps.stable-release.outputs.mode }}
             publish_state_mode: ${{ steps.publish-state.outputs.mode }}
+            docs_checkout_ref: ${{ steps.docs-checkout-ref.outputs.ref }}
         services:
             postgres:
                 image: postgres:16
@@ -174,6 +175,11 @@ jobs:
               env:
                   NPM_CONFIG_PROVENANCE: true
 
+            - name: Capture docs checkout ref
+              if: (((github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release') || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable-recovery')) && steps.publish-state.outputs.mode == 'publish'
+              id: docs-checkout-ref
+              run: echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
             - name: Get short SHA
               if: github.event_name == 'workflow_dispatch' && inputs.release_type == 'alpha'
               id: sha
@@ -208,3 +214,5 @@ jobs:
               && needs.release.outputs.publish_state_mode == 'publish'
             )
         uses: danceroutine/tango/.github/workflows/docs-pages.reusable.yml@main
+        with:
+            checkout_ref: ${{ needs.release.outputs.docs_checkout_ref }}

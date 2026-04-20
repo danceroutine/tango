@@ -2,6 +2,12 @@ name: Docs Pages (reusable)
 
 on:
     workflow_call:
+        inputs:
+            checkout_ref:
+                description: Git ref to build the docs site from.
+                required: false
+                type: string
+                default: ''
 
 jobs:
     build:
@@ -10,6 +16,8 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.checkout_ref || github.sha }}
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
