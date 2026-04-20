@@ -8,9 +8,9 @@ Complete the [Contributor setup](/contributors/setup) before you begin. Maintain
 
 Tango ships through two release channels.
 
-Stable releases publish the normal package versions that advance the fixed Tango release train. They are driven by changesets, update the root changelog, and must publish from `main`.
+Stable releases publish the normal package versions that advance the fixed Tango release train. They are driven by changesets, update the docs changelog page, and must publish from `main`.
 
-Alpha releases publish snapshot builds under the `alpha` dist-tag. They support testing and early feedback, and they leave the root changelog unchanged.
+Alpha releases publish snapshot builds under the `alpha` dist-tag. They support testing and early feedback, and they leave the docs changelog page unchanged.
 
 ## Release invariant
 
@@ -65,7 +65,7 @@ The workflow performs these steps:
 9. commits generated version changes to `main` with a bot-authored `[skip ci]` commit when a release is pending
 10. publishes the packages that are still missing from npm
 
-The stable versioning command is `pnpm changeset:version`, which runs `scripts/release/version-with-root-changelog.ts`. That script executes `changeset version`, refreshes the lockfile, and prepends the new entry to the root `CHANGELOG.md`.
+The stable versioning command is `pnpm changeset:version`, which runs `scripts/release/version-docs-changelog.ts`. That script executes `changeset version`, refreshes the lockfile, and prepends the new entry to `docs/changelog.md`.
 
 Each pending changeset summary is copied into the new release entry as authored Markdown rather than being rewritten into a synthetic bullet format. That means maintainers should write the changeset summary in the changelog shape they want to preserve, whether that is a concise paragraph, a short bullet list, or a compact illustrative code block for a major feature.
 
@@ -150,7 +150,7 @@ The alpha path performs these steps:
 5. builds the packages
 6. publishes them with the `alpha` dist-tag
 
-Alpha releases preserve the existing root changelog. The workflow publishes the snapshot build directly from the selected branch, and `main` remains unchanged.
+Alpha releases preserve the existing docs changelog page. The workflow publishes the snapshot build directly from the selected branch, and `main` remains unchanged.
 
 ## Verify the published result
 
@@ -180,7 +180,7 @@ When the release system changes, update these files and settings in the same pul
 - `.github/workflows/release.yml`
 - `.changeset/config.json`
 - `scripts/release/resolve-publish-state.ts`
-- `scripts/release/version-with-root-changelog.ts`
+- `scripts/release/version-docs-changelog.ts`
 - root `package.json` scripts for `changeset:version` and `changeset:publish`
 - repository Actions configuration for `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY`
 - this page

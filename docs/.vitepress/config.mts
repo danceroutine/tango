@@ -67,7 +67,7 @@ export default defineConfig({
             { text: 'Contributors', link: '/contributors/' },
             {
                 text: `v${publicVersion}`,
-                items: [{ text: 'Changelog', link: 'https://github.com/danceroutine/tango/blob/master/CHANGELOG.md' }],
+                items: [{ text: 'Changelog', link: '/changelog' }],
             },
         ],
 

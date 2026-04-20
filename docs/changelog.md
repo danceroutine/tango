@@ -1,6 +1,8 @@
-# Changelog
+---
+maintainerNote: This page is generated from stable release changesets during Tango stable releases. Do not edit manually.
+---
 
-This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
+# Changelog
 
 ## 1.7.0 - 2026-04-20
 
