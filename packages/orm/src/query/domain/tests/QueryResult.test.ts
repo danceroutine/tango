@@ -46,17 +46,17 @@ describe(QueryResult.name, () => {
         expect([...r]).toEqual([{ a: 1 }, { a: 2 }]);
     });
 
-    it('returns a mutable shallow copy from toArray', () => {
-        const r = new QueryResult([{ id: 1 }]);
+    it('returns a plain array from toArray', () => {
+        const r = new QueryResult([1, 2]);
         const copy = r.toArray();
-        copy.push({ id: 2 });
-        expect(r.length).toBe(1);
+        expect(copy).toEqual([1, 2]);
+        expect(copy).not.toBe(r.items);
     });
 
-    it('exposes deprecated results with a single warning per process', () => {
-        const r = new QueryResult([1, 2]);
-        expect(r.results).toEqual([1, 2]);
-        expect(r.results).toEqual([1, 2]);
+    it('still exposes rows through the compatibility accessor with a single warning per process', () => {
+        const r = new QueryResult([9]);
+        expect(r.results).toEqual([9]);
+        expect(r.results).toEqual([9]);
         expect(warn).toHaveBeenCalledTimes(1);
     });
 });

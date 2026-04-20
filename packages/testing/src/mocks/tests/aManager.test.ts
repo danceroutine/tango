@@ -13,26 +13,61 @@ describe(aManager, () => {
 
         expect(manager.meta.table).toBe('mock_table');
         expect(manager.query()).toBe(querySet);
+        expect(manager.all()).toBe(querySet);
         await expect(manager.create({ name: 'created' })).resolves.toEqual({ id: 7, name: 'created' });
         await expect(manager.update('7', { name: 'updated' })).resolves.toEqual({ name: 'updated' });
         await expect(manager.findById('2')).resolves.toEqual({ id: 2, name: 'found' });
         await expect(manager.delete('2')).resolves.toBeUndefined();
         await expect(manager.bulkCreate([{ name: 'bulk' }])).resolves.toEqual([{ name: 'bulk' }]);
+        await expect(manager.getOrCreate({ where: { id: 1 }, defaults: { name: 'created' } })).resolves.toEqual({
+            record: { name: 'created' },
+            created: true,
+        });
+        await expect(
+            manager.updateOrCreate({ where: { id: 1 }, defaults: { name: 'created' }, update: { name: 'updated' } })
+        ).resolves.toEqual({
+            record: { name: 'created' },
+            created: true,
+            updated: false,
+        });
     });
 
     it('supports explicit query and error-path overrides', async () => {
         const querySet = aQuerySet<{ id: number; name: string }>();
         const querySpy = vi.fn(() => querySet);
+        const allSpy = vi.fn(() => querySet);
         const getOrThrowSpy = vi.fn(async () => ({ id: 5, name: 'found' }));
+        const getOrCreateSpy = vi.fn(async () => ({ record: { id: 6, name: 'created' }, created: false }));
+        const updateOrCreateSpy = vi.fn(async () => ({
+            record: { id: 7, name: 'updated' },
+            created: false,
+            updated: true,
+        }));
         const manager = aManager<{ id: number; name: string }>({
             query: querySpy,
+            all: allSpy,
             getOrThrow: getOrThrowSpy,
+            getOrCreate: getOrCreateSpy,
+            updateOrCreate: updateOrCreateSpy,
         });
 
         expect(manager.query()).toBe(querySet);
+        expect(manager.all()).toBe(querySet);
         await expect(manager.getOrThrow('5')).resolves.toEqual({ id: 5, name: 'found' });
+        await expect(manager.getOrCreate({ where: { id: 6 } })).resolves.toEqual({
+            record: { id: 6, name: 'created' },
+            created: false,
+        });
+        await expect(manager.updateOrCreate({ where: { id: 7 }, update: { name: 'updated' } })).resolves.toEqual({
+            record: { id: 7, name: 'updated' },
+            created: false,
+            updated: true,
+        });
         expect(querySpy).toHaveBeenCalledTimes(1);
+        expect(allSpy).toHaveBeenCalledTimes(1);
         expect(getOrThrowSpy).toHaveBeenCalledWith('5');
+        expect(getOrCreateSpy).toHaveBeenCalledWith({ where: { id: 6 } });
+        expect(updateOrCreateSpy).toHaveBeenCalledWith({ where: { id: 7 }, update: { name: 'updated' } });
     });
 
     it('throws from the default getOrThrow implementation when no record exists', async () => {
@@ -81,5 +116,19 @@ describe(aManager, () => {
         const manager = aManager<{ id: number; name: string }>();
 
         await expect(manager.create({ name: 'created' })).resolves.toEqual({ name: 'created' });
+    });
+
+    it('falls back to empty records for default getOrCreate and updateOrCreate calls without defaults', async () => {
+        const manager = aManager<{ id: number; name: string }>();
+
+        await expect(manager.getOrCreate({ where: { id: 1 } })).resolves.toEqual({
+            record: {},
+            created: true,
+        });
+        await expect(manager.updateOrCreate({ where: { id: 1 } })).resolves.toEqual({
+            record: {},
+            created: true,
+            updated: false,
+        });
     });
 });
