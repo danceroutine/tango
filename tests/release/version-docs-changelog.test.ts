@@ -7,12 +7,13 @@ import {
     parseChangesetContent,
     prependReleaseEntry,
     runReleaseVersioning,
-} from '../../scripts/release/version-with-root-changelog';
+} from '../../scripts/release/version-docs-changelog';
 
 async function createFixtureRepository(): Promise<string> {
     const rootDir = await mkdtemp(join(tmpdir(), 'tango-release-'));
 
     await mkdir(join(rootDir, '.changeset'), { recursive: true });
+    await mkdir(join(rootDir, 'docs'), { recursive: true });
     await mkdir(join(rootDir, 'packages/core'), { recursive: true });
     await mkdir(join(rootDir, 'packages/schema'), { recursive: true });
     await writeFile(
@@ -42,10 +43,12 @@ These instructions explain how to write changesets for Tango packages.
 `
     );
     await writeFile(
-        join(rootDir, 'CHANGELOG.md'),
-        `# Changelog
+        join(rootDir, 'docs/changelog.md'),
+        `---
+maintainerNote: This page is generated from stable release changesets during Tango stable releases. Do not edit manually.
+---
 
-This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
+# Changelog
 
 No stable releases have been published yet.
 `
@@ -109,9 +112,11 @@ Improve shared request normalization.`,
 describe(prependReleaseEntry, () => {
     it('replaces the bootstrap no-release state', () => {
         const content = prependReleaseEntry(
-            `# Changelog
+            `---
+maintainerNote: This page is generated from stable release changesets during Tango stable releases. Do not edit manually.
+---
 
-This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
+# Changelog
 
 No stable releases have been published yet.
 `,
@@ -137,9 +142,11 @@ No stable releases have been published yet.
 
     it('prepends a new entry ahead of existing release entries', () => {
         const content = prependReleaseEntry(
-            `# Changelog
+            `---
+maintainerNote: This page is generated from stable release changesets during Tango stable releases. Do not edit manually.
+---
 
-This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
+# Changelog
 
 ## 0.1.0 - 2026-01-01
 
@@ -168,9 +175,11 @@ First stable release.
 
     it('preserves authored markdown summaries verbatim', () => {
         const content = prependReleaseEntry(
-            `# Changelog
+            `---
+maintainerNote: This page is generated from stable release changesets during Tango stable releases. Do not edit manually.
+---
 
-This file is generated from stable release changesets during Tango stable releases. Do not edit manually.
+# Changelog
 
 No stable releases have been published yet.
 `,
@@ -213,7 +222,7 @@ describe(runReleaseVersioning, () => {
         temporaryDirectories.length = 0;
     });
 
-    it('updates versions, lockfile, and the root changelog in one pass', async () => {
+    it('updates versions, lockfile, and the docs changelog in one pass', async () => {
         const rootDir = await createFixtureRepository();
         temporaryDirectories.push(rootDir);
 
@@ -236,7 +245,7 @@ describe(runReleaseVersioning, () => {
             },
         });
 
-        const changelog = await readFile(join(rootDir, 'CHANGELOG.md'), 'utf8');
+        const changelog = await readFile(join(rootDir, 'docs/changelog.md'), 'utf8');
         const corePackage = JSON.parse(await readFile(join(rootDir, 'packages/core/package.json'), 'utf8')) as {
             version: string;
         };

@@ -34,7 +34,7 @@
         "docs:build": "pnpm --filter @danceroutine/tango-docs build",
         "docs:preview": "pnpm --filter @danceroutine/tango-docs preview",
         "changeset": "changeset",
-        "changeset:version": "pnpm exec tsx scripts/release/version-with-root-changelog.ts",
+        "changeset:version": "pnpm exec tsx scripts/release/version-docs-changelog.ts",
         "changeset:publish": "pnpm build && changeset publish",
         "typecheck:prod": "tsc --noEmit -p tsconfig.scripts.json && pnpm -r --filter '!./.temp/**' --if-present run typecheck:prod",
         "typecheck:tests": "pnpm -r --filter '!./.temp/**' --if-present run typecheck:test",

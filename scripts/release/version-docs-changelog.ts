@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 type BumpType = 'major' | 'minor' | 'patch';
 
@@ -23,13 +23,15 @@ interface RunCommandOptions {
 
 type RunCommand = (command: string, args: string[], options: RunCommandOptions) => void | Promise<void>;
 
-const CHANGELOG_INTRO = `# Changelog
+const CHANGELOG_INTRO = `---
+maintainerNote: This page is generated from stable release changesets during Tango stable releases. Do not edit manually.
+---
 
-This file is generated from stable release changesets during Tango stable releases. Do not edit manually.`;
+# Changelog`;
 const NO_RELEASES_MESSAGE = 'No stable releases have been published yet.';
 const CHANGESET_DIRECTORY = '.changeset';
 const CHANGESET_CONFIG_PATH = join(CHANGESET_DIRECTORY, 'config.json');
-const CHANGELOG_PATH = 'CHANGELOG.md';
+const CHANGELOG_PATH = join('docs', 'changelog.md');
 const CHANGESET_README = 'README.md';
 
 export async function collectPendingChangesets(rootDir: string): Promise<ChangesetReleaseNote[]> {
@@ -211,6 +213,7 @@ export async function runReleaseVersioning(
         packageOrder
     );
 
+    await mkdir(dirname(changelogPath), { recursive: true });
     await writeFile(changelogPath, nextChangelog);
 }
 
