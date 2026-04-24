@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.8.1 - 2026-04-24
+
+Fix scaffolded apps so generated relation registry declarations participate in TypeScript relation-aware query typing by default.
+
 ## 1.8.0 - 2026-04-24
 
 Ship Tango's first complete many-to-many workflow across schema, migrations, ORM, resources, and testing.

@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-resources",
-    "version": "1.8.0",
+    "version": "1.8.1",
     "description": "ModelViewSet, serializers, filters, and pagination for Tango",
     "type": "module",
     "main": "./dist/index.js",
