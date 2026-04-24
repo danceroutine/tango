@@ -212,8 +212,8 @@ export abstract class ModelViewSet<
                 }
             }
 
-            qs = paginator.apply(qs);
-            const resultPromise = qs.fetch();
+            const paginatedQueryset = paginator.apply(qs);
+            const resultPromise = paginatedQueryset.fetch();
             const totalCountPromise = paginator.needsTotalCount()
                 ? qs.count()
                 : Promise.resolve<number | undefined>(undefined);
