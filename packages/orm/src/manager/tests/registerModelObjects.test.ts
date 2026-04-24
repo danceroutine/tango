@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { setupTestTangoRuntime } from '@danceroutine/tango-testing';
@@ -358,6 +361,50 @@ describe(registerModelObjects, () => {
         }
     });
 
+    it('throws from create() when the target model has no registered objects manager', async () => {
+        const TagModel = Model({
+            namespace: 'test',
+            name: 'Tag',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+        const PostModel = Model({
+            namespace: 'test',
+            name: 'Post',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                tags: t.manyToMany(TagModel),
+            }),
+        });
+        const tagsManager = PostModel.objects.createManyToManyRelatedManager<{ id: number }>('tags', 1);
+        const registry = ModelRegistry.getOwner(PostModel);
+        const fakeModel = { metadata: { key: TagModel.metadata.key }, schema: { parse: () => ({}) } };
+        const getByKeySpy = vi
+            .spyOn(registry, 'getByKey')
+            .mockReturnValue(fakeModel as unknown as ReturnType<typeof registry.getByKey>);
+        const runtime = getTangoRuntime();
+        const client = {
+            query: vi.fn(async (_sql: string, _params?: readonly unknown[]) => ({ rows: [] as never[] })),
+            begin: vi.fn(async () => {}),
+            commit: vi.fn(async () => {}),
+            rollback: vi.fn(async () => {}),
+            createSavepoint: vi.fn(async () => {}),
+            releaseSavepoint: vi.fn(async () => {}),
+            rollbackToSavepoint: vi.fn(async () => {}),
+            close: vi.fn(async () => {}),
+        };
+        const release = vi.fn(async () => {});
+        const leaseSpy = vi.spyOn(runtime, 'leaseTransactionClient').mockResolvedValue({ client, release });
+
+        try {
+            await expect(tagsManager.create({ id: 7 })).rejects.toThrow(/Cannot resolve a target manager/);
+        } finally {
+            leaseSpy.mockRestore();
+            getByKeySpy.mockRestore();
+        }
+    });
+
     it('adds and removes many-to-many links for implicit join tables through the related manager', async () => {
         const TagModel = Model({
             namespace: 'test',
@@ -411,6 +458,110 @@ describe(registerModelObjects, () => {
             expect(batchedSql).toContain('1,3,5');
         } finally {
             leaseSpy.mockRestore();
+        }
+    });
+
+    it('creates, links, and clears many-to-many rows through the runtime-backed related manager', async () => {
+        const tempDir = await mkdtemp(join(tmpdir(), 'tango-m2m-create-clear-'));
+
+        try {
+            await setupTestTangoRuntime({ sqliteFilename: join(tempDir, 'runtime.sqlite') });
+
+            const TagModel = Model({
+                namespace: 'test',
+                name: 'Tag',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    name: z.string(),
+                }),
+            });
+            const PostModel = Model({
+                namespace: 'test',
+                name: 'Post',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    title: z.string(),
+                    tags: t.manyToMany(TagModel),
+                }),
+            });
+
+            const relation = PostModel.objects.meta.relations?.tags;
+            expect(relation?.kind).toBe('manyToMany');
+            expect(relation?.throughTable).toBeDefined();
+            expect(relation?.throughSourceKey).toBeDefined();
+            expect(relation?.throughTargetKey).toBeDefined();
+
+            const client = await getTangoRuntime().getClient();
+            await client.query('CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)');
+            await client.query('CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT)');
+            await client.query(
+                `CREATE TABLE ${relation!.throughTable} (
+                    id INTEGER PRIMARY KEY,
+                    ${relation!.throughSourceKey} INTEGER NOT NULL,
+                    ${relation!.throughTargetKey} INTEGER NOT NULL,
+                    UNIQUE (${relation!.throughSourceKey}, ${relation!.throughTargetKey})
+                )`
+            );
+
+            const post = await PostModel.objects.create({ id: 1, title: 'Hello' });
+            expect(ManyToManyRelatedManager.isManyToManyRelatedManager(post.tags)).toBe(true);
+
+            post.tags.primePrefetchCache([{ id: 99, name: 'stale' }]);
+            const created = await post.tags.create({ id: 2, name: 'tango' });
+
+            expect(created).toEqual({ id: 2, name: 'tango' });
+            expect(post.tags.snapshotCache()).toBeNull();
+
+            const linked = await post.tags.all().orderBy('id').fetch();
+            expect(linked.results).toEqual([{ id: 2, name: 'tango' }]);
+
+            post.tags.primePrefetchCache([{ id: 2, name: 'tango' }]);
+            await post.tags.clear();
+
+            expect(post.tags.snapshotCache()).toBeNull();
+            const remaining = await post.tags.all().fetch();
+            expect(remaining.results).toEqual([]);
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    it('rolls back the created target when the follow-up join insert fails', async () => {
+        const tempDir = await mkdtemp(join(tmpdir(), 'tango-m2m-create-rollback-'));
+
+        try {
+            await setupTestTangoRuntime({ sqliteFilename: join(tempDir, 'runtime.sqlite') });
+
+            const TagModel = Model({
+                namespace: 'test',
+                name: 'Tag',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    name: z.string(),
+                }),
+            });
+            const PostModel = Model({
+                namespace: 'test',
+                name: 'Post',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    title: z.string(),
+                    tags: t.manyToMany(TagModel),
+                }),
+            });
+
+            const client = await getTangoRuntime().getClient();
+            await client.query('CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)');
+            await client.query('CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT)');
+
+            const post = await PostModel.objects.create({ id: 1, title: 'Rollback' });
+
+            await expect(post.tags.create({ id: 5, name: 'transient' })).rejects.toThrow();
+
+            const tags = await TagModel.objects.all().fetch();
+            expect(tags.results).toEqual([]);
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
         }
     });
 });

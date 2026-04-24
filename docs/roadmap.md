@@ -14,7 +14,7 @@ The next relation work focuses on related-row projection: fetching related field
 
 ### Many-to-many Django-parity follow-ups
 
-Many-to-many hydration and join-row writes now share the resolved through-table metadata path, and persisted records expose a related manager that supports `add(...)`, `remove(...)`, and `all()` against the active runtime client. Follow-up work includes reverse-side naming for many-to-many, inverse edges in the resolved graph, the bulk `set(...)` helper, the `clear()` helper, `create(...)` on the related manager, and richer symmetry helpers beyond the current join-row link helpers.
+Many-to-many hydration and join-row writes now share the resolved through-table metadata path, and persisted records expose a related manager that supports `add(...)`, `remove(...)`, `set(...)`, `clear()`, `create(...)`, and `all()` against the active runtime client. Follow-up work includes reverse-side naming for many-to-many, inverse edges in the resolved graph, and richer symmetry helpers beyond the current join-row link helpers.
 
 ### Transaction ergonomics beyond `atomic(...)`
 
