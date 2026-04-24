@@ -393,7 +393,7 @@ If any major section violates the roadmap or answers a different question too ea
 
 ### Pass 2: Anti-Pattern Review
 
-Use the anti-pattern section headings from `references/anti-patterns.md` when available.
+Use the anti-pattern section headings from `./references/anti-patterns.md` (relative to this SKILL file) when available.
 
 During anti-pattern review, announce each pass in chat with this exact template before checking:
 
