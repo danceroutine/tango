@@ -1,8 +1,9 @@
 import { createRequire } from 'node:module';
 import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
-import type { Adapter, AdapterConfig } from '../Adapter';
+import type { Adapter, AdapterConfig, SqlPlaceholders } from '../Adapter';
 import type { DBClient } from '../../clients/DBClient';
 import { SqliteClient } from '../../clients/dialects/SqliteClient';
+import { InternalDialect } from '../../../query/domain/internal/InternalDialect';
 
 type BetterSqliteCtor = new (filename: string, options?: unknown) => BetterSqliteDatabase;
 
@@ -13,10 +14,23 @@ export class SqliteAdapter implements Adapter {
     static readonly BRAND = 'tango.orm.sqlite_adapter' as const;
     readonly __tangoBrand: typeof SqliteAdapter.BRAND = SqliteAdapter.BRAND;
     readonly name = 'sqlite';
-    readonly features = {
+    readonly dialect: Adapter['dialect'] = InternalDialect.SQLITE;
+    readonly features: Adapter['features'] = {
         transactionalDDL: true,
         concurrentIndex: false,
         validateForeignKeys: false,
+        ignoreDuplicateInsert: true,
+    };
+    readonly placeholders: SqlPlaceholders = {
+        at(): string {
+            return '?';
+        },
+        list(count: number): string {
+            return Array.from({ length: count }, () => '?').join(', ');
+        },
+        listFromOffset(count: number): string {
+            return this.list(count);
+        },
     };
 
     /**

@@ -1,10 +1,19 @@
-import type { APIViewMethod, ModelSerializerClass, SerializerSchema } from '@danceroutine/tango-resources';
+import type { APIViewMethod, AnyModelSerializer, AnyModelSerializerClass } from '@danceroutine/tango-resources';
 import type { OpenAPIViewSetDescriptor, OpenAPIGenericAPIViewDescriptor, OpenAPIAPIViewDescriptor } from './types';
 
-export function describeViewSet(descriptor: Omit<OpenAPIViewSetDescriptor, 'kind'>): OpenAPIViewSetDescriptor;
+export function describeViewSet(
+    descriptor: Omit<
+        OpenAPIViewSetDescriptor<
+            Record<string, unknown>,
+            // oxlint-disable-next-line typescript/no-explicit-any
+            AnyModelSerializerClass
+        >,
+        'kind'
+    >
+): OpenAPIViewSetDescriptor;
 export function describeViewSet<
     TModel extends Record<string, unknown>,
-    TSerializer extends ModelSerializerClass<TModel, SerializerSchema, SerializerSchema, SerializerSchema>,
+    TSerializer extends AnyModelSerializer<TModel> = AnyModelSerializer<TModel>,
 >(
     descriptor: Omit<OpenAPIViewSetDescriptor<TModel, TSerializer>, 'kind'>
 ): OpenAPIViewSetDescriptor<TModel, TSerializer>;
@@ -16,11 +25,18 @@ export function describeViewSet(descriptor: Omit<OpenAPIViewSetDescriptor, 'kind
 }
 
 export function describeGenericAPIView(
-    descriptor: Omit<OpenAPIGenericAPIViewDescriptor, 'kind'>
+    descriptor: Omit<
+        OpenAPIGenericAPIViewDescriptor<
+            Record<string, unknown>,
+            // oxlint-disable-next-line typescript/no-explicit-any
+            AnyModelSerializerClass
+        >,
+        'kind'
+    >
 ): OpenAPIGenericAPIViewDescriptor;
 export function describeGenericAPIView<
     TModel extends Record<string, unknown>,
-    TSerializer extends ModelSerializerClass<TModel, SerializerSchema, SerializerSchema, SerializerSchema>,
+    TSerializer extends AnyModelSerializer<TModel> = AnyModelSerializer<TModel>,
 >(
     descriptor: Omit<OpenAPIGenericAPIViewDescriptor<TModel, TSerializer>, 'kind'>
 ): OpenAPIGenericAPIViewDescriptor<TModel, TSerializer>;

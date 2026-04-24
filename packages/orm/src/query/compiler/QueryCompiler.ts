@@ -12,12 +12,16 @@ import type {
 } from '../domain/CompiledQuery';
 import type { WhereClause } from '../domain/WhereClause';
 import type { FilterInput } from '../domain/FilterInput';
-import type { Dialect } from '../domain/Dialect';
+import type { Adapter, SqlPlaceholders } from '../../connection/adapters/Adapter';
 import { InternalRelationHydrationLoadMode } from '../domain/RelationMeta';
 import { InternalDialect } from '../domain/internal/InternalDialect';
+import { InternalPrefetchQueryKind } from '../domain/internal/InternalPrefetchQueryKind';
 import { InternalQNodeType } from '../domain/internal/InternalQNodeType';
 import { InternalLookupType } from '../domain/internal/InternalLookupType';
+import { InternalSqlValidationPlanKind as SqlPlanKind } from '../../validation/internal/InternalSqlValidationPlanKind';
+import { InternalValidatedFilterDescriptorKind } from '../../validation/internal/InternalValidatedFilterDescriptorKind';
 import { OrmSqlSafetyAdapter } from '../../validation';
+import type { ValidatedFilterDescriptor, ValidatedRelationMeta } from '../../validation/SQLValidationEngine';
 import { QueryPlanner } from '../planning';
 import type { QueryHydrationPlanNode } from '../planning';
 
@@ -36,10 +40,14 @@ export class QueryCompiler {
     static readonly BRAND = 'tango.orm.query_compiler' as const;
     readonly __tangoBrand: typeof QueryCompiler.BRAND = QueryCompiler.BRAND;
 
+    private readonly placeholders: SqlPlaceholders;
+
     constructor(
         private meta: TableMeta,
-        private dialect: Dialect = InternalDialect.POSTGRES
-    ) {}
+        private adapter: Adapter
+    ) {
+        this.placeholders = adapter.placeholders;
+    }
 
     static isQueryCompiler(value: unknown): value is QueryCompiler {
         return (
@@ -49,10 +57,10 @@ export class QueryCompiler {
         );
     }
 
-    compile<T>(state: QuerySetState<T>): CompiledQuery {
+    compile<T, TSourceModel = unknown>(state: QuerySetState<T, TSourceModel>): CompiledQuery {
         const hydrationPlan = new QueryPlanner(this.meta).plan(state);
         const validatedPlan = sqlSafetyAdapter.validate({
-            kind: 'select',
+            kind: SqlPlanKind.SELECT,
             meta: this.meta,
             selectFields: state.select?.map(String),
             filterKeys: this.collectStateFilterKeys(state),
@@ -147,10 +155,11 @@ export class QueryCompiler {
     }
 
     compilePrefetch(node: CompiledHydrationNode, sourceValues: readonly (string | number)[]): CompiledPrefetchQuery {
-        const placeholders =
-            this.dialect === InternalDialect.POSTGRES
-                ? sourceValues.map((_, index) => `$${index + 1}`).join(', ')
-                : sourceValues.map(() => '?').join(', ');
+        if (node.throughTable && node.throughSourceKey && node.throughTargetKey) {
+            return this.compileManyToManyPrefetch(node, sourceValues);
+        }
+
+        const placeholders = this.placeholders.list(sourceValues.length);
         const validatedTarget = this.validatePrefetchTarget(node);
         const baseAlias = this.buildPrefetchBaseAlias(node.relationPath);
         const joinCollection: JoinCollection = { selects: [], joins: [] };
@@ -161,10 +170,65 @@ export class QueryCompiler {
 
         const baseSelects = Object.keys(validatedTarget.columns).map((column) => `${baseAlias}.${column} AS ${column}`);
         return {
+            kind: InternalPrefetchQueryKind.DIRECT,
             sql: `SELECT ${[...baseSelects, ...joinCollection.selects].join(', ')} FROM ${validatedTarget.table} ${baseAlias}${joinCollection.joins.length ? ` ${joinCollection.joins.join(' ')}` : ''} WHERE ${baseAlias}.${validatedTarget.targetKey} IN (${placeholders}) ORDER BY ${baseAlias}.${validatedTarget.targetKey} ASC, ${baseAlias}.${validatedTarget.primaryKey} ASC`,
             params: sourceValues,
             targetKey: validatedTarget.targetKey,
             targetColumns: validatedTarget.columns,
+        };
+    }
+
+    compileManyToManyTargets(
+        node: CompiledHydrationNode,
+        targetIds: readonly (string | number)[]
+    ): { sql: string; params: readonly unknown[] } {
+        const placeholders = this.placeholders.list(targetIds.length);
+        const validatedTarget = this.validatePrefetchTarget(node);
+        const baseAlias = this.buildPrefetchBaseAlias(node.relationPath);
+        const joinCollection: JoinCollection = { selects: [], joins: [] };
+
+        for (const joinChild of node.joinChildren) {
+            this.collectNestedJoinSql(joinChild, baseAlias, validatedTarget.columns, joinCollection);
+        }
+
+        const baseSelects = Object.keys(validatedTarget.columns).map((column) => `${baseAlias}.${column} AS ${column}`);
+        return {
+            sql: `SELECT ${[...baseSelects, ...joinCollection.selects].join(', ')} FROM ${validatedTarget.table} ${baseAlias}${joinCollection.joins.length ? ` ${joinCollection.joins.join(' ')}` : ''} WHERE ${baseAlias}.${validatedTarget.primaryKey} IN (${placeholders}) ORDER BY ${baseAlias}.${validatedTarget.primaryKey} ASC`,
+            params: targetIds,
+        };
+    }
+
+    private compileManyToManyPrefetch(
+        node: CompiledHydrationNode,
+        sourceValues: readonly (string | number)[]
+    ): CompiledPrefetchQuery {
+        const placeholders = this.placeholders.list(sourceValues.length);
+        const throughValidated = sqlSafetyAdapter.validate({
+            kind: SqlPlanKind.SELECT,
+            meta: {
+                table: node.throughTable!,
+                pk: node.throughSourceKey!,
+                columns: {
+                    [node.throughSourceKey!]: node.throughSourceColumnType ?? 'int',
+                    [node.throughTargetKey!]: node.throughTargetColumnType ?? 'int',
+                },
+            },
+            filterKeys: [node.throughSourceKey!, node.throughTargetKey!],
+            relationNames: [],
+        });
+        const ownerAlias = this.validateInternalAlias('__tango_m2m_owner');
+        const targetAlias = this.validateInternalAlias('__tango_m2m_target');
+        const throughSourceColumn = throughValidated.filterKeys[node.throughSourceKey!]!.field;
+        const throughTargetColumn = throughValidated.filterKeys[node.throughTargetKey!]!.field;
+        return {
+            kind: InternalPrefetchQueryKind.MANY_TO_MANY,
+            throughSql: `SELECT ${throughValidated.meta.table}.${throughSourceColumn} AS ${ownerAlias}, ${throughValidated.meta.table}.${throughTargetColumn} AS ${targetAlias} FROM ${throughValidated.meta.table} WHERE ${throughValidated.meta.table}.${throughSourceColumn} IN (${placeholders}) ORDER BY ${throughValidated.meta.table}.${throughSourceColumn} ASC, ${throughValidated.meta.table}.${throughTargetColumn} ASC`,
+            throughParams: sourceValues,
+            ownerAlias,
+            targetAlias,
+            targetTable: node.targetTable,
+            targetPrimaryKey: node.targetPrimaryKey,
+            targetColumns: node.targetColumns,
         };
     }
 
@@ -256,6 +320,11 @@ export class QueryCompiler {
             targetKey: validatedRelation.targetKey,
             targetTable: validatedRelation.table,
             targetPrimaryKey: node.relationEdge.targetPrimaryKey,
+            throughTable: node.relationEdge.throughTable,
+            throughSourceKey: node.relationEdge.throughSourceKey,
+            throughTargetKey: node.relationEdge.throughTargetKey,
+            throughSourceColumnType: node.relationEdge.throughSourceColumnType,
+            throughTargetColumnType: node.relationEdge.throughTargetColumnType,
             targetColumns,
             provenance: node.provenance,
             joinChildren: compiledJoinChildren,
@@ -269,7 +338,7 @@ export class QueryCompiler {
         relationName: string
     ): NonNullable<TableMeta['relations']>[string] {
         return sqlSafetyAdapter.validate({
-            kind: 'select',
+            kind: SqlPlanKind.SELECT,
             meta: ownerMeta,
             relationNames: [relationName],
         }).relations[relationName]!;
@@ -293,7 +362,7 @@ export class QueryCompiler {
     } {
         try {
             const validated = sqlSafetyAdapter.validate({
-                kind: 'select',
+                kind: SqlPlanKind.SELECT,
                 meta: {
                     table: node.targetTable,
                     pk: node.targetPrimaryKey,
@@ -399,6 +468,12 @@ export class QueryCompiler {
         );
     }
 
+    private buildFilterAlias(relationPath: string, suffix: string): string {
+        return this.assertInternalAliasDoesNotCollide(
+            `__tango_filter_${this.sanitizeRelationPath(relationPath)}_${suffix}`
+        );
+    }
+
     private sanitizeRelationPath(relationPath: string): string {
         return relationPath.replace(/[^a-zA-Z0-9]+/g, '_');
     }
@@ -413,7 +488,7 @@ export class QueryCompiler {
     private compileQNode<T>(
         node: QNode<T>,
         paramIndex: number,
-        filterKeys: Record<string, { lookup: LookupType; qualifiedColumn: string }>
+        filterKeys: Record<string, ValidatedFilterDescriptor>
     ): WhereClause {
         switch (node.kind) {
             case InternalQNodeType.ATOM:
@@ -432,7 +507,7 @@ export class QueryCompiler {
     private compileAtom<T>(
         where: FilterInput<T>,
         paramIndex: number,
-        filterKeys: Record<string, { lookup: LookupType; qualifiedColumn: string }>
+        filterKeys: Record<string, ValidatedFilterDescriptor>
     ): WhereClause {
         const entries = Object.entries(where).filter(([, value]) => value !== undefined);
 
@@ -440,7 +515,10 @@ export class QueryCompiler {
             (accumulator, [key, value]) => {
                 const descriptor = filterKeys[String(key)]!;
                 const idx = paramIndex + accumulator.params.length;
-                const clause = this.lookupToSQL(descriptor.qualifiedColumn, descriptor.lookup, value, idx);
+                const clause =
+                    descriptor.kind === InternalValidatedFilterDescriptorKind.COLUMN
+                        ? this.lookupToSQL(descriptor.qualifiedColumn, descriptor.lookup, value, idx)
+                        : this.compileRelationFilter(descriptor, value, idx);
                 accumulator.parts.push(clause.sql);
                 accumulator.params.push(...clause.params);
                 return accumulator;
@@ -457,7 +535,7 @@ export class QueryCompiler {
     private compileAnd<T>(
         nodes: QNode<T>[],
         paramIndex: number,
-        filterKeys: Record<string, { lookup: LookupType; qualifiedColumn: string }>
+        filterKeys: Record<string, ValidatedFilterDescriptor>
     ): WhereClause {
         const { parts, params } = nodes.reduce<{ parts: string[]; params: unknown[] }>(
             (accumulator, node) => {
@@ -480,7 +558,7 @@ export class QueryCompiler {
     private compileOr<T>(
         nodes: QNode<T>[],
         paramIndex: number,
-        filterKeys: Record<string, { lookup: LookupType; qualifiedColumn: string }>
+        filterKeys: Record<string, ValidatedFilterDescriptor>
     ): WhereClause {
         const { parts, params } = nodes.reduce<{ parts: string[]; params: unknown[] }>(
             (accumulator, node) => {
@@ -503,7 +581,7 @@ export class QueryCompiler {
     private compileNot<T>(
         node: QNode<T>,
         paramIndex: number,
-        filterKeys: Record<string, { lookup: LookupType; qualifiedColumn: string }>
+        filterKeys: Record<string, ValidatedFilterDescriptor>
     ): WhereClause {
         const result = this.compileQNode(node, paramIndex, filterKeys);
         if (!result.sql) {
@@ -516,8 +594,66 @@ export class QueryCompiler {
         };
     }
 
+    private compileRelationFilter(
+        descriptor: Extract<ValidatedFilterDescriptor, { kind: typeof InternalValidatedFilterDescriptorKind.RELATION }>,
+        value: unknown,
+        paramIndex: number
+    ): WhereClause {
+        return this.buildRelationFilterExists(
+            this.meta.table,
+            descriptor.relationChain,
+            descriptor.terminalColumn,
+            descriptor.lookup,
+            value,
+            paramIndex,
+            descriptor.relationPath
+        );
+    }
+
+    private buildRelationFilterExists(
+        ownerAlias: string,
+        relationChain: readonly ValidatedRelationMeta[],
+        terminalColumn: string,
+        lookup: LookupType,
+        value: unknown,
+        paramIndex: number,
+        relationPath: string
+    ): WhereClause {
+        const [relation, ...rest] = relationChain;
+        if (!relation) {
+            throw new Error(`Cannot compile empty relation filter path '${relationPath}'.`);
+        }
+
+        const targetAlias = this.buildFilterAlias(relationPath, `target_${relation.alias}_${rest.length}`);
+        const targetPredicate =
+            rest.length === 0
+                ? this.lookupToSQL(`${targetAlias}.${terminalColumn}`, lookup, value, paramIndex)
+                : this.buildRelationFilterExists(
+                      targetAlias,
+                      rest,
+                      terminalColumn,
+                      lookup,
+                      value,
+                      paramIndex,
+                      relationPath
+                  );
+
+        if (relation.throughTable && relation.throughSourceKey && relation.throughTargetKey) {
+            const throughAlias = this.buildFilterAlias(relationPath, `through_${relation.alias}_${rest.length}`);
+            return {
+                sql: `EXISTS (SELECT 1 FROM ${relation.throughTable} ${throughAlias} INNER JOIN ${relation.table} ${targetAlias} ON ${targetAlias}.${relation.targetKey} = ${throughAlias}.${relation.throughTargetKey} WHERE ${throughAlias}.${relation.throughSourceKey} = ${ownerAlias}.${relation.sourceKey} AND ${targetPredicate.sql})`,
+                params: targetPredicate.params,
+            };
+        }
+
+        return {
+            sql: `EXISTS (SELECT 1 FROM ${relation.table} ${targetAlias} WHERE ${targetAlias}.${relation.targetKey} = ${ownerAlias}.${relation.sourceKey} AND ${targetPredicate.sql})`,
+            params: targetPredicate.params,
+        };
+    }
+
     private lookupToSQL(col: string, lookup: LookupType, value: unknown, paramIndex: number): WhereClause {
-        const placeholder = this.dialect === InternalDialect.POSTGRES ? `$${paramIndex}` : '?';
+        const placeholder = this.placeholders.at(paramIndex);
         const normalized = this.normalizeParam(value);
 
         switch (lookup) {
@@ -539,10 +675,7 @@ export class QueryCompiler {
                 if (entries.length === 0) {
                     return { sql: '1=0', params: [] };
                 }
-                const placeholders =
-                    this.dialect === InternalDialect.POSTGRES
-                        ? entries.map((_, index) => `$${paramIndex + index}`).join(', ')
-                        : entries.map(() => '?').join(', ');
+                const placeholders = this.placeholders.listFromOffset(entries.length, paramIndex - 1);
                 return { sql: `${col} IN (${placeholders})`, params: entries };
             }
             case InternalLookupType.ISNULL:
@@ -550,19 +683,19 @@ export class QueryCompiler {
             case InternalLookupType.CONTAINS:
                 return { sql: `${col} LIKE ${placeholder}`, params: [`%${value}%`] };
             case InternalLookupType.ICONTAINS: {
-                const lowerCol = this.dialect === InternalDialect.POSTGRES ? `LOWER(${col})` : `${col}`;
+                const lowerCol = this.adapter.dialect === InternalDialect.POSTGRES ? `LOWER(${col})` : `${col}`;
                 return { sql: `${lowerCol} LIKE ${placeholder}`, params: [`%${String(value).toLowerCase()}%`] };
             }
             case InternalLookupType.STARTSWITH:
                 return { sql: `${col} LIKE ${placeholder}`, params: [`${value}%`] };
             case InternalLookupType.ISTARTSWITH: {
-                const lowerCol = this.dialect === InternalDialect.POSTGRES ? `LOWER(${col})` : `${col}`;
+                const lowerCol = this.adapter.dialect === InternalDialect.POSTGRES ? `LOWER(${col})` : `${col}`;
                 return { sql: `${lowerCol} LIKE ${placeholder}`, params: [`${String(value).toLowerCase()}%`] };
             }
             case InternalLookupType.ENDSWITH:
                 return { sql: `${col} LIKE ${placeholder}`, params: [`%${value}`] };
             case InternalLookupType.IENDSWITH: {
-                const lowerCol = this.dialect === InternalDialect.POSTGRES ? `LOWER(${col})` : `${col}`;
+                const lowerCol = this.adapter.dialect === InternalDialect.POSTGRES ? `LOWER(${col})` : `${col}`;
                 return { sql: `${lowerCol} LIKE ${placeholder}`, params: [`%${String(value).toLowerCase()}`] };
             }
             default:
@@ -571,13 +704,13 @@ export class QueryCompiler {
     }
 
     private normalizeParam(value: unknown): unknown {
-        if (this.dialect === InternalDialect.SQLITE && typeof value === 'boolean') {
+        if (this.adapter.dialect === InternalDialect.SQLITE && typeof value === 'boolean') {
             return value ? 1 : 0;
         }
         return value;
     }
 
-    private collectStateFilterKeys<T>(state: QuerySetState<T>): string[] {
+    private collectStateFilterKeys<T, TSourceModel = unknown>(state: QuerySetState<T, TSourceModel>): string[] {
         const filterKeys = new Set<string>();
         if (state.q) {
             this.collectNodeFilterKeys(state.q, filterKeys);
@@ -587,7 +720,10 @@ export class QueryCompiler {
         return [...filterKeys];
     }
 
-    private collectNodeFilterKeys<T>(node: QNode<T>, filterKeys: Set<string>): void {
+    private collectNodeFilterKeys<T, TSourceModel = unknown>(
+        node: QNode<T, TSourceModel>,
+        filterKeys: Set<string>
+    ): void {
         Object.keys(node.where ?? {}).forEach((key) => filterKeys.add(key));
         node.nodes?.forEach((child) => this.collectNodeFilterKeys(child, filterKeys));
         if (node.node) {

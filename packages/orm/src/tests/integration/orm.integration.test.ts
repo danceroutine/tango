@@ -2,17 +2,19 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import {
     Dialect,
     ResetMode,
     TestHarness,
     applyAndVerifyMigrations,
-    createQuerySetFixture,
+    createModelQuerySetFixture,
     expectQueryResult,
     seedTable,
     type IntegrationHarness,
 } from '@danceroutine/tango-testing/integration';
-import { diffSchema } from '@danceroutine/tango-migrations';
+import { buildMigrationModelMetadataProjection, diffSchema } from '@danceroutine/tango-migrations/diff';
+import { Model, ModelRegistry, t } from '@danceroutine/tango-schema';
 
 function selectedDialects(): Dialect[] {
     const forced = process.env.TANGO_TEST_DIALECT;
@@ -111,7 +113,7 @@ describe.each(selectedDialects())('ORM integration (%s)', (dialect) => {
                 },
             ]);
 
-            const queryset = createQuerySetFixture<PostRow>({
+            const queryset = createModelQuerySetFixture<PostRow>({
                 harness,
                 meta: {
                     table: 'posts',
@@ -174,6 +176,75 @@ describe.each(selectedDialects())('ORM integration (%s)', (dialect) => {
                 "SELECT name FROM sqlite_master WHERE type='table'"
             );
             expect(Array.isArray(rows.rows)).toBe(true);
+        }
+    });
+
+    it('cascades implicit many-to-many join rows when a parent record is deleted', async () => {
+        ModelRegistry.clear();
+
+        Model({
+            namespace: 'blog',
+            name: 'Tag',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                slug: t.unique(z.string()),
+            }),
+        });
+        Model({
+            namespace: 'blog',
+            name: 'Post',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                title: z.string(),
+                tags: t.manyToMany('blog/Tag'),
+            }),
+        });
+
+        const projection = buildMigrationModelMetadataProjection(ModelRegistry.global());
+        const joinTable = projection.find((entry) => entry.table.startsWith('m2m_'))?.table;
+        expect(joinTable).toBeDefined();
+
+        const migrationsDir = await mkdtemp(join(tmpdir(), `tango-orm-m2m-delete-${dialect}-`));
+
+        try {
+            const ops = diffSchema({ tables: {} }, projection);
+            await writeMigration(migrationsDir, '001_initial', ops);
+            await applyAndVerifyMigrations(harness, {
+                migrationsDir,
+                expectedAppliedIds: ['001_initial'],
+            });
+
+            const p = (index: number) => (dialect === Dialect.Postgres ? `$${index}` : '?');
+            const q = (identifier: string) => `"${identifier}"`;
+            const joinTableProjection = projection.find((entry) => entry.table === joinTable);
+            const postKey = joinTableProjection?.fields.find((field) => field.references?.table === 'posts')?.name;
+            const tagKey = joinTableProjection?.fields.find((field) => field.references?.table === 'tags')?.name;
+
+            expect(postKey).toBeDefined();
+            expect(tagKey).toBeDefined();
+
+            await harness.dbClient.query(`INSERT INTO ${q('tags')} (${q('id')}, ${q('slug')}) VALUES (${p(1)}, ${p(2)})`, [
+                1,
+                'tango',
+            ]);
+            await harness.dbClient.query(`INSERT INTO ${q('posts')} (${q('id')}, ${q('title')}) VALUES (${p(1)}, ${p(2)})`, [
+                1,
+                'Hello',
+            ]);
+            await harness.dbClient.query(
+                `INSERT INTO ${q(joinTable!)} (${q('id')}, ${q(postKey!)}, ${q(tagKey!)}) VALUES (${p(1)}, ${p(2)}, ${p(3)})`,
+                [1, 1, 1]
+            );
+
+            await harness.dbClient.query(`DELETE FROM ${q('posts')} WHERE ${q('id')} = ${p(1)}`, [1]);
+
+            const remaining = await harness.dbClient.query<{ count: number | string }>(
+                `SELECT COUNT(*) AS count FROM ${q(joinTable!)}`
+            );
+            expect(Number(remaining.rows[0]?.count ?? NaN)).toBe(0);
+        } finally {
+            ModelRegistry.clear();
+            await rm(migrationsDir, { recursive: true, force: true });
         }
     });
 });

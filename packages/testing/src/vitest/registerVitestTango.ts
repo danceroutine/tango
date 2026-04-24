@@ -8,11 +8,12 @@
  * ```
  */
 import { expect, vi } from 'vitest';
+import { getLogger } from '@danceroutine/tango-core';
 import {
     TestHarness,
     applyAndVerifyMigrations as applyAndVerifyMigrationsFn,
     assertMigrationPlan as assertMigrationPlanFn,
-    createQuerySetFixture as createQuerySetFixtureFn,
+    createModelQuerySetFixture as createModelQuerySetFixtureFn,
     expectQueryResult as expectQueryResultFn,
     introspectSchema as introspectSchemaFn,
     seedTable as seedTableFn,
@@ -36,6 +37,8 @@ function isError(value: unknown): value is Error {
 }
 
 let activeHarness: IntegrationHarness | null = null;
+const logger = getLogger('tango.testing.vitest');
+let hasWarnedForCreateQuerySetFixture = false;
 
 async function resolveHarness(
     input: IntegrationHarness | (() => IntegrationHarness | Promise<IntegrationHarness>)
@@ -58,6 +61,13 @@ export interface TangoVitestHelpers {
     ): Promise<{ statuses: { id: string; applied: boolean }[] }>;
     introspectSchema(harness?: IntegrationHarness): Promise<unknown>;
     seedTable<T extends Record<string, unknown>>(table: string, rows: T[], harness?: IntegrationHarness): Promise<void>;
+    createModelQuerySetFixture<TModel extends Record<string, unknown>>(options: {
+        meta: import('@danceroutine/tango-orm/query').TableMeta;
+        harness?: IntegrationHarness;
+    }): import('@danceroutine/tango-orm').QuerySet<TModel>;
+    /**
+     * @deprecated Use `vi.tango.createModelQuerySetFixture(...)` instead.
+     */
     createQuerySetFixture<TModel extends Record<string, unknown>>(options: {
         meta: import('@danceroutine/tango-orm/query').TableMeta;
         harness?: IntegrationHarness;
@@ -106,11 +116,26 @@ const tangoHelpers: TangoVitestHelpers = {
     ): Promise<void> {
         await seedTableFn(harness ?? tangoHelpers.getTestHarness(), table, rows);
     },
+    createModelQuerySetFixture<TModel extends Record<string, unknown>>(options: {
+        meta: import('@danceroutine/tango-orm/query').TableMeta;
+        harness?: IntegrationHarness;
+    }): import('@danceroutine/tango-orm').QuerySet<TModel> {
+        return createModelQuerySetFixtureFn<TModel>({
+            harness: options.harness ?? tangoHelpers.getTestHarness(),
+            meta: options.meta,
+        });
+    },
     createQuerySetFixture<TModel extends Record<string, unknown>>(options: {
         meta: import('@danceroutine/tango-orm/query').TableMeta;
         harness?: IntegrationHarness;
     }): import('@danceroutine/tango-orm').QuerySet<TModel> {
-        return createQuerySetFixtureFn<TModel>({
+        if (!hasWarnedForCreateQuerySetFixture) {
+            hasWarnedForCreateQuerySetFixture = true;
+            logger.warn(
+                '`vi.tango.createQuerySetFixture(...)` is deprecated. Use `vi.tango.createModelQuerySetFixture(...)` instead.'
+            );
+        }
+        return createModelQuerySetFixtureFn<TModel>({
             harness: options.harness ?? tangoHelpers.getTestHarness(),
             meta: options.meta,
         });

@@ -103,7 +103,8 @@ export class MigrationRunner {
         migrations.forEach((migration) => {
             const builder = new CollectingBuilder();
             migration.up(builder);
-            const sqls = builder.ops.flatMap((op) => this.compileOperation(op));
+            const preparedOps = this.compilerStrategy.prepareOperations(this.dialect, builder.ops);
+            const sqls = preparedOps.flatMap((op) => this.compileOperation(op));
 
             output += `# ${migration.id}\n`;
             sqls.forEach((statement) => {
@@ -191,7 +192,8 @@ export class MigrationRunner {
         const builder = new CollectingBuilder();
         await migration.up(builder);
 
-        const sqls = builder.ops.flatMap((op) => this.compileOperation(op));
+        const preparedOps = this.compilerStrategy.prepareOperations(this.dialect, builder.ops);
+        const sqls = preparedOps.flatMap((op) => this.compileOperation(op));
         const checksum = String(this.hashJSON(builder.ops));
 
         const isOnline = (migration.mode ?? builder.getMode()) === 'online';

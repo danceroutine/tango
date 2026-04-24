@@ -259,6 +259,52 @@ describe('model decorators', () => {
         ).toThrow('t.manyToMany(...) does not support relatedName yet.');
     });
 
+    it('rejects partial through configuration on many-to-many decorators', () => {
+        Model({
+            namespace: 'blog',
+            name: 'Tag',
+            table: 'tags',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+        const JoinModel = Model({
+            namespace: 'blog',
+            name: 'Join',
+            table: 'joins',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+            }),
+        });
+        expect(() =>
+            Model({
+                namespace: 'blog',
+                name: 'Post',
+                table: 'posts',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    tags: t.manyToMany('blog/Tag', {
+                        through: JoinModel,
+                    }),
+                }),
+            })
+        ).toThrow('through config requires through, throughSourceFieldName, and throughTargetFieldName.');
+        expect(() =>
+            Model({
+                namespace: 'blog',
+                name: 'OtherPost',
+                table: 'other_posts',
+                schema: z.object({
+                    id: t.primaryKey(z.number().int()),
+                    tags: t.manyToMany('blog/Tag', {
+                        throughSourceFieldName: 'postId',
+                        throughTargetFieldName: 'tagId',
+                    }),
+                }),
+            })
+        ).toThrow('through config requires through, throughSourceFieldName, and throughTargetFieldName.');
+    });
+
     it('warns once per decorator kind for deprecated positional schema overloads', () => {
         const warn = vi.fn();
         setLoggerFactory({

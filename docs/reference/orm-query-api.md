@@ -162,6 +162,32 @@ VALUES (?, ?), (?, ?)
 RETURNING *
 ```
 
+### Many-to-many relations on persisted records
+
+Every persisted record returned by the manager carries a related-manager accessor for each many-to-many relation declared on the source model. The accessor is named after the published forward relation name, so a field such as `tagIds: t.manyToMany(..., { name: 'tags' })` exposes `post.tags`. The accessor is attached non-enumerably, which keeps `JSON.stringify(post)` and other enumeration helpers focused on the persisted columns.
+
+```ts
+const post = await PostModel.objects.getOrThrow(postId);
+
+await post.tags.add(tag, featuredTag);
+await post.tags.remove(tag, featuredTag);
+```
+
+`add(...targets)` and `remove(...targets)` accept target records, objects that carry the target primary key, or bare primary-key values. `add(...)` is idempotent for duplicate memberships, so repeated links do not raise a duplicate-row error. When one call touches several targets, Tango resolves the target primary keys once and runs the membership write inside one `transaction.atomic(...)` boundary.
+
+Use `post.tags.all()` when application code wants to read the linked targets. The returned queryset reads through the join table and follows the standard `QuerySet` contract, so it accepts `filter(...)`, `exclude(...)`, `orderBy(...)`, `select(...)`, `fetch(...)`, `fetchOne(...)`, `count()`, and `exists()`.
+
+```ts
+const allTags = await post.tags.all().fetch();
+const featuredTags = await post.tags.all().filter({ featured: true }).fetch();
+```
+
+`post.tags` remains a related manager even after eager loading. `prefetchRelated('tags')` warms that manager's cache; it does not replace the relation with a plain array on the model instance. This mirrors the Django-style contract that Tango follows for many-to-many accessors.
+
+When `prefetchRelated('tags')` ran in the same fetch, `post.tags.all()` returns the prefetched targets without issuing a follow-up query. The prefetch result is cached on the related manager and a successful `add(...)` or `remove(...)` invalidates that cache so the next read returns fresh data. If application code or a serializer needs an array-shaped value, materialize it explicitly from the manager with `await post.tags.all().fetch()`.
+
+Reverse many-to-many access, the bulk `set(...)` helper, the `clear()` helper, and `create(...)` on the related manager are tracked on the roadmap for a follow-up release.
+
 ## Transactions
 
 Some application workflows need several ORM writes to commit or roll back as one unit. `transaction.atomic(...)` defines that boundary.
@@ -416,7 +442,7 @@ ORDER BY posts.id ASC
 
 ### `prefetchRelated(...relations)`
 
-In contrast, use `prefetchRelated(...)` when the requested path includes a collection edge. Prefetch paths may continue beyond that edge, so one branch can still hydrate deeper single-valued or collection-valued descendants.
+In contrast, use `prefetchRelated(...)` when the requested path includes a collection edge. Valid collection edges include `hasMany` relations and many-to-many relations backed by a join table. Prefetch paths may continue beyond that edge, so one branch can still hydrate deeper single-valued or collection-valued descendants.
 
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
@@ -430,6 +456,10 @@ firstPost?.title;
 firstPost?.author?.email;
 firstComment?.body;
 ```
+
+Many-to-many prefetch reads the join table once for the batched owners, then loads targets by primary key in a follow-up query. The prefetched targets seed the related-manager cache on each owner, so a follow-up `post.tags.all().fetch()` returns the prefetched targets without another database round-trip. The model instance still exposes `tags` as a related manager, not as a plain `Tag[]`.
+
+Forward many-to-many path typing comes from the generated relation registry. Without generated relation typing, the older explicit target-model generic still only supplies reverse `hasMany` path typing; the runtime can still execute the many-to-many prefetch path, but TypeScript will need the generated registry to describe it precisely.
 
 `prefetchRelated(...)` runs the base query first, then runs batched follow-up queries for the planned collection edges. A user record with no matching posts still receives `posts: []`, and a post record with no matching comments receives `comments: []`.
 

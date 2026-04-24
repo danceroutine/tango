@@ -32,6 +32,7 @@ export type ModelMetadataLike = {
     table: string;
     fields: ModelField[];
     indexes?: ModelIndex[];
+    managed?: boolean;
 };
 
 /**
@@ -40,10 +41,11 @@ export type ModelMetadataLike = {
  */
 export function diffSchema(db: DbSchema, models: ModelMetadataLike[]): MigrationOperation[] {
     const ops: MigrationOperation[] = [];
-    const modelTables = new Set(models.map((model) => model.table));
-    const internalTables = new Set(['_tango_migrations']);
-
     models.forEach((model) => {
+        if (model.managed === false) {
+            return;
+        }
+
         const dbTable = db.tables[model.table];
 
         if (!dbTable) {
@@ -159,25 +161,9 @@ export function diffSchema(db: DbSchema, models: ModelMetadataLike[]): Migration
             }
         });
 
-        dbIndexNames.forEach((dbIndexName) => {
-            if (!modelIndexes.has(dbIndexName)) {
-                ops.push(
-                    op.index.drop({
-                        name: dbIndexName,
-                        table: model.table,
-                    })
-                );
-            }
-        });
-    });
-
-    Object.keys(db.tables).forEach((dbTableName) => {
-        if (internalTables.has(dbTableName)) {
-            return;
-        }
-        if (!modelTables.has(dbTableName)) {
-            ops.push(op.table(dbTableName).drop());
-        }
+        // Index drift is intentionally conservative. Extra indexes in the live
+        // database may be app-owned or dialect-managed, so migrations only add
+        // missing declared indexes and avoid destructive index drops here.
     });
 
     return ops;

@@ -133,7 +133,7 @@ export class PostViewSet extends ModelViewSet<Post, typeof PostSerializer> {
 
 At request time, the viewset reads the query string, applies the declared filter set, applies any allowed ordering rules, and then paginates the result. A request such as `/api/posts?published=true&authorId=42&created_after=2026-01-01&ordering=-createdAt` now has one clear place in application code where that list behavior is defined.
 
-If you want Tango's built-in `search` query parameter as well, add `searchFields` alongside `filters` in the same constructor.
+If you want Tango's built-in `search` query parameter as well, add `searchFields` alongside `filters` in the same constructor. `searchFields` accepts relation paths too, so a blog resource can search over direct columns such as `title` and related columns such as `tags__name` through one declarative list-search contract.
 
 ### Add parser hooks when the public parameter needs them
 
@@ -215,7 +215,7 @@ export class PostViewSet extends ModelViewSet<Post, typeof PostSerializer> {
             published: true,
         });
 
-        return TangoResponse.json(this.getSerializer().toRepresentation(updated));
+        return TangoResponse.json(await this.getSerializer().serialize(updated));
     }
 
     async reindex(_ctx: RequestContext): Promise<TangoResponse> {

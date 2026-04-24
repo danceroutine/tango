@@ -3,6 +3,7 @@ import { trustedSql } from '@danceroutine/tango-core';
 import { PostgresCompiler } from '../PostgresCompiler';
 import { InternalOperationKind } from '../../../domain/internal/InternalOperationKind';
 import { InternalColumnType } from '../../../domain/internal/InternalColumnType';
+import type { MigrationOperation } from '../../../domain/MigrationOperation';
 
 describe(PostgresCompiler, () => {
     it('identifies matching instances', () => {
@@ -299,5 +300,78 @@ describe(PostgresCompiler, () => {
                 ],
             })
         ).toThrow(/untrusted raw sql fragment/i);
+    });
+
+    it('sorts table creates lexicographically when no foreign keys are present', () => {
+        const compiler = new PostgresCompiler();
+        const ops: MigrationOperation[] = [
+            {
+                kind: InternalOperationKind.TABLE_CREATE,
+                table: 'zebras',
+                columns: [{ name: 'id', type: 'serial', primaryKey: true }],
+            },
+            {
+                kind: InternalOperationKind.TABLE_CREATE,
+                table: 'apples',
+                columns: [{ name: 'id', type: 'serial', primaryKey: true }],
+            },
+        ];
+
+        const prepared = compiler.prepareOperations(ops);
+        const tables = prepared
+            .filter((op) => op.kind === InternalOperationKind.TABLE_CREATE)
+            .map((op) => (op.kind === InternalOperationKind.TABLE_CREATE ? op.table : ''));
+
+        expect(tables).toEqual(['apples', 'zebras']);
+    });
+
+    it('preserves non-table operations after prepared postgres create batches', () => {
+        const compiler = new PostgresCompiler();
+        const ops: MigrationOperation[] = [
+            {
+                kind: InternalOperationKind.TABLE_CREATE,
+                table: 'comments',
+                columns: [{ name: 'id', type: 'serial', primaryKey: true }],
+            },
+            {
+                kind: InternalOperationKind.INDEX_CREATE,
+                name: 'comments_id_idx',
+                table: 'comments',
+                on: ['id'],
+            },
+        ];
+
+        const prepared = compiler.prepareOperations(ops);
+        expect(prepared[0]?.kind).toBe(InternalOperationKind.TABLE_CREATE);
+        expect(prepared[1]?.kind).toBe(InternalOperationKind.INDEX_CREATE);
+    });
+
+    it('moves inline foreign keys out of table creates during preparation', () => {
+        const compiler = new PostgresCompiler();
+        const ops: MigrationOperation[] = [
+            {
+                kind: InternalOperationKind.TABLE_CREATE,
+                table: 'comments',
+                columns: [
+                    { name: 'id', type: 'serial', primaryKey: true },
+                    {
+                        name: 'post_id',
+                        type: 'int',
+                        notNull: true,
+                        references: { table: 'posts', column: 'id', onDelete: 'CASCADE', onUpdate: 'CASCADE' },
+                    },
+                ],
+            },
+        ];
+
+        const prepared = compiler.prepareOperations(ops);
+        const create = prepared.find((op) => op.kind === InternalOperationKind.TABLE_CREATE);
+        const fk = prepared.find((op) => op.kind === InternalOperationKind.FK_CREATE);
+
+        expect(
+            create?.kind === InternalOperationKind.TABLE_CREATE &&
+                create.columns.some((column) => column.name === 'post_id' && !column.references)
+        ).toBe(true);
+        expect(fk?.kind === InternalOperationKind.FK_CREATE && fk.refTable === 'posts').toBe(true);
     });
 });

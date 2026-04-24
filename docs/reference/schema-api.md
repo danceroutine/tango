@@ -303,7 +303,13 @@ CREATE UNIQUE INDEX profiles_user_id_unique ON profiles(userId);
 
 #### `manyToMany(target, config?)`
 
-Use `manyToMany(target, config?)` when the model contract needs to record many-to-many relation intent on the schema surface. Tango records that relation in the [relation graph](/contributors/topics/resolved-relation-graph) while keeping generated database fields and persisted record contracts unchanged.
+Use `manyToMany(target, config?)` when the model contract needs a collection-valued relation between two models. The field itself does not become a column on the owning table; instead, Tango records the relation in the [relation graph](/contributors/topics/resolved-relation-graph) and synchronizes migrations and ORM metadata through a join table.
+
+When you omit `through`, `throughSourceFieldName`, and `throughTargetFieldName`, Tango synthesizes an internal-only join model registered on the same registry as your app models. That model picks up a deterministic physical table name derived from the owning model key, the Zod field key where `manyToMany` appears, and the target model key. Publishing a different relation `name` alone does not change that identity. Renaming the field key on the owning schema can change join-table identity; if you need a stable hand-managed layout or want to avoid collisions with existing tables, supply an explicit through model and full through metadata instead.
+
+Self-referential many-to-many uses distinct through-side field names shaped like `fromPost` and `toPost`, mirroring Django’s implicit intermediary naming when both endpoints are the same model.
+
+When you provide `through`, you must supply `through`, `throughSourceFieldName`, and `throughTargetFieldName` together so the relation graph can resolve physical columns on your join model.
 
 ```ts
 const PostSchema = z.object({
@@ -314,11 +320,13 @@ const PostSchema = z.object({
 });
 ```
 
-The config object supports `field` and `name`. `field` supplies the relation-facing Zod schema. If it is omitted, Tango uses `z.array(z.number().int())`. `name` publishes the forward relation name.
+The config object supports `field`, `name`, `through`, `throughSourceFieldName`, and `throughTargetFieldName`. `field` supplies the relation-facing Zod schema. If it is omitted, Tango uses `z.array(z.number().int())`. `name` publishes the forward relation name.
 
-A relational database represents many-to-many storage through a join table rather than through one foreign-key field on either endpoint. Until join-table support owns that workflow directly, the usual Tango pattern is to model the join table explicitly with two foreign keys.
+The forward many-to-many edge stays `migratable: false` on the owner model because there is still no owner-row column for the collection; DDL for the join rows is owned by the synthesized or explicit through model that appears in migration metadata.
 
-`manyToMany(...)` supports the forward `name` option. Reverse many-to-many naming belongs to the future join-table workflow.
+Persisted records returned by the manager carry a related-manager accessor named after the published relation. For the example above, `post.tags.add(tag, featuredTag)`, `post.tags.remove(tag)`, and `post.tags.all()` insert, delete, and read membership rows through the resolved through model. `add(...)` and `remove(...)` accept one or more targets, and duplicate `add(...)` calls are ignored. The accessor stays a manager even after `prefetchRelated('tags')`; eager loading only warms its cache. The accessor is documented in the [ORM query API reference](/reference/orm-query-api).
+
+Reverse many-to-many naming, the bulk `set(...)` helper, the `clear()` helper, and `create(...)` on the related manager remain roadmap work.
 
 The object form is the preferred public relation-decorator contract. The older positional schema overloads remain available for compatibility.
 

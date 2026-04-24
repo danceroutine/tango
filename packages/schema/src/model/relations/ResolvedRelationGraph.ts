@@ -25,6 +25,12 @@ export interface ResolvedRelationDescriptor {
     cardinality: RelationCardinality;
     localFieldName?: string;
     targetFieldName?: string;
+    throughModelKey?: string;
+    throughTable?: string;
+    throughSourceFieldName?: string;
+    throughTargetFieldName?: string;
+    throughSourceKey?: string;
+    throughTargetKey?: string;
     capabilities: {
         migratable: boolean;
         queryable: boolean;

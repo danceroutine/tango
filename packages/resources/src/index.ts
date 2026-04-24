@@ -38,6 +38,7 @@ export {
 export {
     Serializer,
     ModelSerializer,
+    relation,
     type SerializerClass,
     type AnySerializerClass,
     type SerializerCreateInput,
@@ -45,7 +46,13 @@ export {
     type SerializerOutput,
     type SerializerSchema,
     type ModelSerializerClass,
+    type AnyModelSerializer,
     type AnyModelSerializerClass,
+    type ModelSerializerRelationFields,
+    type ManyToManyManagerKeys,
+    type ManyToManyRelationField,
+    type ManyToManyReadStrategy,
+    type ManyToManyWriteStrategy,
 } from './serializer/index';
 export { ModelViewSet } from './viewset/index';
 export type {

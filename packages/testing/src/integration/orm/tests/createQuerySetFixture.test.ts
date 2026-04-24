@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createQuerySetFixture } from '../index';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Dialect, ResetMode, type IntegrationHarness } from '../../domain/index';
+import { anAdapter } from '../../../mocks/anAdapter';
 
 function harnessFor(dialect: Dialect): IntegrationHarness {
     return {
         dialect,
+        adapter: anAdapter({ dialect: dialect === Dialect.Postgres ? 'postgres' : 'sqlite' }),
         capabilities: {
             transactionalDDL: true,
             supportsSchemas: dialect === Dialect.Postgres,
@@ -27,10 +28,27 @@ function harnessFor(dialect: Dialect): IntegrationHarness {
     } as unknown as IntegrationHarness;
 }
 
-describe(createQuerySetFixture, () => {
-    it('creates a queryset fixture with supplied metadata', async () => {
+describe('createQuerySetFixture', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('warns once and delegates to createModelQuerySetFixture', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.resetModules();
+
+        const { createQuerySetFixture } = await import('../createQuerySetFixture');
         const harness = harnessFor(Dialect.Sqlite);
-        const queryset = createQuerySetFixture<{ id: number }>({
+
+        const first = createQuerySetFixture<{ id: number }>({
+            harness,
+            meta: {
+                table: 'users',
+                pk: 'id',
+                columns: { id: 'int' },
+            },
+        });
+        const second = createQuerySetFixture<{ id: number }>({
             harness,
             meta: {
                 table: 'users',
@@ -39,10 +57,12 @@ describe(createQuerySetFixture, () => {
             },
         });
 
-        await expect(queryset.fetchOne()).resolves.toEqual({ id: 1 });
-        expect(vi.mocked(harness.dbClient.query)).toHaveBeenCalledWith(
-            'SELECT users.* FROM users ORDER BY users.id ASC LIMIT 1',
-            []
+        await expect(first.fetchOne()).resolves.toEqual({ id: 1 });
+        await expect(second.fetchOne()).resolves.toEqual({ id: 1 });
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy).toHaveBeenCalledWith(
+            '[tango.testing.integration]',
+            '`createQuerySetFixture(...)` is deprecated. Use `createModelQuerySetFixture(...)` instead.'
         );
     });
 });

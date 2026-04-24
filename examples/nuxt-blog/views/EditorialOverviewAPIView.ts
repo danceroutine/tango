@@ -1,13 +1,13 @@
 import { TangoResponse } from '@danceroutine/tango-core';
 import { APIView, type RequestContext } from '@danceroutine/tango-resources';
 import { z } from 'zod';
-import { CommentReadSchema, PostModel, PostReadSchema, UserModel, UserReadSchema } from '~~/lib/models';
+import { CommentReadSchema, PostModel, PostRecordSchema, UserModel, UserReadSchema } from '~~/lib/models';
 
 const UserHydrationSchema = UserReadSchema;
 const CommentHydrationSchema = CommentReadSchema.extend({
     author: UserHydrationSchema.nullable(),
 });
-const PostHydrationSchema = PostReadSchema.extend({
+const PostHydrationSchema = PostRecordSchema.extend({
     author: UserHydrationSchema.nullable(),
     comments: z.array(CommentHydrationSchema),
 });

@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { anAdapter } from '../mocks/anAdapter';
 import { aDBClient } from '../mocks/aDBClient';
 import { Dialect } from './domain/Dialect';
 import { ResetMode } from './domain/ResetMode';
@@ -18,6 +19,7 @@ const defaultCapabilities: DialectTestCapabilities = {
 export function anIntegrationHarness(overrides: Partial<IntegrationHarness> = {}): IntegrationHarness {
     return {
         dialect: Dialect.Sqlite,
+        adapter: anAdapter({ dialect: 'sqlite' }),
         capabilities: defaultCapabilities,
         resetMode: ResetMode.DropSchema,
         dbClient: aDBClient(),

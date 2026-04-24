@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "fingerprint": "2c1c9e896dd689ff079fee3f0cd27efdd404874c73ae73f9732e020b28980a7f",
+    "fingerprint": "86aec4867bfc220091510f04bd844d1866645d05172572240d4a28c59994a06a",
     "snapshot": {
         "models": [
             {
@@ -82,6 +82,27 @@
                             "queryable": true,
                             "hydratable": true
                         }
+                    },
+                    {
+                        "edgeId": "nuxt-blog/Post:tagIds:manyToMany",
+                        "sourceModelKey": "nuxt-blog/Post",
+                        "targetModelKey": "nuxt-blog/Tag",
+                        "name": "tags",
+                        "kind": "manyToMany",
+                        "storageStrategy": "many_to_many",
+                        "cardinality": "many",
+                        "throughModelKey": "tango.implicit/m2m_9144b023282bdac68c491a1d0bf322a5",
+                        "throughTable": "m2m_9144b023282bdac6",
+                        "throughSourceFieldName": "postId",
+                        "throughTargetFieldName": "tagId",
+                        "throughSourceKey": "postId",
+                        "throughTargetKey": "tagId",
+                        "alias": "post_tags",
+                        "capabilities": {
+                            "migratable": false,
+                            "queryable": true,
+                            "hydratable": true
+                        }
                     }
                 ]
             },
@@ -118,6 +139,47 @@
                         "localFieldName": "authorId",
                         "targetFieldName": "id",
                         "alias": "post_posts",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    }
+                ]
+            },
+            {
+                "key": "tango.implicit/m2m_9144b023282bdac68c491a1d0bf322a5",
+                "relations": [
+                    {
+                        "edgeId": "tango.implicit/m2m_9144b023282bdac68c491a1d0bf322a5:postId:foreignKey",
+                        "sourceModelKey": "tango.implicit/m2m_9144b023282bdac68c491a1d0bf322a5",
+                        "targetModelKey": "nuxt-blog/Post",
+                        "name": "post",
+                        "inverseEdgeId": "tango.implicit/m2m_9144b023282bdac68c491a1d0bf322a5:postId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "postId",
+                        "targetFieldName": "id",
+                        "alias": "post_post",
+                        "capabilities": {
+                            "migratable": true,
+                            "queryable": true,
+                            "hydratable": true
+                        }
+                    },
+                    {
+                        "edgeId": "tango.implicit/m2m_9144b023282bdac68c491a1d0bf322a5:tagId:foreignKey",
+                        "sourceModelKey": "tango.implicit/m2m_9144b023282bdac68c491a1d0bf322a5",
+                        "targetModelKey": "nuxt-blog/Tag",
+                        "name": "tag",
+                        "inverseEdgeId": "tango.implicit/m2m_9144b023282bdac68c491a1d0bf322a5:tagId:foreignKey:inverse",
+                        "kind": "belongsTo",
+                        "storageStrategy": "reference",
+                        "cardinality": "single",
+                        "localFieldName": "tagId",
+                        "targetFieldName": "id",
+                        "alias": "tag_tag",
                         "capabilities": {
                             "migratable": true,
                             "queryable": true,

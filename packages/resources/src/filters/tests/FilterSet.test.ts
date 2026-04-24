@@ -125,6 +125,26 @@ describe(FilterSet, () => {
         expect(result).toEqual([{ age__gte: '18' }, { age__lte: '65' }]);
     });
 
+    it('accepts relation-path field declarations in define config', () => {
+        const filters = FilterSet.define<UserFilterModel>({
+            fields: {
+                tags__slug: true,
+                author__email: ['icontains'],
+            },
+        });
+
+        const result = filters.apply(query('tags__slug=tango&author__email__icontains=example.com'));
+        expect(result).toEqual([{ tags__slug: 'tango' }, { author__email__icontains: '%example.com%' }]);
+    });
+
+    it('ignores malformed all-field lookup params that resolve to an empty relation path', () => {
+        const filters = FilterSet.define<UserFilterModel>({
+            all: '__all__',
+        });
+
+        expect(filters.apply(query('__icontains=ignored'))).toEqual([]);
+    });
+
     it('supports field parser maps and omits undefined parser output', () => {
         const filters = FilterSet.define<UserFilterModel>({
             fields: {

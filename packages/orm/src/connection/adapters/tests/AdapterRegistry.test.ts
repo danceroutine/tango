@@ -2,15 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { aDBClient } from '@danceroutine/tango-testing';
 import { AdapterRegistry, connectDB, getDefaultAdapterRegistry } from '../AdapterRegistry';
 import type { Adapter } from '../Adapter';
+import { PostgresAdapter } from '../dialects/PostgresAdapter';
 
 function makeAdapter(name: string): Adapter {
+    const reference = new PostgresAdapter();
     return {
         name,
-        features: {
-            transactionalDDL: true,
-            concurrentIndex: false,
-            validateForeignKeys: false,
-        },
+        dialect: reference.dialect,
+        features: reference.features,
+        placeholders: reference.placeholders,
         connect: vi.fn(async () => aDBClient()),
     };
 }

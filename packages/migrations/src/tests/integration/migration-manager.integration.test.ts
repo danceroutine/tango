@@ -87,7 +87,7 @@ const modelsV2: ModelMetadataList = [
                 references: { table: 'users', column: 'id', onDelete: 'CASCADE', onUpdate: 'CASCADE' },
             },
             { name: 'title', type: 'text', notNull: true },
-            { name: 'slug', type: 'text', notNull: true },
+            { name: 'slug', type: 'text' },
         ],
         indexes: [{ name: 'posts_slug_idx', on: ['slug'], unique: true }],
     },

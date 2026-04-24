@@ -8,12 +8,14 @@ const post = await PostModel.objects
     .query()
     .filter({ slug })
     .selectRelated('author')
-    .prefetchRelated('comments__author')
+    .prefetchRelated('comments__author', 'tags')
     .fetchOne();
 
 if (!post || !post.published) {
     throw createError({ statusCode: 404, statusMessage: 'Not Found' });
 }
+
+const tags = (await post.tags.all().fetch()).results;
 </script>
 
 <template>
@@ -32,6 +34,9 @@ if (!post || !post.published) {
                     }}</time>
                     <span>By {{ post.author?.username ?? 'Unknown author' }}</span>
                     <span>{{ post.comments.length }} comments</span>
+                </div>
+                <div class="tag-row">
+                    <span v-for="tag in tags" :key="tag.id" class="tag-chip">{{ tag.name }}</span>
                 </div>
             </header>
 
@@ -84,6 +89,20 @@ if (!post || !post.published) {
     flex-wrap: wrap;
     gap: 1rem;
     color: #6b7280;
+}
+
+.tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+}
+
+.tag-chip {
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #374151;
 }
 
 .post-detail time {

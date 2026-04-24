@@ -5,16 +5,37 @@
 declare global {
     interface TangoGeneratedRelationRegistry {
         'nuxt-blog/Comment': {
-            author: { target: (typeof import('../lib/models.ts'))['UserModel']; cardinality: 'single' };
-            post: { target: (typeof import('../lib/models.ts'))['PostModel']; cardinality: 'single' };
+            author: {
+                target: (typeof import('../lib/models.ts'))['UserModel'];
+                cardinality: 'single';
+                kind: 'belongsTo';
+            };
+            post: {
+                target: (typeof import('../lib/models.ts'))['PostModel'];
+                cardinality: 'single';
+                kind: 'belongsTo';
+            };
         };
         'nuxt-blog/Post': {
-            author: { target: (typeof import('../lib/models.ts'))['UserModel']; cardinality: 'single' };
-            comments: { target: (typeof import('../lib/models.ts'))['CommentModel']; cardinality: 'many' };
+            author: {
+                target: (typeof import('../lib/models.ts'))['UserModel'];
+                cardinality: 'single';
+                kind: 'belongsTo';
+            };
+            comments: {
+                target: (typeof import('../lib/models.ts'))['CommentModel'];
+                cardinality: 'many';
+                kind: 'hasMany';
+            };
+            tags: { target: (typeof import('../lib/models.ts'))['TagModel']; cardinality: 'many'; kind: 'manyToMany' };
         };
         'nuxt-blog/User': {
-            comments: { target: (typeof import('../lib/models.ts'))['CommentModel']; cardinality: 'many' };
-            posts: { target: (typeof import('../lib/models.ts'))['PostModel']; cardinality: 'many' };
+            comments: {
+                target: (typeof import('../lib/models.ts'))['CommentModel'];
+                cardinality: 'many';
+                kind: 'hasMany';
+            };
+            posts: { target: (typeof import('../lib/models.ts'))['PostModel']; cardinality: 'many'; kind: 'hasMany' };
         };
     }
 }

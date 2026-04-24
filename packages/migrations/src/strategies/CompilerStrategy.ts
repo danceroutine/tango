@@ -32,6 +32,14 @@ export class CompilerStrategy {
     }
 
     /**
+     * Prepare a batch of migration operations for a target dialect.
+     */
+    prepareOperations(dialect: Dialect, operations: MigrationOperation[]): MigrationOperation[] {
+        const compiler = this.getCompiler(dialect);
+        return compiler.prepareOperations ? compiler.prepareOperations(operations) : operations;
+    }
+
+    /**
      * Compile a migration operation to SQL for a target dialect.
      */
     compile(dialect: Dialect, operation: MigrationOperation): SQL[] {

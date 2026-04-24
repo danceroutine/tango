@@ -58,7 +58,7 @@ For integration tests, the package exposes the `TestHarness` and dialect strateg
 
 ## Public API
 
-The root export covers three main jobs. Mock helpers such as `aDBClient`, `aManager`, `aQueryExecutor`, and `aQuerySet` keep unit tests lightweight. Runtime and integration helpers such as `aTangoConfig`, `setupTestTangoRuntime`, `TestHarness`, and `createQuerySetFixture` support database-backed and framework-backed workflows. `ModelDataFactory` and the Vitest integration surface round out the package for data fixtures and test-runner setup.
+The root export covers three main jobs. Mock helpers such as `aDBClient`, `aManager`, `aQueryExecutor`, and `aModelQuerySet` keep unit tests lightweight. Runtime and integration helpers such as `aTangoConfig`, `setupTestTangoRuntime`, `TestHarness`, and `createModelQuerySetFixture` support database-backed and framework-backed workflows. `ModelDataFactory` and the Vitest integration surface round out the package for data fixtures and test-runner setup.
 
 The package also exposes subpaths such as `mocks`, `factories`, `assertions`, `integration`, and `vitest` when you want a more explicit import boundary.
 

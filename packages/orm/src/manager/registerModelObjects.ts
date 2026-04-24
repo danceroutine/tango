@@ -1,20 +1,19 @@
 import type { z } from 'zod';
-import type { Model as SchemaModel, PersistedModelOutput } from '@danceroutine/tango-schema/domain';
+import type { Model as SchemaModel, ModelWriteHooks } from '@danceroutine/tango-schema/domain';
 import { registerModelAugmentor } from '@danceroutine/tango-schema';
 import { ModelManager } from './ModelManager';
+import type { MaterializedModelRecord } from './relations/MaterializedModelRecord';
 import type { TangoRuntime } from '../runtime/TangoRuntime';
 import { getTangoRuntime } from '../runtime/defaultRuntime';
 
 const managerCache = new WeakMap<object, { runtime: TangoRuntime; manager: ModelManager<Record<string, unknown>> }>();
 let hasRegisteredModelObjects = false;
 
-type AugmentableSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>> = Pick<
-    SchemaModel<TSchema>,
-    'metadata' | 'hooks'
-> & {
+type AugmentableSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>> = Pick<SchemaModel<TSchema>, 'metadata'> & {
     schema: {
-        parse(input: unknown): PersistedModelOutput<TSchema>;
+        parse(input: unknown): MaterializedModelRecord<TSchema>;
     };
+    hooks?: ModelWriteHooks<MaterializedModelRecord<TSchema>>;
 };
 
 function defineObjectsProperty<TSchema extends z.ZodObject<z.ZodRawShape>, TKey extends string>(
@@ -30,13 +29,13 @@ function defineObjectsProperty<TSchema extends z.ZodObject<z.ZodRawShape>, TKey 
                 return cached.manager;
             }
 
-            const manager = new ModelManager<PersistedModelOutput<TSchema>, SchemaModel<TSchema, TKey>>(
+            const manager = new ModelManager<MaterializedModelRecord<TSchema>, SchemaModel<TSchema, TKey>>(
                 model as unknown as AugmentableSchemaModel<TSchema>,
                 runtime
             );
             managerCache.set(model, {
                 runtime,
-                manager: manager as ModelManager<Record<string, unknown>>,
+                manager: manager as unknown as ModelManager<Record<string, unknown>>,
             });
             return manager;
         },

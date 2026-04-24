@@ -1,4 +1,5 @@
 import type { TableMeta } from '../query/domain/TableMeta';
+import { InternalSqlValidationPlanKind as SqlPlanKind } from './internal/InternalSqlValidationPlanKind';
 
 /**
  * Validation request for read/query compilation.
@@ -7,7 +8,7 @@ import type { TableMeta } from '../query/domain/TableMeta';
  * and relation names before SQL is assembled.
  */
 export type SelectSqlValidationPlan = {
-    kind: 'select';
+    kind: typeof SqlPlanKind.SELECT;
     meta: TableMeta;
     selectFields?: readonly string[];
     filterKeys?: readonly string[];
@@ -19,7 +20,7 @@ export type SelectSqlValidationPlan = {
  * Validation request for insert statements.
  */
 export type InsertSqlValidationPlan = {
-    kind: 'insert';
+    kind: typeof SqlPlanKind.INSERT;
     meta: TableMeta;
     writeKeys: readonly string[];
 };
@@ -28,7 +29,7 @@ export type InsertSqlValidationPlan = {
  * Validation request for update statements.
  */
 export type UpdateSqlValidationPlan = {
-    kind: 'update';
+    kind: typeof SqlPlanKind.UPDATE;
     meta: TableMeta;
     writeKeys: readonly string[];
 };
@@ -37,7 +38,7 @@ export type UpdateSqlValidationPlan = {
  * Validation request for delete statements.
  */
 export type DeleteSqlValidationPlan = {
-    kind: 'delete';
+    kind: typeof SqlPlanKind.DELETE;
     meta: TableMeta;
 };
 

@@ -1,10 +1,10 @@
 import type {
     APIView,
     APIViewMethod,
+    AnyModelSerializer,
+    AnyModelSerializerClass,
     GenericAPIView,
-    ModelSerializerClass,
     ModelViewSet,
-    SerializerSchema,
 } from '@danceroutine/tango-resources';
 import type { z } from 'zod';
 
@@ -143,12 +143,7 @@ export interface OpenAPIOptions {
 
 export type OpenAPIViewSetDescriptor<
     TModel extends Record<string, unknown> = Record<string, unknown>,
-    TSerializer extends ModelSerializerClass<
-        TModel,
-        SerializerSchema,
-        SerializerSchema,
-        SerializerSchema
-    > = ModelSerializerClass<TModel, SerializerSchema, SerializerSchema, SerializerSchema>,
+    TSerializer extends AnyModelSerializer<TModel> = AnyModelSerializer<TModel>,
 > = {
     kind: 'viewset';
     basePath: string;
@@ -159,12 +154,7 @@ export type OpenAPIViewSetDescriptor<
 
 export type OpenAPIGenericAPIViewDescriptor<
     TModel extends Record<string, unknown> = Record<string, unknown>,
-    TSerializer extends ModelSerializerClass<
-        TModel,
-        SerializerSchema,
-        SerializerSchema,
-        SerializerSchema
-    > = ModelSerializerClass<TModel, SerializerSchema, SerializerSchema, SerializerSchema>,
+    TSerializer extends AnyModelSerializer<TModel> = AnyModelSerializer<TModel>,
 > = {
     kind: 'generic';
     collectionPath?: string;
@@ -182,19 +172,30 @@ export type OpenAPIAPIViewDescriptor = {
     methods: Partial<Record<APIViewMethod, OpenAPIOperationOverride>>;
 };
 
-type AnyOpenAPIViewSetDescriptor = OpenAPIViewSetDescriptor<
-    // oxlint-disable-next-line typescript/no-explicit-any
-    any,
-    // oxlint-disable-next-line typescript/no-explicit-any
-    any
->;
+type AnyOpenAPIViewSetDescriptor = {
+    kind: 'viewset';
+    basePath: string;
+    resource: ModelViewSet<
+        // oxlint-disable-next-line typescript/no-explicit-any
+        any,
+        AnyModelSerializerClass
+    >;
+    tags?: string[];
+    actions?: Record<string, OpenAPIOperationOverride>;
+};
 
-type AnyOpenAPIGenericAPIViewDescriptor = OpenAPIGenericAPIViewDescriptor<
-    // oxlint-disable-next-line typescript/no-explicit-any
-    any,
-    // oxlint-disable-next-line typescript/no-explicit-any
-    any
->;
+type AnyOpenAPIGenericAPIViewDescriptor = {
+    kind: 'generic';
+    collectionPath?: string;
+    detailPath?: string;
+    resource: GenericAPIView<
+        // oxlint-disable-next-line typescript/no-explicit-any
+        any,
+        AnyModelSerializerClass
+    >;
+    tags?: string[];
+    methods?: Partial<Record<APIViewMethod, OpenAPIOperationOverride>>;
+};
 
 export type OpenAPIResourceDescriptor =
     | AnyOpenAPIViewSetDescriptor

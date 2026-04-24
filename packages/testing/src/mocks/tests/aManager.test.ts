@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { aManager } from '../aManager';
-import { aQuerySet } from '../aQuerySet';
+import { aModelQuerySet } from '../aModelQuerySet';
 
 describe(aManager, () => {
     it('provides defaults and allows behavior overrides', async () => {
-        const querySet = aQuerySet<{ id: number; name: string }>();
+        const querySet = aModelQuerySet<{ id: number; name: string }>();
         const manager = aManager<{ id: number; name: string }>({
             querySet,
             create: async (input) => ({ id: 7, name: String(input.name ?? 'x') }),
@@ -33,7 +33,7 @@ describe(aManager, () => {
     });
 
     it('supports explicit query and error-path overrides', async () => {
-        const querySet = aQuerySet<{ id: number; name: string }>();
+        const querySet = aModelQuerySet<{ id: number; name: string }>();
         const querySpy = vi.fn(() => querySet);
         const allSpy = vi.fn(() => querySet);
         const getOrThrowSpy = vi.fn(async () => ({ id: 5, name: 'found' }));

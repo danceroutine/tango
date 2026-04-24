@@ -19,6 +19,8 @@ import {
 } from './GeneratedRelationRegistryArtifact';
 import { ResolvedRelationGraphArtifactFactory } from './ResolvedRelationGraphArtifactFactory';
 import type { ResolvedRelationGraphSnapshot } from './ResolvedRelationGraphSnapshot';
+import { ImplicitManyToManyIdentifier } from '../relations/ImplicitManyToManyIdentifier';
+import { ImplicitManyToManyThroughFactory } from '../relations/ImplicitManyToManyThroughFactory';
 
 const DEFAULT_IDENTIFIER_NAME = 'id';
 const ACTIVE_REGISTRY_STORAGE_KEY = Symbol.for('tango.schema.activeRegistryStorage');
@@ -211,6 +213,15 @@ export class ModelRegistry {
             return this.storageCache;
         }
 
+        const strippedImplicit = this.stripImplicitManyToManyModels();
+        const implicitThroughModels = ImplicitManyToManyThroughFactory.buildModels(this);
+        for (const model of implicitThroughModels) {
+            this.models.set(model.metadata.key, model);
+        }
+        if (strippedImplicit || implicitThroughModels.length > 0) {
+            this.bumpVersion();
+        }
+
         const primaryKeyByModel = new Map<string, string>();
         for (const model of this.models.values()) {
             primaryKeyByModel.set(model.metadata.key, this.inferPrimaryKeyName(model));
@@ -270,10 +281,11 @@ export class ModelRegistry {
 
         // The registry owns cache/version orchestration. The dedicated builder owns
         // forward edge resolution, reverse synthesis, and override validation.
+        const storage = this.finalizeStorageArtifacts();
         const finalized = ResolvedRelationGraphBuilder.build({
             version: this.version,
             models: this.values(),
-            storage: this.finalizeStorageArtifacts(),
+            storage,
             resolveRef: (ref) => this.resolveRef(ref),
         });
         this.relationGraphCache = finalized;
@@ -315,6 +327,17 @@ export class ModelRegistry {
         this.storageCache = undefined;
         this.relationGraphCache = undefined;
         this.lastRelationRegistryDriftCheckVersion = undefined;
+    }
+
+    private stripImplicitManyToManyModels(): boolean {
+        let removed = false;
+        for (const key of this.models.keys()) {
+            if (ImplicitManyToManyIdentifier.isImplicitManyToManyModel(key)) {
+                this.models.delete(key);
+                removed = true;
+            }
+        }
+        return removed;
     }
 
     private freezeFields(fields: readonly Field[]): readonly Field[] {

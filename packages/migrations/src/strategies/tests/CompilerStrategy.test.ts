@@ -8,6 +8,7 @@ describe(CompilerStrategy, () => {
     it('dispatches to the compiler registered for a dialect', () => {
         const fakeFactory: CompilerFactory = {
             create: () => ({
+                prepareOperations: (operations) => operations,
                 compile: () => [{ sql: '-- fake', params: [] }],
             }),
         };
@@ -40,6 +41,7 @@ describe(CompilerStrategy, () => {
             create: () => {
                 createCalls += 1;
                 return {
+                    prepareOperations: (operations) => operations,
                     compile: () => [{ sql: '-- fake', params: [] }],
                 };
             },
@@ -62,9 +64,27 @@ describe(CompilerStrategy, () => {
         expect(createCalls).toBe(1);
     });
 
+    it('returns operations unchanged when the compiler has no prepare hook', () => {
+        const fakeFactory: CompilerFactory = {
+            create: () =>
+                ({
+                    compile: () => [{ sql: '-- fake', params: [] }],
+                }) as ReturnType<CompilerFactory['create']>,
+        };
+
+        const strategy = new CompilerStrategy({
+            [InternalDialect.POSTGRES]: fakeFactory,
+            [InternalDialect.SQLITE]: fakeFactory,
+        });
+        const operations = [{ kind: InternalOperationKind.TABLE_DROP, table: 'users' }] as const;
+
+        expect(strategy.prepareOperations(InternalDialect.POSTGRES, [...operations])).toEqual(operations);
+    });
+
     it('accepts custom compiler handlers and rejects unknown dialects', () => {
         const fakeFactory: CompilerFactory = {
             create: () => ({
+                prepareOperations: (operations) => operations,
                 compile: () => [{ sql: '-- fake', params: [] }],
             }),
         };

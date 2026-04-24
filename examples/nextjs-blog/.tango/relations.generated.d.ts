@@ -5,16 +5,40 @@
 declare global {
     interface TangoGeneratedRelationRegistry {
         'nextjs-blog/Comment': {
-            author: { target: (typeof import('../src/lib/models.ts'))['UserModel']; cardinality: 'single' };
-            post: { target: (typeof import('../src/lib/models.ts'))['PostModel']; cardinality: 'single' };
+            author: {
+                target: (typeof import('../src/lib/models.ts'))['UserModel'];
+                cardinality: 'single';
+                kind: 'belongsTo';
+            };
+            post: {
+                target: (typeof import('../src/lib/models.ts'))['PostModel'];
+                cardinality: 'single';
+                kind: 'belongsTo';
+            };
         };
         'nextjs-blog/Post': {
-            author: { target: (typeof import('../src/lib/models.ts'))['UserModel']; cardinality: 'single' };
-            comments: { target: (typeof import('../src/lib/models.ts'))['CommentModel']; cardinality: 'many' };
+            author: {
+                target: (typeof import('../src/lib/models.ts'))['UserModel'];
+                cardinality: 'single';
+                kind: 'belongsTo';
+            };
+            comments: {
+                target: (typeof import('../src/lib/models.ts'))['CommentModel'];
+                cardinality: 'many';
+                kind: 'hasMany';
+            };
         };
         'nextjs-blog/User': {
-            comments: { target: (typeof import('../src/lib/models.ts'))['CommentModel']; cardinality: 'many' };
-            posts: { target: (typeof import('../src/lib/models.ts'))['PostModel']; cardinality: 'many' };
+            comments: {
+                target: (typeof import('../src/lib/models.ts'))['CommentModel'];
+                cardinality: 'many';
+                kind: 'hasMany';
+            };
+            posts: {
+                target: (typeof import('../src/lib/models.ts'))['PostModel'];
+                cardinality: 'many';
+                kind: 'hasMany';
+            };
         };
     }
 }

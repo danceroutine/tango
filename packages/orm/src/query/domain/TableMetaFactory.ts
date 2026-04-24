@@ -4,33 +4,19 @@ import type { TableMeta } from './TableMeta';
 import type { RelationMeta } from './RelationMeta';
 import { InternalRelationKind } from './internal/InternalRelationKind';
 
-type ModelMetadataLike = Omit<SchemaModel['metadata'], 'key' | 'namespace' | 'fields'> & {
-    key?: string;
-    namespace?: string;
-    fields: Array<{
-        name: string;
-        type: string;
-        primaryKey?: boolean;
-    }>;
-};
-
-type TableMetaModel = {
-    metadata: ModelMetadataLike;
-};
-
 /**
  * Build registry-backed recursive table metadata for query planning and
  * hydration execution.
  */
 export class TableMetaFactory {
-    static create(model: TableMetaModel): TableMeta {
+    static create(model: SchemaModel): TableMeta {
         const owner = model.metadata.key ? ModelRegistry.getOwner(model) : undefined;
         const cache = new Map<string, TableMeta>();
         return TableMetaFactory.createWithCache(model, owner, cache);
     }
 
     private static createWithCache(
-        model: TableMetaModel,
+        model: SchemaModel,
         owner: ModelRegistry | undefined,
         cache: Map<string, TableMeta>
     ): TableMeta {
@@ -76,23 +62,43 @@ export class TableMetaFactory {
                     const isSingleRelation =
                         relation.kind === InternalRelationKind.BELONGS_TO ||
                         relation.kind === InternalRelationKind.HAS_ONE;
-                    const sourceKey =
-                        relation.kind === InternalRelationKind.BELONGS_TO
-                            ? relation.localFieldName
-                            : relation.targetFieldName;
-                    const targetKey =
-                        relation.kind === InternalRelationKind.BELONGS_TO
-                            ? relation.targetFieldName
-                            : relation.localFieldName;
                     const targetColumns = Object.fromEntries(
                         targetModel.metadata.fields.map((field) => [field.name, field.type])
                     );
+                    let throughSourceColumnType: string | undefined;
+                    let throughTargetColumnType: string | undefined;
+                    if (
+                        relation.kind === InternalRelationKind.MANY_TO_MANY &&
+                        relation.throughModelKey &&
+                        relation.throughSourceKey &&
+                        relation.throughTargetKey
+                    ) {
+                        const throughModel = owner.getByKey(relation.throughModelKey);
+                        throughSourceColumnType = throughModel?.metadata.fields.find(
+                            (field) => field.name === relation.throughSourceKey
+                        )?.type;
+                        throughTargetColumnType = throughModel?.metadata.fields.find(
+                            (field) => field.name === relation.throughTargetKey
+                        )?.type;
+                    }
                     const capabilities: RelationMeta['capabilities'] = {
                         queryable,
                         hydratable,
                         joinable: isSingleRelation && queryable && hydratable,
                         prefetchable: queryable && hydratable,
                     };
+                    const sourceKey =
+                        relation.kind === InternalRelationKind.MANY_TO_MANY
+                            ? tableMeta.pk
+                            : relation.kind === InternalRelationKind.BELONGS_TO
+                              ? relation.localFieldName
+                              : relation.targetFieldName;
+                    const targetKey =
+                        relation.kind === InternalRelationKind.MANY_TO_MANY
+                            ? targetMeta.pk
+                            : relation.kind === InternalRelationKind.BELONGS_TO
+                              ? relation.targetFieldName
+                              : relation.localFieldName;
 
                     return [
                         name,
@@ -106,6 +112,12 @@ export class TableMetaFactory {
                             table: targetModel.metadata.table,
                             sourceKey: sourceKey as string,
                             targetKey: targetKey as string,
+                            throughTable: relation.throughTable,
+                            throughModelKey: relation.throughModelKey,
+                            throughSourceKey: relation.throughSourceKey,
+                            throughTargetKey: relation.throughTargetKey,
+                            throughSourceColumnType,
+                            throughTargetColumnType,
                             targetPrimaryKey: targetMeta.pk,
                             targetColumns,
                             alias: relation.alias,

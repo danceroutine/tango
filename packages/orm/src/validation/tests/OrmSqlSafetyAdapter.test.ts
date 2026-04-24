@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { SqlSafetyEngine, validateSqlIdentifier } from '@danceroutine/tango-core';
 import { aRelationMeta } from '@danceroutine/tango-testing';
 import type { TableMeta } from '../../query/domain/TableMeta';
+import { InternalSqlValidationPlanKind as SqlPlanKind } from '../internal/InternalSqlValidationPlanKind';
 import { OrmSqlSafetyAdapter } from '../OrmSqlSafetyAdapter';
 import type { SelectSqlValidationPlan } from '../SqlValidationPlan';
 import { InternalRelationKind } from '../../query/domain/internal/InternalRelationKind';
-import { sqlInjectionRejectCases, type SqlInjectionCase } from './sqlInjectionCorpus';
+import {
+    InternalSqlInjectionApplicablePosition as SqlInjectionPosition,
+    sqlInjectionRejectCases,
+    type SqlInjectionCase,
+} from './sqlInjectionCorpus';
 
 const sqlSafetyAdapter = new OrmSqlSafetyAdapter();
 
@@ -32,23 +37,23 @@ const sqlSafetyTestMeta: TableMeta = {
 
 function buildRejectValidationPlan(testCase: SqlInjectionCase): SelectSqlValidationPlan {
     switch (testCase.applicablePosition) {
-        case 'identifier':
+        case SqlInjectionPosition.IDENTIFIER:
             return {
-                kind: 'select' as const,
+                kind: SqlPlanKind.SELECT,
                 meta: {
                     ...sqlSafetyTestMeta,
                     table: testCase.payload,
                 },
             };
-        case 'order':
+        case SqlInjectionPosition.ORDER:
             return {
-                kind: 'select' as const,
+                kind: SqlPlanKind.SELECT,
                 meta: sqlSafetyTestMeta,
                 orderFields: [testCase.payload],
             };
-        case 'relation':
+        case SqlInjectionPosition.RELATION:
             return {
-                kind: 'select' as const,
+                kind: SqlPlanKind.SELECT,
                 meta: {
                     ...sqlSafetyTestMeta,
                     relations: {
@@ -64,13 +69,13 @@ function buildRejectValidationPlan(testCase: SqlInjectionCase): SelectSqlValidat
                 },
                 relationNames: ['organization'],
             };
-        case 'lookup_key':
+        case SqlInjectionPosition.LOOKUP_KEY:
             return {
-                kind: 'select' as const,
+                kind: SqlPlanKind.SELECT,
                 meta: sqlSafetyTestMeta,
                 filterKeys: [`email__${testCase.payload}`],
             };
-        case 'value':
+        case SqlInjectionPosition.VALUE:
             throw new Error(`Cannot build a reject plan from value-position case '${testCase.id}'.`);
     }
 }
@@ -85,10 +90,10 @@ const safeValidationCases: SafeValidationCase[] = [
         id: 'accepts a safe table identifier',
         assert: () => {
             const result = sqlSafetyAdapter.validate({
-                kind: 'delete',
+                kind: SqlPlanKind.DELETE,
                 meta: sqlSafetyTestMeta,
             });
-            expect(result.kind).toBe('delete');
+            expect(result.kind).toBe(SqlPlanKind.DELETE);
             expect(result.meta.table).toBe('users');
         },
     },
@@ -96,11 +101,11 @@ const safeValidationCases: SafeValidationCase[] = [
         id: 'accepts a safe order field',
         assert: () => {
             const result = sqlSafetyAdapter.validate({
-                kind: 'select',
+                kind: SqlPlanKind.SELECT,
                 meta: sqlSafetyTestMeta,
                 orderFields: ['email'],
             });
-            expect(result.kind).toBe('select');
+            expect(result.kind).toBe(SqlPlanKind.SELECT);
             expect(result.orderFields.email).toBe('users.email');
         },
     },
@@ -108,11 +113,11 @@ const safeValidationCases: SafeValidationCase[] = [
         id: 'accepts a safe relation table',
         assert: () => {
             const result = sqlSafetyAdapter.validate({
-                kind: 'select',
+                kind: SqlPlanKind.SELECT,
                 meta: sqlSafetyTestMeta,
                 relationNames: ['organization'],
             });
-            expect(result.kind).toBe('select');
+            expect(result.kind).toBe(SqlPlanKind.SELECT);
             expect(result.relations.organization?.table).toBe('organizations');
         },
     },
@@ -120,11 +125,11 @@ const safeValidationCases: SafeValidationCase[] = [
         id: 'accepts a safe lookup key',
         assert: () => {
             const result = sqlSafetyAdapter.validate({
-                kind: 'select',
+                kind: SqlPlanKind.SELECT,
                 meta: sqlSafetyTestMeta,
                 filterKeys: ['email__icontains'],
             });
-            expect(result.kind).toBe('select');
+            expect(result.kind).toBe(SqlPlanKind.SELECT);
             expect(result.filterKeys.email__icontains?.lookup).toBe('icontains');
         },
     },
@@ -133,7 +138,7 @@ const safeValidationCases: SafeValidationCase[] = [
 describe(OrmSqlSafetyAdapter, () => {
     it('accepts known safe identifiers and resolves qualified columns', () => {
         const result = sqlSafetyAdapter.validate({
-            kind: 'select',
+            kind: SqlPlanKind.SELECT,
             meta: sqlSafetyTestMeta,
             selectFields: ['email', 'name'],
             filterKeys: ['email__icontains'],
@@ -145,6 +150,7 @@ describe(OrmSqlSafetyAdapter, () => {
         expect(result.meta.pk).toBe('id');
         expect(result.selectFields.email).toBe('users.email');
         expect(result.filterKeys.email__icontains).toEqual({
+            kind: 'column',
             rawKey: 'email__icontains',
             field: 'email',
             lookup: 'icontains',
@@ -156,7 +162,7 @@ describe(OrmSqlSafetyAdapter, () => {
 
     it('accepts select plans that omit optional relation and order fields entirely', () => {
         const result = sqlSafetyAdapter.validate({
-            kind: 'select',
+            kind: SqlPlanKind.SELECT,
             meta: sqlSafetyTestMeta,
             filterKeys: ['email'],
         });
@@ -169,7 +175,7 @@ describe(OrmSqlSafetyAdapter, () => {
     it('rejects unknown but syntactically valid columns', () => {
         expect(() =>
             sqlSafetyAdapter.validate({
-                kind: 'insert',
+                kind: SqlPlanKind.INSERT,
                 meta: sqlSafetyTestMeta,
                 writeKeys: ['nickname'],
             })
@@ -179,7 +185,7 @@ describe(OrmSqlSafetyAdapter, () => {
     it('rejects primary keys that are missing from the declared columns', () => {
         expect(() =>
             sqlSafetyAdapter.validate({
-                kind: 'delete',
+                kind: SqlPlanKind.DELETE,
                 meta: {
                     ...sqlSafetyTestMeta,
                     pk: 'missing_id',
@@ -210,7 +216,7 @@ describe(OrmSqlSafetyAdapter, () => {
 
         expect(() =>
             adapter.validate({
-                kind: 'delete',
+                kind: SqlPlanKind.DELETE,
                 meta: sqlSafetyTestMeta,
             })
         ).toThrow(/unknown column 'missing_id'/i);
@@ -219,7 +225,7 @@ describe(OrmSqlSafetyAdapter, () => {
     it('rejects unknown relations requested by the caller', () => {
         expect(() =>
             sqlSafetyAdapter.validate({
-                kind: 'select',
+                kind: SqlPlanKind.SELECT,
                 meta: sqlSafetyTestMeta,
                 relationNames: ['missing'],
             })
@@ -229,17 +235,127 @@ describe(OrmSqlSafetyAdapter, () => {
     it('rejects lookup keys with more than one lookup separator', () => {
         expect(() =>
             sqlSafetyAdapter.validate({
-                kind: 'select',
+                kind: SqlPlanKind.SELECT,
                 meta: sqlSafetyTestMeta,
                 filterKeys: ['email__icontains__extra'],
             })
         ).toThrow(/invalid sql lookup key/i);
     });
 
+    it('rejects malformed relation lookup keys and invalid relation metadata during nested filter validation', () => {
+        expect(() =>
+            sqlSafetyAdapter.validate({
+                kind: SqlPlanKind.SELECT,
+                meta: sqlSafetyTestMeta,
+                filterKeys: ['icontains'],
+            })
+        ).toThrow(/invalid sql lookup key/i);
+
+        expect(() =>
+            sqlSafetyAdapter.validate({
+                kind: SqlPlanKind.SELECT,
+                meta: sqlSafetyTestMeta,
+                filterKeys: ['email____icontains'],
+            })
+        ).toThrow(/invalid sql lookup key/i);
+
+        expect(() =>
+            sqlSafetyAdapter.validate({
+                kind: SqlPlanKind.SELECT,
+                meta: {
+                    ...sqlSafetyTestMeta,
+                    relations: {
+                        organization: aRelationMeta({
+                            kind: InternalRelationKind.BELONGS_TO,
+                            table: 'organizations',
+                            sourceKey: 'organization_id',
+                            targetKey: 'id',
+                            targetColumns: { id: 'text', name: 'text' },
+                            alias: 'organizations',
+                        }),
+                    },
+                },
+                filterKeys: ['organization__exact'],
+            })
+        ).toThrow(/unknown column 'organization'/i);
+
+        expect(() =>
+            sqlSafetyAdapter.validate({
+                kind: SqlPlanKind.SELECT,
+                meta: sqlSafetyTestMeta,
+                filterKeys: ['missing__name__icontains'],
+            })
+        ).toThrow(/unknown relation 'missing'/i);
+
+        expect(() =>
+            sqlSafetyAdapter.validate({
+                kind: SqlPlanKind.SELECT,
+                meta: {
+                    ...sqlSafetyTestMeta,
+                    relations: {
+                        organization: {
+                            kind: InternalRelationKind.BELONGS_TO,
+                            table: 'organizations',
+                            sourceKey: 'organization_id',
+                            targetKey: 'id',
+                            targetPrimaryKey: 'id',
+                            targetColumns: { id: 'text', name: 'text' },
+                            alias: 'organizations',
+                            targetMeta: undefined,
+                        } as unknown as NonNullable<TableMeta['relations']>[string],
+                    },
+                },
+                filterKeys: ['organization__name__icontains'],
+            })
+        ).toThrow(/missing target metadata/i);
+    });
+
+    it('validates relation-path filters against nested relation metadata', () => {
+        const result = sqlSafetyAdapter.validate({
+            kind: SqlPlanKind.SELECT,
+            meta: {
+                ...sqlSafetyTestMeta,
+                relations: {
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
+                        table: 'organizations',
+                        sourceKey: 'organization_id',
+                        targetKey: 'id',
+                        targetPrimaryKey: 'id',
+                        targetColumns: { id: 'text', name: 'text' },
+                        alias: 'organizations',
+                        targetMeta: {
+                            table: 'organizations',
+                            pk: 'id',
+                            columns: { id: 'text', name: 'text' },
+                        },
+                    }),
+                },
+            },
+            filterKeys: ['organization__name__icontains'],
+        });
+
+        expect(result.filterKeys.organization__name__icontains).toEqual({
+            kind: 'relation',
+            rawKey: 'organization__name__icontains',
+            field: 'name',
+            lookup: 'icontains',
+            relationPath: 'organization',
+            relationChain: [
+                expect.objectContaining({
+                    table: 'organizations',
+                    sourceKey: 'organization_id',
+                    targetKey: 'id',
+                }),
+            ],
+            terminalColumn: 'name',
+        });
+    });
+
     it('rejects relations without a validated source key', () => {
         expect(() =>
             sqlSafetyAdapter.validate({
-                kind: 'select',
+                kind: SqlPlanKind.SELECT,
                 meta: {
                     ...sqlSafetyTestMeta,
                     relations: {
@@ -279,7 +395,7 @@ describe(OrmSqlSafetyAdapter, () => {
 
     it('validates relation target keys when present', () => {
         const result = sqlSafetyAdapter.validate({
-            kind: 'select',
+            kind: SqlPlanKind.SELECT,
             meta: {
                 ...sqlSafetyTestMeta,
                 relations: {

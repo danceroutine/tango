@@ -21,13 +21,14 @@ export class PostViewSet extends ModelViewSet<Post, typeof PostSerializer> {
                 fields: {
                     published: true,
                     slug: true,
+                    tags__slug: true,
                 },
                 aliases: {
-                    q: { fields: ['title', 'content'], lookup: 'icontains' },
+                    q: { fields: ['title', 'content', 'tags__name'], lookup: 'icontains' },
                 },
             }),
             orderingFields: ['id', 'createdAt', 'updatedAt', 'title'],
-            searchFields: ['title', 'content'],
+            searchFields: ['title', 'content', 'tags__name'],
         });
     }
 
@@ -36,6 +37,6 @@ export class PostViewSet extends ModelViewSet<Post, typeof PostSerializer> {
             published: true,
         } as Partial<Post>);
 
-        return TangoResponse.json(this.getSerializer().toRepresentation(updated));
+        return TangoResponse.json(await this.getSerializer().serialize(updated));
     }
 }

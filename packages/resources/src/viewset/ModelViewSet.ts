@@ -8,12 +8,7 @@ import { Q } from '@danceroutine/tango-orm';
 import type { Paginator } from '../pagination/index';
 import type { ModelViewSetOpenAPIDescription } from '../resource/index';
 import type { ResourceModelLike } from '../resource/index';
-import type {
-    AnyModelSerializerClass,
-    ModelSerializerClass,
-    SerializerOutput,
-    SerializerSchema,
-} from '../serializer/index';
+import type { AnyModelSerializer, AnyModelSerializerClass, SerializerOutput } from '../serializer/index';
 
 export type ViewSetActionScope = 'detail' | 'collection';
 export type ViewSetActionMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -30,13 +25,14 @@ export interface ResolvedViewSetActionDescriptor extends ViewSetActionDescriptor
 }
 
 type AnyModelViewSet = ModelViewSet<Record<string, unknown>, AnyModelSerializerClass>;
+type SearchFieldRef<TModel extends Record<string, unknown>> = Extract<keyof TModel, string> | string;
 
 /**
  * Configuration for a ModelViewSet, defining how a serializer-backed model is exposed as an API resource.
  */
 export interface ModelViewSetConfig<
     TModel extends Record<string, unknown>,
-    TSerializer extends ModelSerializerClass<TModel, SerializerSchema, SerializerSchema, SerializerSchema>,
+    TSerializer extends AnyModelSerializer<TModel>,
 > {
     /** Serializer class that owns validation, representation, and persistence hooks */
     serializer: TSerializer;
@@ -48,7 +44,7 @@ export interface ModelViewSetConfig<
     orderingFields?: (keyof TModel)[];
 
     /** Fields that are searched when a free-text search query parameter is provided */
-    searchFields?: (keyof TModel)[];
+    searchFields?: SearchFieldRef<TModel>[];
 
     /** Optional paginator factory used by list endpoints. */
     paginatorFactory?: (queryset: QuerySet<TModel>) => Paginator<TModel, SerializerOutput<TSerializer>>;
@@ -61,7 +57,7 @@ export interface ModelViewSetConfig<
  */
 export abstract class ModelViewSet<
     TModel extends Record<string, unknown>,
-    TSerializer extends ModelSerializerClass<TModel, SerializerSchema, SerializerSchema, SerializerSchema>,
+    TSerializer extends AnyModelSerializer<TModel>,
 > {
     static readonly BRAND = 'tango.resources.model_view_set' as const;
     static readonly actions: readonly ViewSetActionDescriptor[] = [];
@@ -69,7 +65,7 @@ export abstract class ModelViewSet<
     protected readonly serializerClass: TSerializer;
     protected readonly filters?: FilterSet<TModel>;
     protected readonly orderingFields: (keyof TModel)[];
-    protected readonly searchFields: (keyof TModel)[];
+    protected readonly searchFields: SearchFieldRef<TModel>[];
     protected readonly paginatorFactory?: (
         queryset: QuerySet<TModel>
     ) => Paginator<TModel, SerializerOutput<TSerializer>>;
@@ -223,10 +219,8 @@ export abstract class ModelViewSet<
                 : Promise.resolve<number | undefined>(undefined);
             const [result, totalCount] = await Promise.all([resultPromise, totalCountPromise]);
             const serializer = this.getSerializer();
-            const response = paginator.toResponse(
-                result.map((row) => serializer.toRepresentation(row)) as SerializerOutput<TSerializer>[],
-                { totalCount }
-            );
+            const rows = await serializer.serializeMany(result.items);
+            const response = paginator.toResponse(rows as SerializerOutput<TSerializer>[], { totalCount });
 
             return TangoResponse.json(response as unknown as JsonValue, { status: 200 });
         } catch (error) {
@@ -248,7 +242,7 @@ export abstract class ModelViewSet<
                 throw new NotFoundError(`No ${manager.meta.table} record found for ${String(pk)}=${id}.`);
             }
 
-            return TangoResponse.json(this.getSerializer().toRepresentation(result) as JsonValue, { status: 200 });
+            return TangoResponse.json((await this.getSerializer().serialize(result)) as JsonValue, { status: 200 });
         } catch (error) {
             return this.handleError(error);
         }

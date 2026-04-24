@@ -1,4 +1,4 @@
-import type { MigrationOperation } from '../../domain/MigrationOperation';
+import type { ColumnAdd, IndexCreate, MigrationOperation, TableCreate } from '../../domain/MigrationOperation';
 import type { SQL } from '../contracts/SQL';
 import type { ColumnSpec } from '../../builder/contracts/ColumnSpec';
 import type { SQLCompiler } from '../contracts/SQLCompiler';
@@ -23,6 +23,29 @@ export class SqliteCompiler implements SQLCompiler {
             value !== null &&
             (value as { __tangoBrand?: unknown }).__tangoBrand === SqliteCompiler.BRAND
         );
+    }
+
+    /**
+     * Rewrite migration operations into SQLite's safe execution order,
+     * including topological table creation and unique-column add expansion.
+     */
+    prepareOperations(operations: MigrationOperation[]): MigrationOperation[] {
+        const tableCreates: TableCreate[] = [];
+        const remainder: MigrationOperation[] = [];
+
+        for (const operation of operations) {
+            if (operation.kind === InternalOperationKind.TABLE_CREATE) {
+                tableCreates.push(operation);
+            } else {
+                remainder.push(operation);
+            }
+        }
+
+        const preparedRemainder = remainder.flatMap((operation) =>
+            operation.kind === InternalOperationKind.COLUMN_ADD ? this.prepareColumnAdd(operation) : [operation]
+        );
+
+        return [...this.topologicalSortTableCreatesWithReferences(tableCreates), ...preparedRemainder];
     }
 
     /**
@@ -59,7 +82,10 @@ export class SqliteCompiler implements SQLCompiler {
             case InternalOperationKind.COLUMN_ADD:
                 return [
                     {
-                        sql: `ALTER TABLE ${this.sqlSafety.table(op.table)} ADD COLUMN ${this.colDDL(op.column)}`,
+                        sql: `ALTER TABLE ${this.sqlSafety.table(op.table)} ADD COLUMN ${this.colDDL({
+                            ...op.column,
+                            unique: false,
+                        })}`,
                         params: [],
                     },
                 ];
@@ -148,5 +174,95 @@ export class SqliteCompiler implements SQLCompiler {
         }
 
         return parts.join(' ');
+    }
+
+    private prepareColumnAdd(op: ColumnAdd): MigrationOperation[] {
+        const preparedColumn = op.column;
+        if (preparedColumn.notNull && preparedColumn.default === undefined && !preparedColumn.primaryKey) {
+            throw new Error(
+                `SQLite cannot add NOT NULL column '${preparedColumn.name}' to '${op.table}' without a default or backfill path.`
+            );
+        }
+
+        if (!preparedColumn.unique) {
+            return [op];
+        }
+
+        const addColumn: ColumnAdd = {
+            ...op,
+            column: {
+                ...preparedColumn,
+                unique: false,
+            },
+        };
+        const createIndex: IndexCreate = {
+            kind: InternalOperationKind.INDEX_CREATE,
+            name: `${op.table}_${preparedColumn.name}_idx`,
+            table: op.table,
+            on: [preparedColumn.name],
+            unique: true,
+        };
+
+        return [addColumn, createIndex];
+    }
+
+    private topologicalSortTableCreatesWithReferences(creates: TableCreate[]): TableCreate[] {
+        if (creates.length <= 1) {
+            return creates;
+        }
+
+        const tableSet = new Set(creates.map((create) => create.table));
+        const byTable = new Map(creates.map((create) => [create.table, create]));
+        const incoming = new Map<string, number>();
+        const dependents = new Map<string, Set<string>>();
+
+        for (const table of tableSet) {
+            incoming.set(table, 0);
+        }
+
+        for (const create of creates) {
+            const seenParents = new Set<string>();
+            for (const column of create.columns) {
+                if (!column.references) {
+                    continue;
+                }
+                const refTable = column.references.table;
+                if (refTable === create.table || !tableSet.has(refTable)) {
+                    continue;
+                }
+                if (seenParents.has(refTable)) {
+                    continue;
+                }
+                seenParents.add(refTable);
+                incoming.set(create.table, incoming.get(create.table)! + 1);
+                if (!dependents.has(refTable)) {
+                    dependents.set(refTable, new Set());
+                }
+                dependents.get(refTable)!.add(create.table);
+            }
+        }
+
+        const ready = [...tableSet].filter((table) => incoming.get(table) === 0);
+        ready.sort((left, right) => left.localeCompare(right));
+
+        const sorted: TableCreate[] = [];
+        while (ready.length) {
+            const next = ready.shift()!;
+            sorted.push(byTable.get(next)!);
+
+            for (const dependent of dependents.get(next) ?? []) {
+                incoming.set(dependent, incoming.get(dependent)! - 1);
+                if (incoming.get(dependent) === 0) {
+                    ready.push(dependent);
+                    ready.sort((left, right) => left.localeCompare(right));
+                }
+            }
+        }
+
+        if (sorted.length !== creates.length) {
+            return [...creates].sort((left, right) => left.table.localeCompare(right.table));
+        }
+
+        return sorted;
     }
 }

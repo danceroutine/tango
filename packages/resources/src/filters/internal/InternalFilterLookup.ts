@@ -1,0 +1,15 @@
+export const InternalFilterLookup = {
+    EXACT: 'exact',
+    LT: 'lt',
+    LTE: 'lte',
+    GT: 'gt',
+    GTE: 'gte',
+    IN: 'in',
+    ISNULL: 'isnull',
+    CONTAINS: 'contains',
+    ICONTAINS: 'icontains',
+    STARTSWITH: 'startswith',
+    ISTARTSWITH: 'istartswith',
+    ENDSWITH: 'endswith',
+    IENDSWITH: 'iendswith',
+} as const;

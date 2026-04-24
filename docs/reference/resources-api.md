@@ -28,6 +28,36 @@ Use `ModelSerializer<TModel, ...>` when the resource should persist through `mod
 
 In addition to the three serializer schemas, application code supplies a static `model`. From there, the serializer can expose `getModel()` and `getManager()`, and its built-in `create(input)` and `update(id, input)` methods can validate the payload, run serializer hooks, call the model manager, and serialize the saved record back through `outputSchema`.
 
+This is also the right boundary for relation representation. A Tango model instance may carry related managers such as `post.tags`, especially for many-to-many relations. The serializer still owns the HTTP contract, so a response-facing `tags` field belongs on the serializer even when the underlying model property remains a related manager. That matches Django REST Framework: the model keeps the related manager, while serializer fields decide what the API returns.
+
+`serialize(record)` and `serializeMany(records)` are the main response-shaping entry points. They resolve declarative relation fields first, then any `static outputResolvers`, and finally parse the outward shape through `outputSchema`.
+
+Use `static relationFields` for the common related-field cases. A many-to-many field defaults to DRF-style primary-key lists, and the serializer can opt into nested or slug-based behavior when the API contract needs it.
+
+```ts
+export class PostSerializer extends ModelSerializer<
+    Post,
+    typeof PostCreateSchema,
+    typeof PostUpdateSchema,
+    typeof PostReadSchema,
+    MaterializedModelRecord<typeof PostModel.schema>
+> {
+    static readonly model = PostModel;
+    static readonly outputSchema = PostReadSchema;
+    static readonly relationFields = {
+        tags: relation.manyToMany({
+            read: relation.nested(TagSummarySchema),
+            write: relation.slugList({
+                model: TagModel,
+                lookupField: 'slug',
+                createIfMissing: true,
+                buildCreateInput: (slug) => ({ slug, name: slug }),
+            }),
+        }),
+    };
+}
+```
+
 `beforeCreate(data)` and `beforeUpdate(id, data)` are the main serializer-level extension points. They fit request-scoped normalization that belongs to one resource workflow. Rules that should run whenever the record is created or updated belong on the model layer instead.
 
 `GenericAPIView` and `ModelViewSet` both expect a `ModelSerializer` class. Endpoints without a model-backed persistence workflow should use `APIView` and call the serializer directly.

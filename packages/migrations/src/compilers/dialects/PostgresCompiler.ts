@@ -1,4 +1,4 @@
-import type { MigrationOperation } from '../../domain/MigrationOperation';
+import type { ForeignKeyCreate, MigrationOperation, TableCreate } from '../../domain/MigrationOperation';
 import type { SQL } from '../contracts/SQL';
 import type { ColumnSpec } from '../../builder/contracts/ColumnSpec';
 import type { ColumnType } from '../../builder/contracts/ColumnType';
@@ -24,6 +24,38 @@ export class PostgresCompiler implements SQLCompiler {
             value !== null &&
             (value as { __tangoBrand?: unknown }).__tangoBrand === PostgresCompiler.BRAND
         );
+    }
+
+    /**
+     * Rewrite migration operations into PostgreSQL's preferred execution
+     * order, including separating inline foreign keys from table creation.
+     */
+    prepareOperations(operations: MigrationOperation[]): MigrationOperation[] {
+        const tableCreates: TableCreate[] = [];
+        const remainder: MigrationOperation[] = [];
+
+        for (const operation of operations) {
+            if (operation.kind === InternalOperationKind.TABLE_CREATE) {
+                tableCreates.push(operation);
+            } else {
+                remainder.push(operation);
+            }
+        }
+
+        const strippedCreates: TableCreate[] = [];
+        const foreignKeys: ForeignKeyCreate[] = [];
+
+        for (const operation of tableCreates) {
+            const { create, fks } = this.stripTableCreateForeignKeys(operation);
+            strippedCreates.push(create);
+            foreignKeys.push(...fks);
+        }
+
+        return [
+            ...strippedCreates.sort((left, right) => left.table.localeCompare(right.table)),
+            ...foreignKeys,
+            ...remainder,
+        ];
     }
 
     /**
@@ -203,6 +235,31 @@ export class PostgresCompiler implements SQLCompiler {
         }
 
         return [];
+    }
+
+    private stripTableCreateForeignKeys(op: TableCreate): { create: TableCreate; fks: ForeignKeyCreate[] } {
+        const fks: ForeignKeyCreate[] = [];
+        const columns = op.columns.map((column) => {
+            if (!column.references) {
+                return column;
+            }
+
+            const references = column.references;
+            fks.push({
+                kind: InternalOperationKind.FK_CREATE,
+                table: op.table,
+                columns: [column.name],
+                refTable: references.table,
+                refColumns: [references.column],
+                onDelete: references.onDelete,
+                onUpdate: references.onUpdate,
+            });
+
+            const { references: _references, ...rest } = column;
+            return { ...rest };
+        });
+
+        return { create: { ...op, columns }, fks };
     }
 
     private colDDL(column: ColumnSpec): string {

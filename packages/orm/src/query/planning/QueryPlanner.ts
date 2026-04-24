@@ -3,7 +3,6 @@ import type { TableMeta } from '../domain/TableMeta';
 import { InternalRelationHydrationLoadMode, type RelationMeta } from '../domain/RelationMeta';
 import { InternalRelationHydrationCardinality } from '../domain/RelationTyping';
 import type { QueryHydrationPlanNode, QueryHydrationPlanRoot } from './domain/QueryHydrationPlan';
-import { InternalRelationKind } from '../domain/internal/InternalRelationKind';
 
 type RequestedMode = 'select' | 'prefetch';
 
@@ -33,7 +32,7 @@ export class QueryPlanner {
         );
     }
 
-    plan<T>(state: QuerySetState<T>): QueryHydrationPlanRoot {
+    plan<T, TSourceModel = unknown>(state: QuerySetState<T, TSourceModel>): QueryHydrationPlanRoot {
         const requestedPaths = Array.from(new Set([...(state.selectRelated ?? []), ...(state.prefetchRelated ?? [])]));
         if (requestedPaths.length === 0) {
             return {
@@ -68,7 +67,6 @@ export class QueryPlanner {
         let currentMeta = this.meta;
         let currentChildren = rootChildren;
         let builtPath = '';
-        let containsCollection = false;
 
         for (const segment of segments) {
             const relation = currentMeta.relations?.[segment];
@@ -79,9 +77,6 @@ export class QueryPlanner {
                 throw new Error(
                     `Relation path '${relationPath}' collides with an existing field on table '${currentMeta.table}'.`
                 );
-            }
-            if (relation.kind === InternalRelationKind.MANY_TO_MANY) {
-                throw new Error(`Relation path '${relationPath}' uses unsupported many-to-many hydration.`);
             }
             if (!relation.capabilities.queryable || !relation.capabilities.hydratable) {
                 throw new Error(`Relation path '${relationPath}' cannot be hydrated.`);
@@ -98,7 +93,6 @@ export class QueryPlanner {
                 if (!relation.capabilities.prefetchable) {
                     throw new Error(`Relation path '${relationPath}' cannot be loaded with prefetchRelated(...).`);
                 }
-                containsCollection = true;
             } else if (!relation.capabilities.joinable) {
                 throw new Error(`Relation path '${relationPath}' cannot be loaded with prefetchRelated(...).`);
             }
@@ -124,10 +118,6 @@ export class QueryPlanner {
             currentChildren.set(segment, nextNode);
             currentChildren = nextNode.children;
             currentMeta = targetMeta;
-        }
-
-        if (mode === 'prefetch' && !containsCollection) {
-            throw new Error(`Relation path '${relationPath}' cannot be loaded with prefetchRelated(...).`);
         }
     }
 

@@ -6,13 +6,19 @@ import type {
     SqlValidationPlan,
     UpdateSqlValidationPlan,
 } from './SqlValidationPlan';
+import { InternalSqlValidationPlanKind as SqlPlanKind } from './internal/InternalSqlValidationPlanKind';
+import { InternalValidatedFilterDescriptorKind } from './internal/InternalValidatedFilterDescriptorKind';
 
 export type ValidatedRelationMeta = RelationMeta & {
     table: string;
     alias: string;
     sourceKey: string;
     targetKey: string;
+    targetPrimaryKey: string;
     targetColumns: Record<string, string>;
+    throughTable?: string;
+    throughSourceKey?: string;
+    throughTargetKey?: string;
 };
 
 export type ValidatedTableMeta = {
@@ -22,15 +28,28 @@ export type ValidatedTableMeta = {
     relations?: Record<string, ValidatedRelationMeta>;
 };
 
-export type ValidatedFilterDescriptor = {
+export type ValidatedColumnFilterDescriptor = {
+    kind: typeof InternalValidatedFilterDescriptorKind.COLUMN;
     rawKey: string;
     field: string;
     lookup: LookupType;
     qualifiedColumn: string;
 };
 
+export type ValidatedRelationFilterDescriptor = {
+    kind: typeof InternalValidatedFilterDescriptorKind.RELATION;
+    rawKey: string;
+    field: string;
+    lookup: LookupType;
+    relationPath: string;
+    relationChain: ValidatedRelationMeta[];
+    terminalColumn: string;
+};
+
+export type ValidatedFilterDescriptor = ValidatedColumnFilterDescriptor | ValidatedRelationFilterDescriptor;
+
 export type ValidatedSelectSqlPlan = {
-    kind: 'select';
+    kind: typeof SqlPlanKind.SELECT;
     meta: ValidatedTableMeta;
     selectFields: Record<string, string>;
     filterKeys: Record<string, ValidatedFilterDescriptor>;
@@ -39,19 +58,19 @@ export type ValidatedSelectSqlPlan = {
 };
 
 export type ValidatedInsertSqlPlan = {
-    kind: 'insert';
+    kind: typeof SqlPlanKind.INSERT;
     meta: ValidatedTableMeta;
     writeKeys: string[];
 };
 
 export type ValidatedUpdateSqlPlan = {
-    kind: 'update';
+    kind: typeof SqlPlanKind.UPDATE;
     meta: ValidatedTableMeta;
     writeKeys: string[];
 };
 
 export type ValidatedDeleteSqlPlan = {
-    kind: 'delete';
+    kind: typeof SqlPlanKind.DELETE;
     meta: ValidatedTableMeta;
 };
 

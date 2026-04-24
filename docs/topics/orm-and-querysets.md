@@ -223,7 +223,7 @@ firstPost?.author?.profile?.displayName;
 
 `selectRelated(...)` is for single-valued relations such as `belongsTo`, `hasOne`, and reverse one-to-one paths. A missing related row is returned as `null` at the point where the path stops matching.
 
-In contrast, use `prefetchRelated(...)` when the path includes a collection edge such as `hasMany`. Prefetch paths may continue beyond that collection edge, so one prefetch branch can still hydrate deeper related objects:
+In contrast, use `prefetchRelated(...)` when the path includes a collection edge such as `hasMany` or a join-table-backed many-to-many relation. Prefetch paths may continue beyond that collection edge, so one prefetch branch can still hydrate deeper related objects:
 
 ```ts
 const users = await UserModel.objects.query().prefetchRelated('posts__author', 'posts__comments').fetch();
@@ -234,6 +234,21 @@ firstUser?.posts[0]?.comments[0]?.body;
 ```
 
 In that form, a user with no posts still receives `posts: []`, while a post with no comments receives `comments: []`.
+
+Persisted records returned by the manager carry a related-manager accessor for each many-to-many relation declared on the source model. The accessor is named after the published forward relation name, so a field such as `tagIds: t.manyToMany(..., { name: 'tags' })` exposes `post.tags.add(...)`, `post.tags.remove(...)`, and `post.tags.all()`. `add(...)` and `remove(...)` both accept one or more targets, and duplicate links are ignored so repeated `add(...)` calls stay idempotent. The accessor is attached non-enumerably so persistence-style helpers such as `JSON.stringify(post)` continue to focus on the persisted columns.
+
+```ts
+const post = await PostModel.objects.getOrThrow(postId);
+
+await post.tags.add(tag, featuredTag);
+const linked = await post.tags.all().fetch();
+```
+
+`post.tags` stays a related manager on the model instance. `prefetchRelated('tags')` only warms that manager's cache, so application code still reads through `post.tags.all()` rather than expecting `post.tags` itself to become an array.
+
+When `prefetchRelated('tags')` ran in the same fetch, `post.tags.all()` reads from the prefetched cache. A successful `add(...)` or `remove(...)` invalidates that cache so the next read returns fresh data. If an API response or page helper needs an array-shaped value, materialize it explicitly with `await post.tags.all().fetch()`.
+
+Forward many-to-many prefetch path typing comes from the generated relation registry. Without generated relation typing, the older explicit target-model generic still only describes reverse `hasMany` paths even though the runtime can execute the many-to-many prefetch.
 
 Hydrated relation properties stay attached even when the selected model fields change:
 

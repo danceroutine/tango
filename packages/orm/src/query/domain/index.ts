@@ -17,6 +17,7 @@ export type { QuerySetState } from './QuerySetState';
 export type { RelationMeta } from './RelationMeta';
 export type {
     ForwardSingleRelations,
+    GeneratedRelationFilterKeys,
     GeneratedHydratedRelationMap,
     GeneratedPrefetchRelatedPathKeys,
     GeneratedSelectRelatedPathKeys,
