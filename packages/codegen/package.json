@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-codegen",
-    "version": "1.8.1",
+    "version": "1.9.0",
     "description": "CLI for generating repositories, types, migrations, and OpenAPI specs for Tango",
     "type": "module",
     "main": "./dist/index.js",

@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.9.0 - 2026-04-24
+
+Add `ManyToManyRelatedManager.set(...)` so Tango can replace many-to-many memberships in one Django-shaped relation-manager call.
+
 ## 1.8.1 - 2026-04-24
 
 Fix scaffolded apps so generated relation registry declarations participate in TypeScript relation-aware query typing by default.
