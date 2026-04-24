@@ -4,6 +4,14 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.8.0 - 2026-04-24
+
+Ship Tango's first complete many-to-many workflow across schema, migrations, ORM, resources, and testing.
+
+- Add implicit through-table synthesis and migration support so `t.manyToMany(...)` works without an explicit join model for the common case.
+- Add many-to-many related managers, relation-aware filtering, and query support so application code can read and manipulate memberships directly.
+- Add DRF-shaped serializer relation fields for many-to-many reads and writes, including primary-key and slug-list workflows.
+
 ## 1.7.0 - 2026-04-20
 
 Added Django-style single-record query conveniences across Tango's ORM surface. `Model.objects` now exposes `all()`, `getOrCreate(...)`, and `updateOrCreate(...)`, while `QuerySet` now exposes `all()`, `first()`, `last()`, and strict `get(...)` lookup behavior.
