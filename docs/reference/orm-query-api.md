@@ -171,9 +171,10 @@ const post = await PostModel.objects.getOrThrow(postId);
 
 await post.tags.add(tag, featuredTag);
 await post.tags.remove(tag, featuredTag);
+await post.tags.set(featuredTag);
 ```
 
-`add(...targets)` and `remove(...targets)` accept target records, objects that carry the target primary key, or bare primary-key values. `add(...)` is idempotent for duplicate memberships, so repeated links do not raise a duplicate-row error. When one call touches several targets, Tango resolves the target primary keys once and runs the membership write inside one `transaction.atomic(...)` boundary.
+`add(...targets)`, `remove(...targets)`, and `set(...targets)` accept target records, objects that carry the target primary key, or bare primary-key values. `add(...)` is idempotent for duplicate memberships, so repeated links do not raise a duplicate-row error. `set(...)` replaces the current membership with exactly the supplied targets: omitted targets are removed, new targets are added, and duplicate inputs are ignored before Tango diffs the relation set. When one call touches several targets, Tango resolves the target primary keys once and runs the membership write inside one `transaction.atomic(...)` boundary.
 
 Use `post.tags.all()` when application code wants to read the linked targets. The returned queryset reads through the join table and follows the standard `QuerySet` contract, so it accepts `filter(...)`, `exclude(...)`, `orderBy(...)`, `select(...)`, `fetch(...)`, `fetchOne(...)`, `count()`, and `exists()`.
 
@@ -184,9 +185,9 @@ const featuredTags = await post.tags.all().filter({ featured: true }).fetch();
 
 `post.tags` remains a related manager even after eager loading. `prefetchRelated('tags')` warms that manager's cache; it does not replace the relation with a plain array on the model instance. This mirrors the Django-style contract that Tango follows for many-to-many accessors.
 
-When `prefetchRelated('tags')` ran in the same fetch, `post.tags.all()` returns the prefetched targets without issuing a follow-up query. The prefetch result is cached on the related manager and a successful `add(...)` or `remove(...)` invalidates that cache so the next read returns fresh data. If application code or a serializer needs an array-shaped value, materialize it explicitly from the manager with `await post.tags.all().fetch()`.
+When `prefetchRelated('tags')` ran in the same fetch, `post.tags.all()` returns the prefetched targets without issuing a follow-up query. The prefetch result is cached on the related manager and a successful `add(...)`, `remove(...)`, or `set(...)` invalidates that cache so the next read returns fresh data. If application code or a serializer needs an array-shaped value, materialize it explicitly from the manager with `await post.tags.all().fetch()`.
 
-Reverse many-to-many access, the bulk `set(...)` helper, the `clear()` helper, and `create(...)` on the related manager are tracked on the roadmap for a follow-up release.
+Reverse many-to-many access, the `clear()` helper, and `create(...)` on the related manager are tracked on the roadmap for a follow-up release.
 
 ## Transactions
 

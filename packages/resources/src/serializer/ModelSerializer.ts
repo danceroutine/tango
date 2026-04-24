@@ -261,13 +261,7 @@ export abstract class ModelSerializer<
         }
 
         const nextTargets = await this.resolveWriteTargets(fieldName, field.write, value);
-        const currentTargets = (await manager.all().fetch()).results;
-        if (currentTargets.length > 0) {
-            await manager.remove(...currentTargets);
-        }
-        if (nextTargets.length > 0) {
-            await manager.add(...nextTargets);
-        }
+        await manager.set(...nextTargets);
     }
 
     private async resolveWriteTargets(
