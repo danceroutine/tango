@@ -3,3 +3,4 @@
  */
 
 export { diffSchema } from './diffSchema';
+export { buildMigrationModelMetadataProjection } from '../schema/buildMigrationModelMetadataProjection';

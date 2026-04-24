@@ -33,6 +33,7 @@ export {
     Model,
     RelationBuilder,
     ModelRegistry,
+    ImplicitManyToManyIdentifier,
     GENERATED_RELATION_REGISTRY_DIRNAME,
     GENERATED_RELATION_REGISTRY_METADATA_FILENAME,
     GENERATED_RELATION_REGISTRY_METADATA_VERSION,

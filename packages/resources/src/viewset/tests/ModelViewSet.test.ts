@@ -17,10 +17,20 @@ type UserRecord = {
     active?: boolean;
 };
 
+type UserModelRecord = UserRecord & {
+    tags: {
+        all(): Promise<readonly string[]>;
+    };
+};
+
 const userReadSchema = z.object({
     id: z.number(),
     email: z.string().email(),
     name: z.string(),
+});
+
+const userReadWithTagsSchema = userReadSchema.extend({
+    tags: z.array(z.string()),
 });
 
 const userWriteSchema = z.object({
@@ -28,7 +38,7 @@ const userWriteSchema = z.object({
     name: z.string(),
 });
 
-let currentUserModel: ResourceModelLike<UserRecord>;
+let currentUserModel: unknown;
 type AnyTestModelViewSet = ModelViewSet<Record<string, unknown>, AnyModelSerializerClass>;
 
 class UserSerializer extends ModelSerializer<
@@ -43,11 +53,33 @@ class UserSerializer extends ModelSerializer<
     static readonly outputSchema = userReadSchema;
 
     override getModel(): ResourceModelLike<UserRecord> {
-        return currentUserModel;
+        return currentUserModel as ResourceModelLike<UserRecord>;
     }
 }
 
 class UserViewSet extends ModelViewSet<UserRecord, typeof UserSerializer> {}
+
+class UserModelRecordSerializer extends ModelSerializer<
+    UserRecord,
+    typeof userWriteSchema,
+    ReturnType<typeof userWriteSchema.partial>,
+    typeof userReadWithTagsSchema,
+    UserModelRecord
+> {
+    static readonly model = undefined as unknown as ResourceModelLike<UserRecord, UserModelRecord>;
+    static readonly createSchema = userWriteSchema;
+    static readonly updateSchema = userWriteSchema.partial();
+    static readonly outputSchema = userReadWithTagsSchema;
+    static readonly outputResolvers = {
+        tags: async (record: UserModelRecord) => await record.tags.all(),
+    };
+
+    override getModel(): ResourceModelLike<UserRecord, UserModelRecord> {
+        return currentUserModel as ResourceModelLike<UserRecord, UserModelRecord>;
+    }
+}
+
+class UserModelRecordViewSet extends ModelViewSet<UserRecord, typeof UserModelRecordSerializer> {}
 
 class ActionUserViewSet extends ModelViewSet<UserRecord, typeof UserSerializer> {
     static readonly actions = ModelViewSet.defineViewSetActions([
@@ -155,7 +187,7 @@ describe(ModelViewSet, () => {
         viewset = new UserViewSet({
             serializer: UserSerializer,
             orderingFields: ['id', 'email', 'name'],
-            searchFields: ['email', 'name'],
+            searchFields: ['email', 'name', 'tags__name'],
         });
     });
 
@@ -171,7 +203,14 @@ describe(ModelViewSet, () => {
             aResourcesRequestContext('GET', 'https://example.test/users?search=user&ordering=-name,unknown')
         );
         expect(response.status).toBe(200);
-        expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalled();
+        expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalledWith({
+            kind: 'or',
+            nodes: [
+                { kind: 'atom', where: { email__icontains: 'user' } },
+                { kind: 'atom', where: { name__icontains: 'user' } },
+                { kind: 'atom', where: { tags__name__icontains: 'user' } },
+            ],
+        });
         expect(vi.mocked(querySetDouble.orderBy)).toHaveBeenCalledWith('-name');
     });
 
@@ -219,6 +258,60 @@ describe(ModelViewSet, () => {
         );
         expect(response.status).toBe(200);
         expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalled();
+    });
+
+    it('supports a serializer whose model row is richer than the outward resource record', async () => {
+        const querySetForModelRow = aQuerySet<UserModelRecord>();
+        vi.mocked(querySetForModelRow.fetch).mockResolvedValueOnce(
+            aQueryResult({
+                items: [
+                    {
+                        id: 7,
+                        email: 'rich@example.com',
+                        name: 'Rich',
+                        tags: {
+                            all: async () => ['staff'],
+                        },
+                    },
+                ],
+            })
+        );
+        vi.mocked(querySetForModelRow.count).mockResolvedValueOnce(1);
+
+        currentUserModel = {
+            objects: aManager<UserModelRecord>({
+                meta: { table: 'users', pk: 'id', columns: { id: 'int', email: 'text', name: 'text' } },
+                query: vi.fn(() => querySetForModelRow),
+                create: vi.fn(
+                    async (input) =>
+                        ({
+                            id: 7,
+                            email: 'rich@example.com',
+                            name: 'Rich',
+                            ...input,
+                            tags: {
+                                all: async () => ['staff'],
+                            },
+                        }) as UserModelRecord
+                ),
+            }),
+            metadata: {
+                name: 'User',
+                fields: [{ name: 'id', type: 'serial', primaryKey: true }],
+            },
+        } as ResourceModelLike<UserRecord, UserModelRecord>;
+
+        const viewsetWithModelRow = new UserModelRecordViewSet({
+            serializer: UserModelRecordSerializer,
+            orderingFields: ['id', 'email', 'name'],
+        });
+
+        const response = await viewsetWithModelRow.list(aResourcesRequestContext('GET', 'https://example.test/users'));
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toEqual({
+            count: 1,
+            results: [{ id: 7, email: 'rich@example.com', name: 'Rich', tags: ['staff'] }],
+        });
     });
 
     it('coerces boolean query params from model metadata when applying filters', async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aRelationMeta } from '@danceroutine/tango-testing';
+import { anAdapter, aRelationMeta } from '@danceroutine/tango-testing';
 import { QueryCompiler } from '../QueryCompiler';
 import { Q } from '../..';
 import type { QNode } from '../../domain/QNode';
@@ -12,6 +12,7 @@ import {
     type SqlInjectionCase,
 } from '../../../validation/tests/sqlInjectionCorpus';
 import { expectPayloadIsParameterized } from '../../../validation/tests/expectPayloadIsParameterized';
+import { InternalPrefetchQueryKind } from '../../domain/internal/InternalPrefetchQueryKind';
 import { InternalRelationKind } from '../../domain/internal/InternalRelationKind';
 
 type UserModel = {
@@ -34,6 +35,9 @@ const mockMeta: TableMeta = {
         isActive: 'bool',
     },
 };
+
+const postgresAdapter = anAdapter({ dialect: 'postgres' });
+const sqliteAdapter = anAdapter({ dialect: 'sqlite' });
 
 function compiledPrefetchNode(overrides: Partial<CompiledHydrationNode> = {}): CompiledHydrationNode {
     return {
@@ -118,8 +122,135 @@ function buildRejectQueryState(testCase: SqlInjectionCase): {
 }
 
 describe(QueryCompiler, () => {
+    it('splits many-to-many prefetch into a join-row read followed by a primary-key target read so the target query never joins the through table', () => {
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
+        const compiled = compiler.compilePrefetch(
+            compiledPrefetchNode({
+                targetTable: 'tags',
+                targetPrimaryKey: 'id',
+                targetColumns: { id: 'int', name: 'text' },
+                throughTable: 'post_tags',
+                throughSourceKey: 'post_id',
+                throughTargetKey: 'tag_id',
+            }),
+            [1, 2]
+        );
+
+        expect(compiled.kind).toBe(InternalPrefetchQueryKind.MANY_TO_MANY);
+        if (compiled.kind !== InternalPrefetchQueryKind.MANY_TO_MANY) {
+            throw new Error('Expected manyToMany compilation');
+        }
+        expect(compiled.throughSql).toContain('FROM post_tags');
+        expect(compiled.throughSql).toContain('ORDER BY post_tags.post_id ASC');
+
+        const targets = compiler.compileManyToManyTargets(
+            compiledPrefetchNode({
+                targetTable: compiled.targetTable,
+                targetPrimaryKey: compiled.targetPrimaryKey,
+                targetColumns: compiled.targetColumns,
+                targetKey: compiled.targetPrimaryKey,
+            }),
+            [10, 11]
+        );
+        expect(targets.sql).toContain('FROM tags');
+        expect(targets.sql).toContain('WHERE __tango_prefetch_base_posts.id IN ($1, $2)');
+    });
+
+    describe.each([
+        { dialect: 'postgres' as const, adapter: postgresAdapter, expectedPlaceholders: 'IN ($1, $2)' },
+        { dialect: 'sqlite' as const, adapter: sqliteAdapter, expectedPlaceholders: 'IN (?, ?)' },
+    ])('uses $dialect placeholders for many-to-many', ({ adapter, expectedPlaceholders }) => {
+        it('scopes the through-table read to owner ids', () => {
+            const compiler = new QueryCompiler(mockMeta, adapter);
+            const compiled = compiler.compilePrefetch(
+                compiledPrefetchNode({
+                    targetTable: 'tags',
+                    targetPrimaryKey: 'id',
+                    targetColumns: { id: 'int', name: 'text' },
+                    throughTable: 'post_tags',
+                    throughSourceKey: 'post_id',
+                    throughTargetKey: 'tag_id',
+                }),
+                [1, 2]
+            );
+
+            expect(compiled.kind).toBe(InternalPrefetchQueryKind.MANY_TO_MANY);
+            if (compiled.kind !== InternalPrefetchQueryKind.MANY_TO_MANY) {
+                throw new Error('Expected manyToMany compilation');
+            }
+            expect(compiled.throughSql).toContain(expectedPlaceholders);
+        });
+
+        it('scopes the follow-up target read to resolved target ids', () => {
+            const compiler = new QueryCompiler(mockMeta, adapter);
+            const targets = compiler.compileManyToManyTargets(
+                compiledPrefetchNode({
+                    targetTable: 'tags',
+                    targetPrimaryKey: 'id',
+                    targetKey: 'id',
+                    targetColumns: { id: 'int', name: 'text' },
+                }),
+                [10, 11]
+            );
+            expect(targets.sql).toContain(expectedPlaceholders);
+        });
+    });
+
+    it('includes nested joins when compiling many-to-many target queries', () => {
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
+        const targets = compiler.compileManyToManyTargets(
+            compiledPrefetchNode({
+                targetTable: 'posts',
+                targetPrimaryKey: 'id',
+                targetKey: 'id',
+                targetColumns: { id: 'int', author_id: 'int', title: 'text' },
+                joinChildren: [
+                    compiledPrefetchNode({
+                        relationName: 'author',
+                        relationPath: 'posts__author',
+                        loadMode: 'join',
+                        cardinality: 'single',
+                        sourceKey: 'author_id',
+                        targetKey: 'id',
+                        targetTable: 'authors',
+                        targetPrimaryKey: 'id',
+                        targetModelKey: 'tests/Author',
+                        targetColumns: { id: 'int', name: 'text' },
+                        join: {
+                            alias: '__tango_join_posts_author',
+                            columns: {
+                                id: '__tango_hydrate_posts_author_id',
+                                name: '__tango_hydrate_posts_author_name',
+                            },
+                        },
+                    }),
+                ],
+            }),
+            [1]
+        );
+
+        expect(targets.sql).toContain('LEFT JOIN authors __tango_join_posts_author');
+    });
+
+    it('throws when relation-filter compilation is asked to traverse an empty relation chain', () => {
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter) as unknown as {
+            buildRelationFilterExists: (
+                ownerAlias: string,
+                relationChain: readonly unknown[],
+                terminalColumn: string,
+                lookup: 'exact',
+                value: unknown,
+                paramIndex: number,
+                relationPath: string
+            ) => unknown;
+        };
+
+        expect(() =>
+            compiler.buildRelationFilterExists('users', [], 'name', 'exact', 'pedro', 1, 'organization')
+        ).toThrow(/cannot compile empty relation filter path/i);
+    });
     it('identifies matching instances', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
         expect(QueryCompiler.isQueryCompiler(compiler)).toBe(true);
         expect(QueryCompiler.isQueryCompiler({})).toBe(false);
     });
@@ -129,7 +260,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { email: 'test@example.com' } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('WHERE');
         expect(result.sql).toContain('users.email = $1');
@@ -141,10 +272,149 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { email: null } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.email IS NULL');
         expect(result.params).toEqual([]);
+    });
+
+    it('compiles single-valued relation-path filters through correlated EXISTS clauses', () => {
+        const compiler = new QueryCompiler(
+            {
+                ...mockMeta,
+                relations: {
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
+                        table: 'organizations',
+                        sourceKey: 'organization_id',
+                        targetKey: 'id',
+                        targetPrimaryKey: 'id',
+                        targetColumns: { id: 'int', name: 'text' },
+                        alias: 'organizations',
+                        targetMeta: {
+                            table: 'organizations',
+                            pk: 'id',
+                            columns: { id: 'int', name: 'text' },
+                        },
+                    }),
+                },
+            },
+            postgresAdapter
+        );
+
+        const result = compiler.compile({
+            q: { kind: 'atom', where: { organization__name__icontains: 'dance' } },
+        });
+
+        expect(result.sql).toContain('EXISTS (SELECT 1 FROM organizations');
+        expect(result.sql).toContain('LOWER(__tango_filter_organization_target_organizations_0.name) LIKE $1');
+        expect(result.params).toEqual(['%dance%']);
+    });
+
+    it('compiles nested single-valued relation-path filters through chained correlated EXISTS clauses', () => {
+        const compiler = new QueryCompiler(
+            {
+                ...mockMeta,
+                relations: {
+                    organization: aRelationMeta({
+                        kind: InternalRelationKind.BELONGS_TO,
+                        table: 'organizations',
+                        sourceKey: 'organization_id',
+                        targetKey: 'id',
+                        targetPrimaryKey: 'id',
+                        targetColumns: { id: 'int', parent_id: 'int', name: 'text' },
+                        alias: 'organizations',
+                        targetMeta: {
+                            table: 'organizations',
+                            pk: 'id',
+                            columns: { id: 'int', parent_id: 'int', name: 'text' },
+                            relations: {
+                                parent: aRelationMeta({
+                                    kind: InternalRelationKind.BELONGS_TO,
+                                    table: 'organizations',
+                                    sourceKey: 'parent_id',
+                                    targetKey: 'id',
+                                    targetPrimaryKey: 'id',
+                                    targetColumns: { id: 'int', name: 'text' },
+                                    alias: 'parent',
+                                    targetMeta: {
+                                        table: 'organizations',
+                                        pk: 'id',
+                                        columns: { id: 'int', name: 'text' },
+                                    },
+                                }),
+                            },
+                        },
+                    }),
+                },
+            },
+            postgresAdapter
+        );
+
+        const result = compiler.compile({
+            q: { kind: 'atom', where: { organization__parent__name__icontains: 'core' } },
+        });
+
+        expect(result.sql).toContain(
+            'EXISTS (SELECT 1 FROM organizations __tango_filter_organization_parent_target_organizations_1'
+        );
+        expect(result.sql).toContain(
+            'EXISTS (SELECT 1 FROM organizations __tango_filter_organization_parent_target_parent_0'
+        );
+        expect(result.sql).toContain('LOWER(__tango_filter_organization_parent_target_parent_0.name) LIKE $1');
+        expect(result.params).toEqual(['%core%']);
+    });
+
+    it('compiles many-to-many relation-path filters through correlated EXISTS clauses', () => {
+        const compiler = new QueryCompiler(
+            {
+                table: 'posts',
+                pk: 'id',
+                columns: {
+                    id: 'int',
+                    title: 'text',
+                },
+                relations: {
+                    tags: {
+                        kind: InternalRelationKind.MANY_TO_MANY,
+                        edgeId: 'posts:tags',
+                        sourceModelKey: 'tests/Post',
+                        targetModelKey: 'tests/Tag',
+                        cardinality: 'many',
+                        capabilities: {
+                            queryable: true,
+                            hydratable: true,
+                            joinable: false,
+                            prefetchable: true,
+                        },
+                        table: 'tags',
+                        sourceKey: 'id',
+                        targetKey: 'id',
+                        throughTable: 'post_tags',
+                        throughSourceKey: 'post_id',
+                        throughTargetKey: 'tag_id',
+                        targetPrimaryKey: 'id',
+                        targetColumns: { id: 'int', slug: 'text' },
+                        alias: 'tags',
+                        targetMeta: {
+                            table: 'tags',
+                            pk: 'id',
+                            columns: { id: 'int', slug: 'text' },
+                        },
+                    },
+                },
+            },
+            postgresAdapter
+        );
+
+        const result = compiler.compile({
+            q: { kind: 'atom', where: { tags__slug: 'tango' } },
+        });
+
+        expect(result.sql).toContain('EXISTS (SELECT 1 FROM post_tags');
+        expect(result.sql).toContain('INNER JOIN tags');
+        expect(result.sql).toContain('__tango_filter_tags_target_tags_0.slug = $1');
+        expect(result.params).toEqual(['tango']);
     });
 
     it('compiles lt lookup', () => {
@@ -152,7 +422,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { age__lt: 30 } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.age < $1');
         expect(result.params).toEqual([30]);
@@ -163,7 +433,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { age__gte: 18 } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.age >= $1');
         expect(result.params).toEqual([18]);
@@ -177,8 +447,8 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { age__gt: 21 } },
         };
 
-        const lte = new QueryCompiler(mockMeta, 'postgres').compile(lteState);
-        const gt = new QueryCompiler(mockMeta, 'postgres').compile(gtState);
+        const lte = new QueryCompiler(mockMeta, postgresAdapter).compile(lteState);
+        const gt = new QueryCompiler(mockMeta, postgresAdapter).compile(gtState);
 
         expect(lte.sql).toContain('users.age <= $1');
         expect(gt.sql).toContain('users.age > $1');
@@ -189,7 +459,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { id__in: [1, 2, 3] } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.id IN ($1, $2, $3)');
         expect(result.params).toEqual([1, 2, 3]);
@@ -200,7 +470,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { id__in: [] } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('1=0');
     });
@@ -210,7 +480,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { email__isnull: true } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.email IS NULL');
     });
@@ -220,7 +490,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { email__isnull: false } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.email IS NOT NULL');
     });
@@ -230,7 +500,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { name__contains: 'John' } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.name LIKE $1');
         expect(result.params).toEqual(['%John%']);
@@ -241,7 +511,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { name__icontains: 'JOHN' } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('LOWER(users.name) LIKE $1');
         expect(result.params).toEqual(['%john%']);
@@ -252,7 +522,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { email__startswith: 'admin' } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.email LIKE $1');
         expect(result.params).toEqual(['admin%']);
@@ -263,7 +533,7 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { email__endswith: '.com' } },
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.email LIKE $1');
         expect(result.params).toEqual(['%.com']);
@@ -277,8 +547,8 @@ describe(QueryCompiler, () => {
             q: { kind: 'atom' as const, where: { email__iendswith: '.COM' } },
         };
 
-        const startsWith = new QueryCompiler(mockMeta, 'postgres').compile(startsWithState);
-        const endsWith = new QueryCompiler(mockMeta, 'postgres').compile(endsWithState);
+        const startsWith = new QueryCompiler(mockMeta, postgresAdapter).compile(startsWithState);
+        const endsWith = new QueryCompiler(mockMeta, postgresAdapter).compile(endsWithState);
 
         expect(startsWith.sql).toContain('LOWER(users.email) LIKE $1');
         expect(startsWith.params).toEqual(['admin%']);
@@ -291,7 +561,7 @@ describe(QueryCompiler, () => {
             q: Q.and<UserModel>({ email: 'test@example.com' }, { age__gte: 18 }),
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.email = $1');
         expect(result.sql).toContain('users.age >= $2');
@@ -304,7 +574,7 @@ describe(QueryCompiler, () => {
             q: Q.or({ email: 'test@example.com' }, { email: 'admin@example.com' }),
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('users.email = $1');
         expect(result.sql).toContain('users.email = $2');
@@ -317,7 +587,7 @@ describe(QueryCompiler, () => {
             q: Q.not({ email: 'test@example.com' }),
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('NOT');
         expect(result.sql).toContain('users.email = $1');
@@ -332,7 +602,7 @@ describe(QueryCompiler, () => {
             ],
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('ORDER BY users.name ASC, users.id DESC');
     });
@@ -342,7 +612,7 @@ describe(QueryCompiler, () => {
             limit: 10,
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('LIMIT 10');
     });
@@ -352,7 +622,7 @@ describe(QueryCompiler, () => {
             offset: 20,
         };
 
-        const result = new QueryCompiler(mockMeta, 'postgres').compile(state);
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('OFFSET 20');
     });
@@ -363,7 +633,7 @@ describe(QueryCompiler, () => {
                 q: { kind: 'atom' as const, where: { email: 'test@example.com' } },
             };
 
-            const result = new QueryCompiler(mockMeta, 'sqlite').compile(state);
+            const result = new QueryCompiler(mockMeta, sqliteAdapter).compile(state);
 
             expect(result.sql).toContain('users.email = ?');
             expect(result.params).toEqual(['test@example.com']);
@@ -374,13 +644,13 @@ describe(QueryCompiler, () => {
                 q: { kind: 'atom' as const, where: { id__in: [1, 2] } },
             };
 
-            const result = new QueryCompiler(mockMeta, 'sqlite').compile(state);
+            const result = new QueryCompiler(mockMeta, sqliteAdapter).compile(state);
             expect(result.sql).toContain('users.id IN (?, ?)');
             expect(result.params).toEqual([1, 2]);
         });
 
         it('normalizes sqlite booleans and supports non-array IN values', () => {
-            const result = new QueryCompiler(mockMeta, 'sqlite').compile({
+            const result = new QueryCompiler(mockMeta, sqliteAdapter).compile({
                 q: Q.and<UserModel>({ isActive: true }, { id__in: 9 }),
             });
 
@@ -390,13 +660,13 @@ describe(QueryCompiler, () => {
         });
 
         it('uses sqlite non-lowercase columns for case-insensitive lookups', () => {
-            const contains = new QueryCompiler(mockMeta, 'sqlite').compile({
+            const contains = new QueryCompiler(mockMeta, sqliteAdapter).compile({
                 q: { kind: 'atom', where: { email__icontains: 'ADMIN' } },
             });
-            const startsWith = new QueryCompiler(mockMeta, 'sqlite').compile({
+            const startsWith = new QueryCompiler(mockMeta, sqliteAdapter).compile({
                 q: { kind: 'atom', where: { email__istartswith: 'ADMIN' } },
             });
-            const endsWith = new QueryCompiler(mockMeta, 'sqlite').compile({
+            const endsWith = new QueryCompiler(mockMeta, sqliteAdapter).compile({
                 q: { kind: 'atom', where: { email__iendswith: '.COM' } },
             });
 
@@ -409,14 +679,14 @@ describe(QueryCompiler, () => {
         });
 
         it('normalizes sqlite false booleans to zero', () => {
-            const result = new QueryCompiler(mockMeta, 'sqlite').compile({
+            const result = new QueryCompiler(mockMeta, sqliteAdapter).compile({
                 q: { kind: 'atom', where: { isActive: false } },
             });
             expect(result.params).toEqual([0]);
         });
 
         it.each(sqlInjectionValueCases)('$id keeps $category payloads parameterized in sqlite filters', (testCase) => {
-            const result = new QueryCompiler(mockMeta, 'sqlite').compile({
+            const result = new QueryCompiler(mockMeta, sqliteAdapter).compile({
                 q: { kind: 'atom', where: { email: testCase.payload } },
             });
 
@@ -448,7 +718,7 @@ describe(QueryCompiler, () => {
                     }),
                 },
             },
-            'postgres'
+            postgresAdapter
         );
 
         const result = compiler.compile<UserModel>({
@@ -490,11 +760,11 @@ describe(QueryCompiler, () => {
                     }),
                 },
             },
-            'postgres'
+            postgresAdapter
         );
 
         expect(() => compiler.compile({ selectRelated: ['posts'] })).toThrow(/selectRelated/);
-        expect(() => compiler.compile({ prefetchRelated: ['organization'] })).toThrow(/prefetchRelated/);
+        expect(() => compiler.compile({ prefetchRelated: ['organization'] })).not.toThrow();
     });
 
     it('compiles validated prefetch follow-up queries', () => {
@@ -512,11 +782,12 @@ describe(QueryCompiler, () => {
                     }),
                 },
             },
-            'postgres'
+            postgresAdapter
         );
         const result = compiler.compilePrefetch(compiledPrefetchNode(), [1, 2]);
 
         expect(result).toEqual({
+            kind: InternalPrefetchQueryKind.DIRECT,
             sql: 'SELECT __tango_prefetch_base_posts.id AS id, __tango_prefetch_base_posts.author_id AS author_id, __tango_prefetch_base_posts.title AS title FROM posts __tango_prefetch_base_posts WHERE __tango_prefetch_base_posts.author_id IN ($1, $2) ORDER BY __tango_prefetch_base_posts.author_id ASC, __tango_prefetch_base_posts.id ASC',
             params: [1, 2],
             targetKey: 'author_id',
@@ -556,7 +827,7 @@ describe(QueryCompiler, () => {
                     }),
                 },
             },
-            'postgres'
+            postgresAdapter
         );
 
         const result = compiler.compile({ selectRelated: ['organization__owner'] });
@@ -628,7 +899,7 @@ describe(QueryCompiler, () => {
                     }),
                 },
             },
-            'postgres'
+            postgresAdapter
         );
 
         const compiled = compiler.compile({ prefetchRelated: ['organization__posts__author__team'] });
@@ -637,6 +908,10 @@ describe(QueryCompiler, () => {
         const prefetch = compiler.compilePrefetch(posts, [1]);
 
         expect(organization.prefetchChildren).toHaveLength(1);
+        if (prefetch.kind !== InternalPrefetchQueryKind.DIRECT) {
+            expect(prefetch.kind).toBe(InternalPrefetchQueryKind.DIRECT);
+            return;
+        }
         expect(prefetch.sql).toContain('LEFT JOIN authors __tango_join_organization_posts_author');
         expect(prefetch.sql).toContain('LEFT JOIN teams __tango_join_organization_posts_author_team');
     });
@@ -656,7 +931,7 @@ describe(QueryCompiler, () => {
                     }),
                 },
             },
-            'sqlite'
+            sqliteAdapter
         );
 
         expect(() =>
@@ -671,7 +946,7 @@ describe(QueryCompiler, () => {
     });
 
     it('rejects nested prefetch join metadata when a compiled child node is mutated', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
 
         expect(() =>
             compiler.compilePrefetch(
@@ -703,7 +978,7 @@ describe(QueryCompiler, () => {
     });
 
     it('rejects compiled hydration nodes that no longer carry target metadata', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres') as unknown as {
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter) as unknown as {
             compileHydrationNode: (
                 node: QueryHydrationPlanNode,
                 context: {
@@ -767,7 +1042,7 @@ describe(QueryCompiler, () => {
     });
 
     it('ignores nested join SQL collection for nodes without join descriptors', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres') as unknown as {
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter) as unknown as {
             collectNestedJoinSql: (
                 node: CompiledHydrationNode,
                 ownerAlias: string,
@@ -782,7 +1057,7 @@ describe(QueryCompiler, () => {
     });
 
     it('rejects nested prefetch joins whose owner column is not present on the parent target', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
 
         expect(() =>
             compiler.compilePrefetch(
@@ -813,7 +1088,7 @@ describe(QueryCompiler, () => {
     });
 
     it('rejects nested prefetch joins whose projected columns are not present on the target', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
 
         expect(() =>
             compiler.compilePrefetch(
@@ -843,7 +1118,7 @@ describe(QueryCompiler, () => {
     });
 
     it('surfaces non-Error validation failures from compiled prefetch metadata', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres') as unknown as {
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter) as unknown as {
             validatePrefetchTarget: (node: CompiledHydrationNode) => unknown;
         };
 
@@ -859,7 +1134,7 @@ describe(QueryCompiler, () => {
     });
 
     it('ignores empty excludes that produce no SQL', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
         const result = compiler.compile({
             excludes: [{ kind: 'atom', where: { email: undefined } }],
         });
@@ -869,12 +1144,14 @@ describe(QueryCompiler, () => {
     });
 
     it('throws on unknown lookups', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
-        expect(() => compiler.compile({ q: { kind: 'atom', where: { id__wat: 1 } } })).toThrow('Unknown lookup: wat');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
+        expect(() => compiler.compile({ q: { kind: 'atom', where: { id__wat: 1 } } })).toThrow(
+            "Invalid SQL lookup key: 'id__wat'."
+        );
     });
 
     it('defensively rejects unsupported lookup values during SQL rendering', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres') as unknown as {
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter) as unknown as {
             lookupToSQL: (column: string, lookup: string, value: unknown, paramIndex: number) => unknown;
         };
 
@@ -882,7 +1159,7 @@ describe(QueryCompiler, () => {
     });
 
     it('ignores q-nodes with unknown kind', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
         const result = compiler.compile({
             q: {
                 kind: 'unknown_kind' as unknown as 'atom',
@@ -894,7 +1171,7 @@ describe(QueryCompiler, () => {
     });
 
     it('returns empty sql for NOT nodes that compile to empty clauses', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
         const result = compiler.compile({
             q: Q.not({ email: undefined }),
         });
@@ -904,7 +1181,7 @@ describe(QueryCompiler, () => {
     });
 
     it('drops empty AND/OR children from compiled predicates', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
         const andResult = compiler.compile<UserModel>({
             q: {
                 kind: 'and',
@@ -931,7 +1208,7 @@ describe(QueryCompiler, () => {
     });
 
     it('returns empty predicates for fully empty AND/OR nodes', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
         const andResult = compiler.compile({
             q: { kind: 'and', nodes: [{ kind: 'atom', where: { email: undefined } }] },
         });
@@ -944,7 +1221,7 @@ describe(QueryCompiler, () => {
     });
 
     it('handles AND/OR nodes without nodes arrays', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
         const andResult = compiler.compile({ q: { kind: 'and' } });
         const orResult = compiler.compile({ q: { kind: 'or' } });
         expect(andResult.sql).not.toContain('WHERE');
@@ -952,7 +1229,7 @@ describe(QueryCompiler, () => {
     });
 
     it('handles ATOM nodes without where objects', () => {
-        const compiler = new QueryCompiler(mockMeta, 'postgres');
+        const compiler = new QueryCompiler(mockMeta, postgresAdapter);
         const result = compiler.compile({ q: { kind: 'atom' } });
         expect(result.sql).not.toContain('WHERE');
         expect(result.params).toEqual([]);
@@ -964,7 +1241,7 @@ describe(QueryCompiler, () => {
                 ...mockMeta,
                 table: 'users; DROP TABLE users;',
             },
-            'postgres'
+            postgresAdapter
         );
 
         expect(() => compiler.compile({})).toThrow(/invalid sql table name/i);
@@ -985,7 +1262,7 @@ describe(QueryCompiler, () => {
                     }),
                 },
             },
-            'postgres'
+            postgresAdapter
         );
 
         expect(() => compiler.compile({ selectRelated: ['organization'] })).toThrow(/unknown column/i);
@@ -1006,7 +1283,7 @@ describe(QueryCompiler, () => {
                     }),
                 },
             },
-            'postgres'
+            postgresAdapter
         );
 
         expect(() => compiler.compile({ selectRelated: ['organization'] })).toThrow(/unknown relation target key/i);
@@ -1031,7 +1308,7 @@ describe(QueryCompiler, () => {
                     }),
                 },
             },
-            'postgres'
+            postgresAdapter
         );
 
         expect(() => compiler.compile({ selectRelated: ['organization'] })).toThrow(/internal query alias/i);
@@ -1039,7 +1316,7 @@ describe(QueryCompiler, () => {
 
     describe('PostgreSQL', () => {
         it.each(sqlInjectionValueCases)('$id keeps $category payloads as bound filter params', (testCase) => {
-            const result = new QueryCompiler(mockMeta, 'postgres').compile({
+            const result = new QueryCompiler(mockMeta, postgresAdapter).compile({
                 q: { kind: 'atom', where: { email: testCase.payload } },
             });
 
@@ -1048,7 +1325,7 @@ describe(QueryCompiler, () => {
 
         it.each(sqlInjectionRejectCases)('$id rejects $applicablePosition payloads before SQL assembly', (testCase) => {
             const { meta, state } = buildRejectQueryState(testCase);
-            expect(() => new QueryCompiler(meta, 'postgres').compile(state)).toThrow();
+            expect(() => new QueryCompiler(meta, postgresAdapter).compile(state)).toThrow();
         });
     });
 });

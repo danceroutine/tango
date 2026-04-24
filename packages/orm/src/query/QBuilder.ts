@@ -27,7 +27,9 @@ export class QBuilder {
     /**
      * Combine multiple filter fragments using logical `AND`.
      */
-    static and<T>(...nodes: Array<FilterInput<T> | QNode<T>>): QNode<T> {
+    static and<T, TSourceModel = unknown>(
+        ...nodes: Array<FilterInput<T, TSourceModel> | QNode<T, TSourceModel>>
+    ): QNode<T, TSourceModel> {
         return {
             kind: InternalQNodeType.AND,
             nodes: nodes.map(QBuilder.wrapNode),
@@ -37,7 +39,9 @@ export class QBuilder {
     /**
      * Combine multiple filter fragments using logical `OR`.
      */
-    static or<T>(...nodes: Array<FilterInput<T> | QNode<T>>): QNode<T> {
+    static or<T, TSourceModel = unknown>(
+        ...nodes: Array<FilterInput<T, TSourceModel> | QNode<T, TSourceModel>>
+    ): QNode<T, TSourceModel> {
         return {
             kind: InternalQNodeType.OR,
             nodes: nodes.map(QBuilder.wrapNode),
@@ -47,20 +51,24 @@ export class QBuilder {
     /**
      * Negate a filter fragment using logical `NOT`.
      */
-    static not<T>(node: FilterInput<T> | QNode<T>): QNode<T> {
+    static not<T, TSourceModel = unknown>(
+        node: FilterInput<T, TSourceModel> | QNode<T, TSourceModel>
+    ): QNode<T, TSourceModel> {
         return {
             kind: InternalQNodeType.NOT,
             node: QBuilder.wrapNode(node),
         };
     }
 
-    private static wrapNode<T>(input: FilterInput<T> | QNode<T>): QNode<T> {
+    private static wrapNode<T, TSourceModel = unknown>(
+        input: FilterInput<T, TSourceModel> | QNode<T, TSourceModel>
+    ): QNode<T, TSourceModel> {
         if (isQNodeLike(input)) {
             return input;
         }
         return {
             kind: InternalQNodeType.ATOM,
-            where: input as FilterInput<T>,
+            where: input as FilterInput<T, TSourceModel>,
         };
     }
 }

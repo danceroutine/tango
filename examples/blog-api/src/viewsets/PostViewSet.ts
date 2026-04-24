@@ -46,6 +46,6 @@ export class PostViewSet extends ModelViewSet<Post, typeof PostSerializer> {
             published: true,
         } as Partial<Post>);
 
-        return this.getSerializer().toRepresentation(updated);
+        return this.getSerializer().serialize(updated);
     }
 }

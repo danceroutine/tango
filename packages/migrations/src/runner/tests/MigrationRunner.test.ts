@@ -31,6 +31,7 @@ function makeClient(queryImpl?: (sql: string, params?: readonly unknown[]) => Pr
 
 function strategyReturning(sql: string): CompilerStrategy {
     return {
+        prepareOperations: vi.fn((_dialect, operations) => operations),
         compile: vi.fn(() => [{ sql, params: [] }]),
     } as unknown as CompilerStrategy;
 }

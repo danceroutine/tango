@@ -2,7 +2,10 @@ import type { Model, RelationDef } from '../../domain/index';
 import type { FinalizedStorageArtifacts } from '../fields/FinalizedStorageArtifacts';
 import { InternalSchemaModel } from '../internal/InternalSchemaModel';
 import type { ResolvedRelationGraphSnapshot } from '../registry/ResolvedRelationGraphSnapshot';
-import type { NormalizedRelationStorageDescriptor } from './NormalizedRelationStorageDescriptor';
+import {
+    InternalNormalizedRelationOrigin,
+    type NormalizedRelationStorageDescriptor,
+} from './NormalizedRelationStorageDescriptor';
 import type { ResolvedRelationDescriptor, ResolvedRelationGraph } from './ResolvedRelationGraph';
 import {
     type RelationCardinality,
@@ -11,6 +14,8 @@ import {
     InternalRelationProvenance,
     InternalRelationStorageStrategy,
 } from './RelationSpec';
+import { ImplicitManyToManyThroughFactory } from './ImplicitManyToManyThroughFactory';
+import { ImplicitManyToManyIdentifier } from './ImplicitManyToManyIdentifier';
 import { pluralize, toSnakeCase } from './SchemaNaming';
 
 const REFERENCE_CAPABILITIES = Object.freeze({
@@ -20,8 +25,8 @@ const REFERENCE_CAPABILITIES = Object.freeze({
 });
 const MANY_TO_MANY_CAPABILITIES = Object.freeze({
     migratable: false,
-    queryable: false,
-    hydratable: false,
+    queryable: true,
+    hydratable: true,
 });
 const RELATION_NAME_SEPARATOR = ':';
 
@@ -79,6 +84,12 @@ export class ResolvedRelationGraphBuilder {
                             cardinality: relation.cardinality,
                             localFieldName: relation.localFieldName,
                             targetFieldName: relation.targetFieldName,
+                            throughModelKey: relation.throughModelKey,
+                            throughTable: relation.throughTable,
+                            throughSourceFieldName: relation.throughSourceFieldName,
+                            throughTargetFieldName: relation.throughTargetFieldName,
+                            throughSourceKey: relation.throughSourceKey,
+                            throughTargetKey: relation.throughTargetKey,
                             alias: relation.alias,
                             capabilities: {
                                 migratable: relation.capabilities.migratable,
@@ -116,8 +127,53 @@ export class ResolvedRelationGraphBuilder {
         for (const descriptor of InternalSchemaModel.getNormalizedRelations(model)) {
             const targetModel = this.options.resolveRef(descriptor.targetRef);
 
-            if (descriptor.origin === 'manyToMany') {
+            if (descriptor.origin === InternalNormalizedRelationOrigin.MANY_TO_MANY) {
                 const relationName = descriptor.explicitForwardName ?? descriptor.namingHint;
+                let throughModel: Model;
+                let throughSourceFieldName: string;
+                let throughTargetFieldName: string;
+
+                if (
+                    descriptor.throughModelRef &&
+                    descriptor.throughSourceFieldName &&
+                    descriptor.throughTargetFieldName
+                ) {
+                    throughModel = this.options.resolveRef(descriptor.throughModelRef);
+                    throughSourceFieldName = descriptor.throughSourceFieldName;
+                    throughTargetFieldName = descriptor.throughTargetFieldName;
+                } else {
+                    throughModel = this.options.resolveRef(
+                        ImplicitManyToManyIdentifier.getModelKey(
+                            model.metadata.key,
+                            descriptor.sourceSchemaFieldKey,
+                            targetModel.metadata.key
+                        )
+                    );
+                    const implicitNames = ImplicitManyToManyThroughFactory.throughFieldNames(model, targetModel);
+                    throughSourceFieldName = implicitNames.throughSourceFieldName;
+                    throughTargetFieldName = implicitNames.throughTargetFieldName;
+                }
+
+                const throughNormalized = InternalSchemaModel.getNormalizedRelations(throughModel);
+                const throughSource = throughNormalized.find(
+                    (rel) => rel.sourceSchemaFieldKey === throughSourceFieldName
+                );
+                const throughTarget = throughNormalized.find(
+                    (rel) => rel.sourceSchemaFieldKey === throughTargetFieldName
+                );
+                if (!throughSource || !throughTarget) {
+                    throw new Error(
+                        `Many-to-many relation '${relationName}' on model '${model.metadata.key}' cannot find through fields on '${throughModel.metadata.key}'.`
+                    );
+                }
+
+                const throughStorage = this.options.storage.byModel.get(throughModel.metadata.key);
+                if (!throughStorage) {
+                    throw new Error(
+                        `Many-to-many relation '${relationName}' on model '${model.metadata.key}' cannot resolve storage artifacts for through model '${throughModel.metadata.key}'.`
+                    );
+                }
+
                 this.addResolvedRelation({
                     edgeId: descriptor.edgeId,
                     sourceModelKey: model.metadata.key,
@@ -129,6 +185,12 @@ export class ResolvedRelationGraphBuilder {
                     capabilities: MANY_TO_MANY_CAPABILITIES,
                     provenance: InternalRelationProvenance.FIELD_DECORATOR,
                     alias: `${toSnakeCase(model.metadata.name)}_${relationName}`,
+                    throughModelKey: throughModel.metadata.key,
+                    throughTable: throughStorage.table,
+                    throughSourceFieldName,
+                    throughTargetFieldName,
+                    throughSourceKey: throughSource.dbColumnName,
+                    throughTargetKey: throughTarget.dbColumnName,
                 });
                 continue;
             }
@@ -165,6 +227,10 @@ export class ResolvedRelationGraphBuilder {
             provenance: InternalRelationProvenance.FIELD_DECORATOR,
             alias: `${toSnakeCase(targetModel.metadata.name)}_${forwardName}`,
         });
+
+        if (ImplicitManyToManyIdentifier.isImplicitManyToManyModel(sourceModel.metadata.key)) {
+            return;
+        }
 
         const reverseOverride = this.findReverseOverride(sourceModel, targetModel, descriptor);
         if (reverseOverride) {

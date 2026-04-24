@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import type { Argv } from 'yargs';
 import { MigrationRunner } from '../runner/MigrationRunner';
 import { MigrationGenerator } from '../generator/MigrationGenerator';
-import { diffSchema } from '../diff/diffSchema';
+import { buildMigrationModelMetadataProjection, diffSchema } from '../diff/index';
 import type { DbSchema } from '../introspect/PostgresIntrospector';
 import type { Dialect } from '../domain/Dialect';
 import type { ColumnType } from '../builder/contracts/ColumnType';
@@ -407,7 +407,10 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
                     env: argv.env as ConfigEnvironment | undefined,
                 });
                 const loaded = await loadModels(argv.models);
-                logger.info(`Found ${loaded.models.length} model(s): ${loaded.models.map((m) => m.table).join(', ')}`);
+                const projectedModels = buildMigrationModelMetadataProjection(loaded.registry);
+                logger.info(
+                    `Found ${loaded.models.length} exported model(s); ${projectedModels.length} model(s) after projection: ${projectedModels.map((m) => m.table).join(', ')}`
+                );
                 try {
                     await writeRelationRegistryArtifacts({
                         registry: loaded.registry,
@@ -428,7 +431,7 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
                     dbState = { tables: {} };
                 }
 
-                const operations = diffSchema(dbState, loaded.models);
+                const operations = diffSchema(dbState, projectedModels);
 
                 if (operations.length === 0) {
                     logger.info('No changes detected — models and database are in sync');

@@ -18,10 +18,20 @@ type UserRecord = {
     active?: boolean;
 };
 
+type UserModelRecord = UserRecord & {
+    tags: {
+        all(): Promise<readonly string[]>;
+    };
+};
+
 const userReadSchema = z.object({
     id: z.number(),
     email: z.string().email(),
     name: z.string(),
+});
+
+const userReadWithTagsSchema = userReadSchema.extend({
+    tags: z.array(z.string()),
 });
 
 const userWriteSchema = z.object({
@@ -29,7 +39,7 @@ const userWriteSchema = z.object({
     name: z.string(),
 });
 
-let currentUserModel: ResourceModelLike<UserRecord>;
+let currentUserModel: unknown;
 
 class UserSerializer extends ModelSerializer<
     UserRecord,
@@ -43,13 +53,35 @@ class UserSerializer extends ModelSerializer<
     static readonly outputSchema = userReadSchema;
 
     override getModel(): ResourceModelLike<UserRecord> {
-        return currentUserModel;
+        return currentUserModel as ResourceModelLike<UserRecord>;
     }
 }
 
 class UserListCreateView extends ListCreateAPIView<UserRecord, typeof UserSerializer> {}
 
 class UserDetailView extends RetrieveUpdateDestroyAPIView<UserRecord, typeof UserSerializer> {}
+
+class TaggedUserSerializer extends ModelSerializer<
+    UserRecord,
+    typeof userWriteSchema,
+    ReturnType<typeof userWriteSchema.partial>,
+    typeof userReadWithTagsSchema,
+    UserModelRecord
+> {
+    static readonly model = undefined as unknown as ResourceModelLike<UserRecord, UserModelRecord>;
+    static readonly createSchema = userWriteSchema;
+    static readonly updateSchema = userWriteSchema.partial();
+    static readonly outputSchema = userReadWithTagsSchema;
+    static readonly outputResolvers = {
+        tags: async (record: UserModelRecord) => await record.tags.all(),
+    };
+
+    override getModel(): ResourceModelLike<UserRecord, UserModelRecord> {
+        return currentUserModel as ResourceModelLike<UserRecord, UserModelRecord>;
+    }
+}
+
+class TaggedUserListView extends ListCreateAPIView<UserRecord, typeof TaggedUserSerializer> {}
 
 class HookProbeView extends GenericAPIView<UserRecord, typeof UserSerializer> {
     exposeHooks(ctx: RequestContext) {
@@ -153,14 +185,21 @@ describe(GenericAPIView, () => {
 
         const view = new UserListCreateView({
             serializer: UserSerializer,
-            searchFields: ['email', 'name'],
+            searchFields: ['email', 'name', 'tags__name'],
         });
 
         const response = await view.dispatch(
             aResourcesRequestContext('GET', 'https://example.test/users?search=user&limit=20&offset=0')
         );
         expect(response.status).toBe(500);
-        expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalled();
+        expect(vi.mocked(querySetDouble.filter)).toHaveBeenCalledWith({
+            kind: 'or',
+            nodes: [
+                { kind: 'atom', where: { email__icontains: 'user' } },
+                { kind: 'atom', where: { name__icontains: 'user' } },
+                { kind: 'atom', where: { tags__name__icontains: 'user' } },
+            ],
+        });
     });
 
     it('reads, updates, and deletes an existing record', async () => {
@@ -193,6 +232,41 @@ describe(GenericAPIView, () => {
         deleteCtx.params = { id: '1' };
         const deleteResponse = await view.dispatch(deleteCtx);
         expect(deleteResponse.status).toBe(204);
+    });
+
+    it('serializes async output resolver fields for list responses', async () => {
+        const querySetDouble = aQuerySet<UserModelRecord>();
+        vi.mocked(querySetDouble.fetch).mockResolvedValue(
+            aQueryResult({
+                items: [
+                    {
+                        id: 7,
+                        email: 'rich@example.com',
+                        name: 'Rich',
+                        tags: {
+                            all: async () => ['staff'],
+                        },
+                    },
+                ],
+            })
+        );
+        vi.mocked(querySetDouble.count).mockResolvedValue(1);
+
+        currentUserModel = {
+            objects: aManager<UserModelRecord>({
+                meta: { table: 'users', pk: 'id', columns: { id: 'int', email: 'text', name: 'text' } },
+                query: vi.fn(() => querySetDouble),
+            }),
+        } as ResourceModelLike<UserRecord, UserModelRecord>;
+
+        const view = new TaggedUserListView({ serializer: TaggedUserSerializer });
+        const response = await view.dispatch(aResourcesRequestContext('GET', 'https://example.test/users'));
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toEqual({
+            count: 1,
+            results: [{ id: 7, email: 'rich@example.com', name: 'Rich', tags: ['staff'] }],
+        });
     });
 
     it('returns 404 when lookup exists but manager returns no row', async () => {

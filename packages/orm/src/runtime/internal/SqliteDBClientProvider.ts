@@ -11,6 +11,7 @@ export class SqliteDBClientProvider implements DBClientProvider {
     private readonly Database: BetterSqliteCtor;
     private readonly autocommitClient: SqliteClient;
     private activeLeaseCount = 0;
+    private exclusiveTail: Promise<void> = Promise.resolve();
 
     constructor(config: AdapterConfig = {}) {
         this.Database = this.getDatabaseCtor();
@@ -20,7 +21,7 @@ export class SqliteDBClientProvider implements DBClientProvider {
     }
 
     async query<T = unknown>(sql: string, params?: readonly unknown[]): Promise<{ rows: T[] }> {
-        return this.autocommitClient.query<T>(sql, params);
+        return this.runExclusive(() => this.autocommitClient.query<T>(sql, params));
     }
 
     async leaseTransactionClient(): Promise<TransactionClientLease> {
@@ -28,22 +29,32 @@ export class SqliteDBClientProvider implements DBClientProvider {
             throw new Error('transaction.atomic(...) requires a file-backed SQLite database. :memory: is unsupported.');
         }
 
-        const client = this.openClient(this.filename);
-        this.activeLeaseCount += 1;
-        let released = false;
+        const releaseExclusive = await this.acquireExclusive();
+        try {
+            const client = this.openClient(this.filename);
+            this.activeLeaseCount += 1;
+            let released = false;
 
-        return {
-            client,
-            release: async () => {
-                if (released) {
-                    return;
-                }
+            return {
+                client,
+                release: async () => {
+                    if (released) {
+                        return;
+                    }
 
-                released = true;
-                this.activeLeaseCount -= 1;
-                await client.close();
-            },
-        };
+                    released = true;
+                    this.activeLeaseCount -= 1;
+                    try {
+                        await client.close();
+                    } finally {
+                        releaseExclusive();
+                    }
+                },
+            };
+        } catch (error) {
+            releaseExclusive();
+            throw error;
+        }
     }
 
     async reset(): Promise<void> {
@@ -60,6 +71,27 @@ export class SqliteDBClientProvider implements DBClientProvider {
         db.pragma('foreign_keys = ON');
         db.pragma('busy_timeout = 5000');
         return new SqliteClient(db);
+    }
+
+    private async runExclusive<T>(work: () => Promise<T>): Promise<T> {
+        const release = await this.acquireExclusive();
+        try {
+            return await work();
+        } finally {
+            release();
+        }
+    }
+
+    private async acquireExclusive(): Promise<() => void> {
+        const previous = this.exclusiveTail;
+        let release: (() => void) | null = null;
+        this.exclusiveTail = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        await previous;
+        return () => {
+            release?.();
+        };
     }
 
     private getDatabaseCtor(): BetterSqliteCtor {

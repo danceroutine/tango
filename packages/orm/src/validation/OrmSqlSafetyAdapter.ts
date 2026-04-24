@@ -20,6 +20,8 @@ import type {
     SqlValidationPlan,
     UpdateSqlValidationPlan,
 } from './SqlValidationPlan';
+import { InternalSqlValidationPlanKind as SqlPlanKind } from './internal/InternalSqlValidationPlanKind';
+import { InternalValidatedFilterDescriptorKind } from './internal/InternalValidatedFilterDescriptorKind';
 
 const ALLOWED_LOOKUPS = Object.values(InternalLookupType) as readonly string[];
 
@@ -39,10 +41,10 @@ export class OrmSqlSafetyAdapter implements SQLValidationEngine {
     validate(plan: DeleteSqlValidationPlan): ValidatedDeleteSqlPlan;
     validate(plan: SqlValidationPlan): ValidatedSqlPlan {
         switch (plan.kind) {
-            case 'select': {
+            case SqlPlanKind.SELECT: {
                 const meta = this.validateTableMeta(plan.meta, plan.relationNames ?? []);
                 return {
-                    kind: 'select',
+                    kind: SqlPlanKind.SELECT,
                     meta,
                     selectFields: Object.fromEntries(
                         (plan.selectFields ?? []).map((field) => [
@@ -51,7 +53,10 @@ export class OrmSqlSafetyAdapter implements SQLValidationEngine {
                         ])
                     ),
                     filterKeys: Object.fromEntries(
-                        (plan.filterKeys ?? []).map((rawKey) => [rawKey, this.validateFilterKey(meta, rawKey)])
+                        (plan.filterKeys ?? []).map((rawKey) => [
+                            rawKey,
+                            this.validateFilterKey(meta, plan.meta, rawKey),
+                        ])
                     ),
                     orderFields: Object.fromEntries(
                         (plan.orderFields ?? []).map((field) => [
@@ -67,25 +72,25 @@ export class OrmSqlSafetyAdapter implements SQLValidationEngine {
                     ),
                 };
             }
-            case 'insert': {
+            case SqlPlanKind.INSERT: {
                 const meta = this.validateTableMeta(plan.meta);
                 return {
-                    kind: 'insert',
+                    kind: SqlPlanKind.INSERT,
                     meta,
                     writeKeys: plan.writeKeys.map((key) => this.resolveColumn(meta, key)),
                 };
             }
-            case 'update': {
+            case SqlPlanKind.UPDATE: {
                 const meta = this.validateTableMeta(plan.meta);
                 return {
-                    kind: 'update',
+                    kind: SqlPlanKind.UPDATE,
                     meta,
                     writeKeys: plan.writeKeys.map((key) => this.resolveColumn(meta, key)),
                 };
             }
-            case 'delete': {
+            case SqlPlanKind.DELETE: {
                 return {
-                    kind: 'delete',
+                    kind: SqlPlanKind.DELETE,
                     meta: this.validateTableMeta(plan.meta),
                 };
             }
@@ -148,6 +153,34 @@ export class OrmSqlSafetyAdapter implements SQLValidationEngine {
                 { key: 'table', role: 'relationTable', value: relation.table },
                 { key: 'alias', role: 'alias', value: relation.alias },
                 { key: 'targetKey', role: 'relationTargetPrimaryKey', value: relation.targetKey },
+                { key: 'targetPrimaryKey', role: 'relationTargetPrimaryKey', value: relation.targetPrimaryKey },
+                ...(relation.throughTable
+                    ? [
+                          {
+                              key: 'throughTable',
+                              role: 'table',
+                              value: relation.throughTable,
+                          } satisfies SqlIdentifierRequest,
+                      ]
+                    : []),
+                ...(relation.throughSourceKey
+                    ? [
+                          {
+                              key: 'throughSourceKey',
+                              role: 'column',
+                              value: relation.throughSourceKey,
+                          } satisfies SqlIdentifierRequest,
+                      ]
+                    : []),
+                ...(relation.throughTargetKey
+                    ? [
+                          {
+                              key: 'throughTargetKey',
+                              role: 'column',
+                              value: relation.throughTargetKey,
+                          } satisfies SqlIdentifierRequest,
+                      ]
+                    : []),
                 ...Object.keys(relation.targetColumns).map<SqlIdentifierRequest>((column) => ({
                     key: `targetColumn:${column}`,
                     role: 'column',
@@ -162,32 +195,91 @@ export class OrmSqlSafetyAdapter implements SQLValidationEngine {
             alias: validated.identifiers.alias!.value,
             sourceKey: this.resolveColumn(meta, relation.sourceKey),
             targetKey: validated.identifiers.targetKey!.value,
+            targetPrimaryKey: validated.identifiers.targetPrimaryKey!.value,
             targetColumns: Object.fromEntries(
                 Object.keys(relation.targetColumns).map((column) => [
                     validated.identifiers[`targetColumn:${column}`]!.value,
                     relation.targetColumns[column]!,
                 ])
             ),
+            throughTable: validated.identifiers.throughTable?.value,
+            throughSourceKey: validated.identifiers.throughSourceKey?.value,
+            throughTargetKey: validated.identifiers.throughTargetKey?.value,
         };
     }
 
-    private validateFilterKey(meta: ValidatedTableMeta, rawKey: string): ValidatedFilterDescriptor {
+    private validateFilterKey(meta: ValidatedTableMeta, rawMeta: TableMeta, rawKey: string): ValidatedFilterDescriptor {
         const segments = rawKey.split('__');
-        if (segments.length > 2) {
+        if (segments.length === 0 || segments.some((segment) => segment.length === 0)) {
             throw new Error(`Invalid SQL lookup key: '${rawKey}'.`);
         }
 
-        const field = segments[0]!;
-        const lookup = (segments[1] ?? InternalLookupType.EXACT) as LookupType;
+        const lookupToken = segments.at(-1)!;
+        const hasExplicitLookup = ALLOWED_LOOKUPS.includes(lookupToken);
+        const lookup = (hasExplicitLookup ? lookupToken : InternalLookupType.EXACT) as LookupType;
+        const pathSegments = hasExplicitLookup ? segments.slice(0, -1) : segments;
+
+        if (pathSegments.length === 0) {
+            throw new Error(`Invalid SQL lookup key: '${rawKey}'.`);
+        }
+
         const validated = this.engine.validate({
             lookupTokens: [{ key: rawKey, lookup, allowed: ALLOWED_LOOKUPS }],
         });
 
+        if (pathSegments.length === 1) {
+            const field = pathSegments[0]!;
+            return {
+                kind: InternalValidatedFilterDescriptorKind.COLUMN,
+                rawKey,
+                field,
+                lookup: validated.lookupTokens[rawKey]!.lookup as LookupType,
+                qualifiedColumn: `${meta.table}.${this.resolveColumn(meta, field)}`,
+            };
+        }
+
+        const rootSegment = pathSegments[0]!;
+        const hasRootColumn = rootSegment in rawMeta.columns;
+        const hasRootRelation = rootSegment in (rawMeta.relations ?? {});
+        if (!hasExplicitLookup && hasRootColumn && !hasRootRelation) {
+            throw new Error(`Invalid SQL lookup key: '${rawKey}'.`);
+        }
+
+        const field = pathSegments.at(-1)!;
+        const relationSegments = pathSegments.slice(0, -1);
+        const relationChain: ValidatedRelationMeta[] = [];
+        let currentValidatedMeta = meta;
+        let currentRawMeta = rawMeta;
+
+        for (const relationName of relationSegments) {
+            const relation = currentRawMeta.relations?.[relationName];
+            if (!relation) {
+                throw new Error(`Unknown relation '${relationName}' for table '${currentValidatedMeta.table}'.`);
+            }
+            if (!relation.targetMeta) {
+                throw new Error(
+                    `Relation '${relationName}' for table '${currentValidatedMeta.table}' is missing target metadata.`
+                );
+            }
+
+            const validatedRelation = this.validateRelationMeta(
+                currentValidatedMeta,
+                relationName,
+                currentRawMeta.relations
+            );
+            relationChain.push(validatedRelation);
+            currentRawMeta = relation.targetMeta;
+            currentValidatedMeta = this.validateTableMeta(currentRawMeta);
+        }
+
         return {
+            kind: InternalValidatedFilterDescriptorKind.RELATION,
             rawKey,
             field,
             lookup: validated.lookupTokens[rawKey]!.lookup as LookupType,
-            qualifiedColumn: `${meta.table}.${this.resolveColumn(meta, field)}`,
+            relationPath: relationSegments.join('__'),
+            relationChain,
+            terminalColumn: this.resolveColumn(currentValidatedMeta, field),
         };
     }
 

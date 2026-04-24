@@ -10,8 +10,11 @@ export * as vitest from './vitest/index';
 export * as express from './express/index';
 
 export {
+    anAdapter,
     aDBClient,
     aManager,
+    aManyToManyRelatedManager,
+    aModelQuerySet,
     aQueryResult,
     aQuerySet,
     aRequestContext,
@@ -20,8 +23,11 @@ export {
 } from './mocks/index';
 export { anExpressRequest, anExpressResponse } from './express/index';
 export type {
+    AdapterOverrides,
     DBClient,
     ManagerOverrides,
+    ManyToManyRelatedManagerFixture,
+    ManyToManyRelatedManagerFixtureOverrides,
     MockQuerySetResult,
     QueryExecutorOverrides,
     RequestContextFixtureOptions,

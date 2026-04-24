@@ -83,6 +83,9 @@ export class RelationDescriptorNormalizer {
             explicitForwardName: meta.forwardName,
             explicitReverseName: meta.reverseName,
             namingHint: this.deriveNamingHint(candidate.sourceSchemaFieldKey),
+            throughModelRef: meta.references.through,
+            throughSourceFieldName: meta.references.throughSourceFieldName,
+            throughTargetFieldName: meta.references.throughTargetFieldName,
             provenance: 'field-decorator',
         };
     }

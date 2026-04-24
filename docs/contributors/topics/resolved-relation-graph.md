@@ -380,7 +380,7 @@ That behavior is what keeps a model with both `authorId` and `editorId` pointing
 
 ## Many-to-many status
 
-Many-to-many declarations now have a durable home in the seam even though full ORM support is still fenced.
+Many-to-many declarations have a durable home in the seam. Field-authored `t.manyToMany(...)` still emits no storage `Field` on the owning table, but registry finalization can synthesize an internal-only through `Model` when authors omit explicit `through` wiring. That through model participates in finalized storage artifacts, migration metadata projection, and `ResolvedRelationGraphBuilder` using the same path as author-defined through models.
 
 A declaration such as:
 
@@ -395,18 +395,18 @@ const PostModel = Model({
 });
 ```
 
-now records relation intent without pretending that `posts` stores a `tags` column.
+records relation intent without pretending that `posts` stores a `tags` column, while still giving migrations and the ORM real join-table keys to compile against.
 
 In the current architecture:
 
-- `t.manyToMany(...)` emits no storage `Field`
-- it is excluded from persisted row contracts
-- it is represented in the normalized relation layer and the resolved relation graph
-- its capability flags remain fenced until the join-table story is implemented
+- `t.manyToMany(...)` emits no storage `Field` on the owner row contract
+- implicit through models supply `Field[]` for the join table through the same inference pipeline as ordinary models
+- the resolved graph carries `throughTable`, through field names, and resolved physical keys for prefetch and join-row helpers
+- the forward edge stays `migratable: false` because the owner table still has no collection column; DDL ownership lives on the through model
 
-The seam already leaves space for auto-through and explicit-through metadata, so later M2M work can extend the relation pipeline without redesigning the seam again.
+Reverse many-to-many naming and inverse edges remain future graph work.
 
-A conceptual future ERD looks like this:
+A conceptual ERD for explicit through tables looks like this:
 
 <MermaidDiagram
     diagram-id="future-many-to-many-through-erd"

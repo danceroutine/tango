@@ -6,5 +6,5 @@
 export * as dialects from './dialects/index';
 
 export { AdapterRegistry, connectDB, getDefaultAdapterRegistry } from './AdapterRegistry';
-export type { Adapter, AdapterConfig } from './Adapter';
+export type { Adapter, AdapterConfig, SqlPlaceholders } from './Adapter';
 export { PostgresAdapter, SqliteAdapter } from './dialects/index';

@@ -30,7 +30,41 @@ export const UserModel = Model({
     }),
 });
 
-export const PostReadSchema = z.object({
+export const TagReadSchema = z.object({
+    id: z.number(),
+    name: z.string().min(1).max(80),
+    slug: z.string(),
+    createdAt: z.string(),
+});
+
+export const TagCreateSchema = z.object({
+    name: z.string().min(1).max(80),
+    slug: z.string().optional(),
+});
+
+export type Tag = z.output<typeof TagReadSchema>;
+
+export const TagModel = Model({
+    namespace: 'nuxt-blog',
+    name: 'Tag',
+    schema: TagReadSchema.extend({
+        id: t.primaryKey(z.number().int()),
+        name: t.unique(z.string().min(1).max(80)),
+        slug: t.unique(z.string()),
+        createdAt: t.field(z.string()).defaultValue({ now: true }).build(),
+    }),
+    hooks: {
+        async beforeCreate({ data }) {
+            return {
+                ...data,
+                slug: data.slug ?? slugify(String(data.name)),
+                createdAt: data.createdAt ?? new Date().toISOString(),
+            };
+        },
+    },
+});
+
+export const PostRecordSchema = z.object({
     id: z.number(),
     title: z.string().min(1).max(200),
     slug: z.string(),
@@ -49,14 +83,26 @@ export const PostCreateSchema = z.object({
     excerpt: z.string().optional(),
     authorId: z.number(),
     published: z.boolean().optional().default(false),
+    tags: z.array(z.string().min(1)).optional().default([]),
 });
 
-export type Post = z.output<typeof PostReadSchema>;
+export const PostTagSummarySchema = TagReadSchema.pick({
+    id: true,
+    name: true,
+    slug: true,
+});
+
+export const PostReadSchema = PostRecordSchema.extend({
+    tags: z.array(PostTagSummarySchema),
+});
+
+export type Post = z.output<typeof PostRecordSchema>;
+export type PostResource = z.output<typeof PostReadSchema>;
 
 export const PostModel = Model({
     namespace: 'nuxt-blog',
     name: 'Post',
-    schema: PostReadSchema.extend({
+    schema: PostRecordSchema.extend({
         id: t.primaryKey(z.number().int()),
         slug: t.unique(z.string()),
         authorId: t.foreignKey(t.modelRef<typeof UserModel>('nuxt-blog/User'), {
@@ -65,6 +111,9 @@ export const PostModel = Model({
             relatedName: 'posts',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
+        }),
+        tagIds: t.manyToMany(t.modelRef<typeof TagModel>('nuxt-blog/Tag'), {
+            name: 'tags',
         }),
         published: t.field(z.coerce.boolean()).defaultValue('false').build(),
         createdAt: t.field(z.string()).defaultValue({ now: true }).build(),

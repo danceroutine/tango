@@ -34,6 +34,7 @@ export default defineConfig({
     test: {
         globals: true,
         environment: 'node',
+        globalSetup: [fileURLToPath(new URL('./vitest.global-setup.ts', import.meta.url))],
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html', 'lcov'],
@@ -47,8 +48,8 @@ export default defineConfig({
                 '**/__tests__/**',
                 '**/*.test.{ts,tsx,js,jsx}',
                 '**/*.spec.{ts,tsx,js,jsx}',
+                '**/vitest.global-setup.ts',
             ],
-            all: true,
             thresholds: {
                 lines: 100,
                 functions: 100,

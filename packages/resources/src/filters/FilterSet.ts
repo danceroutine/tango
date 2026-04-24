@@ -1,17 +1,26 @@
 import { TangoQueryParams } from '@danceroutine/tango-core';
 import type { FilterInput, FilterKey, FilterValue, LookupType } from '@danceroutine/tango-orm';
 import { InternalFilterType } from './internal/InternalFilterType';
+import { InternalFilterLookup } from './internal/InternalFilterLookup';
 import type { RangeOperator } from './RangeOperator';
+
+const FILTER_LOOKUPS = Object.values(InternalFilterLookup) as readonly LookupType[];
+
+type FilterFieldRef<T extends Record<string, unknown>> = Extract<keyof T, string> | string;
+
+function isFilterLookup(value: string): value is LookupType {
+    return (FILTER_LOOKUPS as readonly string[]).includes(value);
+}
 
 /**
  * Configuration for how a query parameter should be resolved into a filter.
  * Supports scalar equality, case-insensitive search, range comparisons, IN queries, and custom logic.
  */
-export type FilterResolver<T> =
-    | { type: typeof InternalFilterType.SCALAR; column: keyof T }
-    | { type: typeof InternalFilterType.ILIKE; columns: (keyof T)[] }
-    | { type: typeof InternalFilterType.RANGE; column: keyof T; op: RangeOperator }
-    | { type: typeof InternalFilterType.IN; column: keyof T }
+export type FilterResolver<T extends Record<string, unknown>> =
+    | { type: typeof InternalFilterType.SCALAR; column: FilterFieldRef<T> }
+    | { type: typeof InternalFilterType.ILIKE; columns: FilterFieldRef<T>[] }
+    | { type: typeof InternalFilterType.RANGE; column: FilterFieldRef<T>; op: RangeOperator }
+    | { type: typeof InternalFilterType.IN; column: FilterFieldRef<T> }
     | {
           type: typeof InternalFilterType.CUSTOM;
           apply: (value: string | string[] | undefined) => FilterInput<T> | undefined;
@@ -33,20 +42,20 @@ export type FieldFilterDeclaration =
 export type AliasFilterDeclaration<T extends Record<string, unknown>> =
     | FilterResolver<T>
     | {
-          field: keyof T;
+          field: FilterFieldRef<T>;
           lookup?: FilterLookup;
           parse?: FilterValueParser;
       }
     | {
-          fields: readonly (keyof T)[];
+          fields: readonly FilterFieldRef<T>[];
           lookup?: FilterLookup;
           parse?: FilterValueParser;
       };
 
 export interface FilterSetDefineConfig<T extends Record<string, unknown>> {
-    fields?: Partial<Record<keyof T, FieldFilterDeclaration>>;
+    fields?: Partial<Record<string, FieldFilterDeclaration>>;
     aliases?: Record<string, AliasFilterDeclaration<T>>;
-    parsers?: Partial<Record<keyof T, FilterValueParser>>;
+    parsers?: Partial<Record<string, FilterValueParser>>;
     all?: '__all__';
 }
 
@@ -93,10 +102,10 @@ export class FilterSet<T extends Record<string, unknown>> {
         config: FilterSetDefineConfig<T>
     ): Record<string, FilterResolver<T>> {
         const spec: Record<string, FilterResolver<T>> = {};
-        const fieldDeclarations: Partial<Record<keyof T, FieldFilterDeclaration>> = config.fields ?? {};
-        const fieldParsers: Partial<Record<keyof T, FilterValueParser>> = config.parsers ?? {};
+        const fieldDeclarations: Partial<Record<string, FieldFilterDeclaration>> = config.fields ?? {};
+        const fieldParsers: Partial<Record<string, FilterValueParser>> = config.parsers ?? {};
 
-        for (const rawField of Object.keys(fieldDeclarations) as Array<keyof T>) {
+        for (const rawField of Object.keys(fieldDeclarations) as Array<FilterFieldRef<T>>) {
             const declaration = fieldDeclarations[rawField];
             if (declaration === undefined) continue;
             const parser = fieldParsers[rawField];
@@ -113,12 +122,12 @@ export class FilterSet<T extends Record<string, unknown>> {
 
     private static addFieldDeclaration<T extends Record<string, unknown>>(
         spec: Record<string, FilterResolver<T>>,
-        field: keyof T,
+        field: FilterFieldRef<T>,
         declaration: FieldFilterDeclaration,
         parser: FilterValueParser | undefined
     ): void {
         if (declaration === true) {
-            spec[String(field)] = FilterSet.createLookupResolver(field, 'exact', parser);
+            spec[String(field)] = FilterSet.createLookupResolver(field, InternalFilterLookup.EXACT, parser);
             return;
         }
 
@@ -130,7 +139,7 @@ export class FilterSet<T extends Record<string, unknown>> {
             return;
         }
 
-        const lookups = declaration.lookups ?? ['exact'];
+        const lookups = declaration.lookups ?? [InternalFilterLookup.EXACT];
         const baseParam = declaration.param ?? String(field);
         const effectiveParser = declaration.parse ?? parser;
 
@@ -152,11 +161,15 @@ export class FilterSet<T extends Record<string, unknown>> {
         }
 
         if ('fields' in declaration) {
-            const lookup = declaration.lookup ?? 'icontains';
+            const lookup = declaration.lookup ?? InternalFilterLookup.ICONTAINS;
             return FilterSet.createMultiFieldResolver(declaration.fields, lookup, declaration.parse);
         }
 
-        return FilterSet.createLookupResolver(declaration.field, declaration.lookup ?? 'exact', declaration.parse);
+        return FilterSet.createLookupResolver(
+            declaration.field,
+            declaration.lookup ?? InternalFilterLookup.EXACT,
+            declaration.parse
+        );
     }
 
     private static isFilterResolverDeclaration<T extends Record<string, unknown>>(
@@ -176,11 +189,11 @@ export class FilterSet<T extends Record<string, unknown>> {
     }
 
     private static createMultiFieldResolver<T extends Record<string, unknown>>(
-        fields: readonly (keyof T)[],
+        fields: readonly FilterFieldRef<T>[],
         lookup: FilterLookup,
         parser?: FilterValueParser
     ): FilterResolver<T> {
-        if (lookup === 'icontains' && parser === undefined) {
+        if (lookup === InternalFilterLookup.ICONTAINS && parser === undefined) {
             return { type: InternalFilterType.ILIKE, columns: [...fields] };
         }
 
@@ -203,7 +216,7 @@ export class FilterSet<T extends Record<string, unknown>> {
     }
 
     private static createLookupResolver<T extends Record<string, unknown>>(
-        field: keyof T,
+        field: FilterFieldRef<T>,
         lookup: FilterLookup,
         parser?: FilterValueParser
     ): FilterResolver<T> {
@@ -239,7 +252,7 @@ export class FilterSet<T extends Record<string, unknown>> {
     }
 
     private static resolveLookupFilter<T extends Record<string, unknown>>(
-        field: keyof T,
+        field: FilterFieldRef<T>,
         lookup: FilterLookup,
         value: ResolvedFilterValue | undefined
     ): FilterInput<T> | undefined {
@@ -296,7 +309,7 @@ export class FilterSet<T extends Record<string, unknown>> {
     /**
      * Return a new filter set with parser-aware scalar/range/in resolvers for matching fields.
      */
-    withFieldParsers(parsers: Partial<Record<keyof T, FilterValueParser>>): FilterSet<T> {
+    withFieldParsers(parsers: Partial<Record<string, FilterValueParser>>): FilterSet<T> {
         if (Object.keys(parsers).length === 0) {
             return this;
         }
@@ -345,17 +358,23 @@ export class FilterSet<T extends Record<string, unknown>> {
     }
 
     private buildAllResolver(param: string): FilterResolver<T> | undefined {
-        const [rawField, ...rawLookupParts] = param.split('__');
-        if (!rawField) {
+        const segments = param.split('__').filter(Boolean);
+        if (segments.length === 0) {
             return undefined;
         }
 
-        const field = rawField as keyof T;
-        if (rawLookupParts.length === 0) {
+        const lastSegment = segments.at(-1)!;
+        const lookup = isFilterLookup(lastSegment) ? lastSegment : 'exact';
+        const field = (lookup === 'exact' ? segments : segments.slice(0, -1)).join('__') as FilterFieldRef<T>;
+
+        if (!field) {
+            return undefined;
+        }
+
+        if (lookup === 'exact') {
             return { type: InternalFilterType.SCALAR, column: field };
         }
 
-        const lookup = rawLookupParts.join('__') as FilterLookup;
         return FilterSet.createLookupResolver(field, lookup);
     }
 
@@ -399,7 +418,7 @@ export class FilterSet<T extends Record<string, unknown>> {
 
     private applyFieldParserOverride(
         resolver: FilterResolver<T>,
-        parsers: Partial<Record<keyof T, FilterValueParser>>
+        parsers: Partial<Record<string, FilterValueParser>>
     ): FilterResolver<T> {
         switch (resolver.type) {
             case InternalFilterType.SCALAR: {

@@ -5,16 +5,40 @@
 declare global {
     interface TangoGeneratedRelationRegistry {
         'blog/Comment': {
-            author: { target: (typeof import('../src/models/index.ts'))['UserModel']; cardinality: 'single' };
-            post: { target: (typeof import('../src/models/index.ts'))['PostModel']; cardinality: 'single' };
+            author: {
+                target: (typeof import('../src/models/index.ts'))['UserModel'];
+                cardinality: 'single';
+                kind: 'belongsTo';
+            };
+            post: {
+                target: (typeof import('../src/models/index.ts'))['PostModel'];
+                cardinality: 'single';
+                kind: 'belongsTo';
+            };
         };
         'blog/Post': {
-            author: { target: (typeof import('../src/models/index.ts'))['UserModel']; cardinality: 'single' };
-            comments: { target: (typeof import('../src/models/index.ts'))['CommentModel']; cardinality: 'many' };
+            author: {
+                target: (typeof import('../src/models/index.ts'))['UserModel'];
+                cardinality: 'single';
+                kind: 'belongsTo';
+            };
+            comments: {
+                target: (typeof import('../src/models/index.ts'))['CommentModel'];
+                cardinality: 'many';
+                kind: 'hasMany';
+            };
         };
         'blog/User': {
-            comments: { target: (typeof import('../src/models/index.ts'))['CommentModel']; cardinality: 'many' };
-            posts: { target: (typeof import('../src/models/index.ts'))['PostModel']; cardinality: 'many' };
+            comments: {
+                target: (typeof import('../src/models/index.ts'))['CommentModel'];
+                cardinality: 'many';
+                kind: 'hasMany';
+            };
+            posts: {
+                target: (typeof import('../src/models/index.ts'))['PostModel'];
+                cardinality: 'many';
+                kind: 'hasMany';
+            };
         };
     }
 }

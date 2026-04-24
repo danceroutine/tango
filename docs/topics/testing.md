@@ -18,7 +18,7 @@ If the behavior depends on the adapter, request translation, route registration,
 
 Tango's mock helpers exist for tests that want the shape of Tango's contracts without paying the cost of a real database.
 
-That is the right level when application code depends on a model manager or query interface, but the test is really about the application's own branching, error handling, or result handling. In that situation, helpers such as `aManager`, `aQuerySet`, `aDBClient`, and `aQueryExecutor` let the test stay close to Tango's public contracts without pretending to prove real SQL behavior.
+That is the right level when application code depends on a model manager or query interface, but the test is really about the application's own branching, error handling, or result handling. In that situation, helpers such as `aManager`, `aModelQuerySet`, `aDBClient`, and `aQueryExecutor` let the test stay close to Tango's public contracts without pretending to prove real SQL behavior.
 
 This level is a good fit for:
 
@@ -28,11 +28,11 @@ This level is a good fit for:
 
 ```ts
 import { expect, it } from 'vitest';
-import { aManager, aQuerySet } from '@danceroutine/tango-testing';
+import { aManager, aModelQuerySet } from '@danceroutine/tango-testing';
 import type { PostModel } from '@/lib/models';
 
 it('tests service logic without starting a real database', async () => {
-    const queryset = aQuerySet<PostModel>({
+    const queryset = aModelQuerySet<PostModel>({
         fetchOne: async () => ({
             id: 1,
             title: 'Hello, Tango',
@@ -115,7 +115,12 @@ At this level, the database is part of the contract. The test is proving that th
 
 ```ts
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { TestHarness, applyAndVerifyMigrations, createQuerySetFixture, seedTable } from '@danceroutine/tango-testing';
+import {
+    TestHarness,
+    applyAndVerifyMigrations,
+    createModelQuerySetFixture,
+    seedTable,
+} from '@danceroutine/tango-testing';
 
 let harness: Awaited<ReturnType<typeof TestHarness.sqlite>>;
 
@@ -137,7 +142,7 @@ it('executes a queryset against the real test database', async () => {
         { id: 2, title: 'Draft', published: false },
     ]);
 
-    const queryset = createQuerySetFixture<{
+    const queryset = createModelQuerySetFixture<{
         id: number;
         title: string;
         published: boolean;

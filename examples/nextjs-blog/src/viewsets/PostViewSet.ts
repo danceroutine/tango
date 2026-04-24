@@ -47,6 +47,6 @@ export class PostViewSet extends ModelViewSet<Post, typeof PostSerializer> {
             published: true,
         } as Partial<Post>);
 
-        return TangoResponse.json(this.getSerializer().toRepresentation(updated));
+        return TangoResponse.json(await this.getSerializer().serialize(updated));
     }
 }

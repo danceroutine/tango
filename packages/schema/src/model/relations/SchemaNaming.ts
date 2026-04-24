@@ -28,3 +28,10 @@ export function pluralize(value: string): string {
 export function deriveTableName(name: string): string {
     return pluralize(toSnakeCase(name));
 }
+
+export function decapitalizeModelName(name: string): string {
+    if (name.length === 0) {
+        return name;
+    }
+    return `${name[0]!.toLowerCase()}${name.slice(1)}`;
+}

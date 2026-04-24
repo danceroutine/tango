@@ -1,5 +1,6 @@
 import type { ZodTypeAny } from './ZodTypeAny';
 import type { ReferentialOptions } from './TangoFieldMeta';
+import type { ModelRef } from './ModelRef';
 
 /**
  * Config object for `t.foreignKey(...)`.
@@ -35,4 +36,7 @@ export interface ManyToManyDecoratorConfig<TField extends ZodTypeAny = ZodTypeAn
     field?: TField;
     name?: string;
     relatedName?: never;
+    through?: ModelRef;
+    throughSourceFieldName?: string;
+    throughTargetFieldName?: string;
 }

@@ -40,7 +40,7 @@ describe(SqliteClient, () => {
         const updateStmt = createStmt();
         const deleteStmt = createStmt();
         const prepare = vi.fn((sql: string) => {
-            if (sql === 'BEGIN') return beginStmt;
+            if (sql === 'BEGIN IMMEDIATE') return beginStmt;
             if (sql === 'COMMIT') return commitStmt;
             if (sql === 'ROLLBACK') return rollbackStmt;
             if (sql === 'SAVEPOINT sp1') return savepointStmt;

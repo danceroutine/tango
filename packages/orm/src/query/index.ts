@@ -10,6 +10,7 @@ export type * from './domain/index';
 export type { TableMeta } from './domain/index';
 export { QueryResult } from './domain/index';
 export { QuerySet } from './QuerySet';
+export { ModelQuerySet } from './ModelQuerySet';
 export type { QueryExecutor } from './QuerySet';
 export { QBuilder, QBuilder as Q } from './QBuilder';
 export { QueryCompiler } from './compiler/index';

@@ -53,6 +53,8 @@ export class PostSerializer extends ModelSerializer<
 
 This is also one of the main boundaries in the API layer. Serializers own request-specific adaptation and representation. Persistence rules that should hold for every write belong lower in the model layer. If one endpoint accepts a convenience field, trims user input, or adapts one incoming shape into another, that work usually belongs on the serializer. If the rule should still apply when the same record is written from another endpoint or from a script, it belongs with the model instead.
 
+The same split matters for relations. A Tango model may expose a many-to-many relation as a related manager on the model instance, while the serializer still returns an array-shaped field in the HTTP response. That is not a contradiction; it is the intended boundary between model behavior and API representation, and it matches the serializer-first pattern familiar from Django REST Framework.
+
 ## Generic views add model-backed HTTP behavior
 
 Once an endpoint is backed by one model and one serializer, the next question is how much of the common HTTP behavior should be supplied by the framework.

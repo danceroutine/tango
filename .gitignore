@@ -15,5 +15,7 @@ coverage
 .vscode
 scrapnotes
 .temp
+.tmp-tango-*
+.tango-migrations-cli-*
 docs/.vitepress/cache
 packages/**/*.d.ts

@@ -14,6 +14,7 @@ export * as relations from './relations/index';
 
 export type { ModelDefinition } from './ModelDefinition';
 export { RelationBuilder } from './relations/index';
+export { ImplicitManyToManyIdentifier } from './relations/ImplicitManyToManyIdentifier';
 export { Model } from './Model';
 export { registerModelAugmentor } from './ModelAugmentorRegistry';
 export { Decorators, t } from './decorators/index';

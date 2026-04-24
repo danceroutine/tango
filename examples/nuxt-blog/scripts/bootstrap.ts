@@ -1,4 +1,13 @@
-import { CommentModel, PostModel, UserModel, type Comment, type Post, type User } from '../lib/models';
+import {
+    CommentModel,
+    PostModel,
+    TagModel,
+    UserModel,
+    type Comment,
+    type Post,
+    type Tag,
+    type User,
+} from '../lib/models';
 
 async function ensureUsers(targetUserCount = 8): Promise<readonly User[]> {
     const existing = await UserModel.objects.query().count();
@@ -46,6 +55,37 @@ async function ensurePosts(users: readonly User[], targetPostCount: number): Pro
     return (await PostModel.objects.query().orderBy('id').fetch()).toArray();
 }
 
+async function ensureTags(): Promise<readonly Tag[]> {
+    const existing = await TagModel.objects.query().count();
+    if (existing === 0) {
+        await TagModel.objects.bulkCreate([
+            { name: 'Tango', slug: 'tango', createdAt: new Date().toISOString() },
+            { name: 'Nuxt', slug: 'nuxt', createdAt: new Date().toISOString() },
+            { name: 'ORM', slug: 'orm', createdAt: new Date().toISOString() },
+            { name: 'Filtering', slug: 'filtering', createdAt: new Date().toISOString() },
+            { name: 'SQLite', slug: 'sqlite', createdAt: new Date().toISOString() },
+        ]);
+    }
+
+    return (await TagModel.objects.query().orderBy('id').fetch()).results;
+}
+
+async function ensurePostTags(posts: readonly Post[], tags: readonly Tag[]): Promise<void> {
+    for (const [index, post] of posts.entries()) {
+        const hydrated = await PostModel.objects.findById(post.id);
+        if (!hydrated) {
+            continue;
+        }
+
+        const first = tags[index % tags.length];
+        const second = tags[(index + 1) % tags.length];
+        const selected = [first, ...(index % 3 === 0 ? [second] : [])].filter((tag): tag is Tag => tag !== undefined);
+        if (selected.length > 0) {
+            await hydrated.tags.add(...selected);
+        }
+    }
+}
+
 async function ensureComments(users: readonly User[], posts: readonly Post[]): Promise<number> {
     const existing = await CommentModel.objects.query().count();
     if (existing > 0) {
@@ -86,10 +126,12 @@ async function ensureComments(users: readonly User[], posts: readonly Post[]): P
 export async function seedPosts(count = 1000): Promise<void> {
     const users = await ensureUsers();
     const posts = await ensurePosts(users, count);
+    const tags = await ensureTags();
+    await ensurePostTags(posts, tags);
     const createdComments = await ensureComments(users, posts);
 
     console.log(
-        `[nuxt-blog bootstrap] Ready with ${users.length} users, ${posts.length} posts, and ${createdComments || (await CommentModel.objects.query().count())} comments.`
+        `[nuxt-blog bootstrap] Ready with ${users.length} users, ${posts.length} posts, ${tags.length} tags, and ${createdComments || (await CommentModel.objects.query().count())} comments.`
     );
 }
 

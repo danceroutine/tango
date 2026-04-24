@@ -71,6 +71,7 @@ export class SqliteHarnessStrategy implements HarnessStrategy {
 
         const harness: IntegrationHarness = {
             dialect: Dialect.Sqlite,
+            adapter,
             capabilities: this.capabilities,
             resetMode,
             get dbClient(): DBClient {

@@ -12,10 +12,10 @@ export * as transaction from './transaction/index';
 export { AdapterRegistry, connectDB, getDefaultAdapterRegistry } from './connection/index';
 export type { Adapter, AdapterConfig, DBClient } from './connection/index';
 export { PostgresAdapter, SqliteAdapter } from './connection/index';
-export { ModelManager } from './manager/index';
-export type { ManagerLike } from './manager/index';
+export { ManyToManyRelatedManager, ModelManager } from './manager/index';
+export type { ManagerLike, ManyToManyTargetRef, MaterializedModelRecord } from './manager/index';
 
-export { Q, QBuilder, QueryCompiler, QueryResult, QuerySet } from './query/index';
+export { Q, QBuilder, QueryCompiler, QueryResult, QuerySet, ModelQuerySet } from './query/index';
 export type { QueryExecutor } from './query/index';
 export type {
     CompiledQuery,

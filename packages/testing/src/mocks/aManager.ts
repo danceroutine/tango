@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import type { ManagerLike, QuerySet } from '@danceroutine/tango-orm';
 import type { TableMeta } from '@danceroutine/tango-orm/query';
-import { aQuerySet } from './aQuerySet';
+import { aModelQuerySet } from './aModelQuerySet';
 
 export type ManagerOverrides<TModel extends Record<string, unknown>> = {
     meta?: TableMeta;
@@ -25,7 +25,7 @@ export function aManager<TModel extends Record<string, unknown>>(
     overrides: ManagerOverrides<TModel> = {}
 ): ManagerLike<TModel> {
     const meta = overrides.meta ?? { table: 'mock_table', pk: 'id', columns: {} };
-    const querySet = overrides.querySet ?? aQuerySet<TModel>();
+    const querySet = overrides.querySet ?? aModelQuerySet<TModel>();
     type ModelId = TModel[keyof TModel];
 
     const queryImpl = overrides.query ?? (() => querySet);

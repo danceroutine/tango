@@ -19,6 +19,7 @@
         "require-await": "off",
         "explicit-length-check": "off",
         "max-lines": "off",
+        "max-depth": "off",
         "no-extraneous-class": "off",
         "no-useless-undefined": "off",
         "no-inline-comments": "off",

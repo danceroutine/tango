@@ -172,9 +172,9 @@ describe(ModelManager, () => {
         expect(created).toEqual({ id: 1, email: 'user@example.com', active: 1 });
 
         const fetched = await manager.query().fetchOne();
-        expect(fetched).toEqual({ id: 1, email: 'user@example.com', active: 1 });
-        expect(await manager.findById(1)).toEqual({ id: 1, email: 'user@example.com', active: 1 });
-        expect(await manager.getOrThrow(1)).toEqual({ id: 1, email: 'user@example.com', active: 1 });
+        expect(fetched).toEqual({ id: 1, email: 'user@example.com', active: true });
+        expect(await manager.findById(1)).toEqual({ id: 1, email: 'user@example.com', active: true });
+        expect(await manager.getOrThrow(1)).toEqual({ id: 1, email: 'user@example.com', active: true });
 
         const updated = await manager.update(1, { email: 'updated@example.com' });
         expect(updated).toEqual({ id: 1, email: 'updated@example.com', active: 1 });
@@ -212,7 +212,7 @@ describe(ModelManager, () => {
             defaults: { id: 99, active: false },
         });
         expect(second.created).toBe(false);
-        expect(second.record).toEqual({ id: 1, email: 'user@example.com', active: 1 });
+        expect(second.record).toEqual({ id: 1, email: 'user@example.com', active: true });
     });
 
     it('raises when getOrCreate or updateOrCreate matches more than one existing row', async () => {
@@ -249,7 +249,11 @@ describe(ModelManager, () => {
 
         await expect(
             manager.getOrCreate({ where: { email__icontains: 'example' }, defaults: { id: 1 } })
-        ).rejects.toThrow('Cannot create User without any values.');
+        ).rejects.toThrow('Cannot create User from lookup-only filters without defaults.');
+
+        await expect(manager.getOrCreate({ where: { id: 7 }, defaults: { id: 7 } })).rejects.toThrow(
+            'Cannot create User without any values.'
+        );
 
         await expect(manager.getOrCreate({ where: Q.and({ active: true }) })).rejects.toThrow(
             'Cannot create User from Q filters without defaults.'
@@ -280,6 +284,13 @@ describe(ModelManager, () => {
                 },
             } as Parameters<ModelManager<UserRecord>['getOrCreate']>[0])
         ).rejects.toThrow('Cannot create User from Q filters without defaults.');
+
+        const createdFromLookupDefaults = await manager.getOrCreate({
+            where: { email__icontains: 'created-from-defaults' },
+            defaults: { id: 11, email: 'created@example.com', active: true },
+        });
+        expect(createdFromLookupDefaults.created).toBe(true);
+        expect(createdFromLookupDefaults.record).toEqual({ id: 11, email: 'created@example.com', active: 1 });
     });
 
     it('creates or updates through getOrCreate and updateOrCreate when the filter is a Q tree', async () => {
@@ -299,7 +310,7 @@ describe(ModelManager, () => {
             defaults: { id: 99, active: false },
         });
         expect(existing.created).toBe(false);
-        expect(existing.record).toEqual({ id: 1, email: 'q@example.com', active: 1 });
+        expect(existing.record).toEqual({ id: 1, email: 'q@example.com', active: true });
 
         await client.query('DELETE FROM users');
 
@@ -463,14 +474,14 @@ describe(ModelManager, () => {
         });
         expect(noop.created).toBe(false);
         expect(noop.updated).toBe(false);
-        expect(noop.record).toEqual({ id: 1, email: 'user@example.com', active: 0 });
+        expect(noop.record).toEqual({ id: 1, email: 'user@example.com', active: false });
 
         const noopBare = await manager.updateOrCreate({
             where: { email: 'user@example.com' },
         });
         expect(noopBare.created).toBe(false);
         expect(noopBare.updated).toBe(false);
-        expect(noopBare.record).toEqual({ id: 1, email: 'user@example.com', active: 0 });
+        expect(noopBare.record).toEqual({ id: 1, email: 'user@example.com', active: false });
 
         await client.query('DELETE FROM users');
 

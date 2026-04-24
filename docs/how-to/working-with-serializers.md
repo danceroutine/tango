@@ -96,7 +96,7 @@ That class now has three jobs:
 
 - `deserializeCreate(...)` validates unknown create-style input
 - `deserializeUpdate(...)` validates unknown update-style input
-- `toRepresentation(...)` shapes unknown data into the response contract
+- `serialize(...)` shapes data into the response contract
 
 Inside a custom endpoint, you would usually use the serializer in two steps: validate unknown input, then shape the response payload.
 
@@ -109,7 +109,7 @@ const preview = {
     excerpt: input.content.slice(0, 140),
 };
 
-const body = serializer.toRepresentation(preview);
+const body = await serializer.serialize(preview);
 ```
 
 That is the right pattern when the serializer should own the HTTP contract, but the endpoint itself still owns the application workflow.
@@ -146,6 +146,45 @@ At that point the serializer can:
 - shape the persisted record into the outward-facing response
 
 For many CRUD resources, that is enough by itself.
+
+This is also where many-to-many response shape belongs. A persisted Tango model instance may expose `post.tags` as a related manager rather than as an array. The serializer still owns the response contract, so if an API should return `tags`, declare that field on the serializer instead of expecting the model property itself to change shape. If you already know Django REST Framework, this is the same division of responsibility: the model keeps the related manager, while the serializer decides how that relation is rendered over HTTP.
+
+For the common cases, prefer `static relationFields`. A many-to-many field defaults to primary-key list behavior, and you can opt into nested output or slug-based writes when the API contract needs something richer.
+
+```ts
+export class PostSerializer extends ModelSerializer<
+    Post,
+    typeof PostCreateSchema,
+    typeof PostUpdateSchema,
+    typeof PostReadSchema,
+    MaterializedModelRecord<typeof PostModel.schema>
+> {
+    static readonly model = PostModel;
+    static readonly outputSchema = PostReadSchema;
+    static readonly relationFields = {
+        tags: relation.manyToMany({
+            read: relation.nested(TagSummarySchema),
+            write: relation.slugList({
+                model: TagModel,
+                lookupField: 'slug',
+                createIfMissing: true,
+                buildCreateInput: (slug) => ({ slug, name: slug }),
+            }),
+        }),
+    };
+}
+```
+
+If the API should keep the DRF-style default, make that explicit too:
+
+```ts
+static readonly relationFields = {
+    tags: relation.manyToMany({
+        read: relation.pkList(),
+        write: relation.pkList(),
+    }),
+};
+```
 
 ## Add resource-scoped normalization when the request contract needs it
 

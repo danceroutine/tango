@@ -1,14 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { anIntegrationHarness, type IntegrationHarness } from '../../integration';
 import type { TangoVitestHelpers } from '../registerVitestTango';
 
 describe('registerVitestTango', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it('exposes the vitest helpers for integration workflows', async () => {
         const assertMigrationPlan = vi.fn(async () => 'plan');
         const applyAndVerifyMigrations = vi.fn(async () => ({ statuses: [{ id: '001', applied: true }] }));
         const introspectSchema = vi.fn(async () => ({ tables: [] }));
         const seedTable = vi.fn(async () => {});
-        const createQuerySetFixture = vi.fn(() => ({ meta: { table: 'users' } }));
+        const createModelQuerySetFixture = vi.fn(() => ({ meta: { table: 'users' } }));
         const expectQueryResult = vi.fn(async () => {});
         const getRegistry = vi.fn(() => ({ list: () => [] }));
 
@@ -19,7 +23,7 @@ describe('registerVitestTango', () => {
             applyAndVerifyMigrations,
             introspectSchema,
             seedTable,
-            createQuerySetFixture,
+            createModelQuerySetFixture,
             expectQueryResult,
         }));
 
@@ -38,15 +42,16 @@ describe('registerVitestTango', () => {
         });
         await expect(helpers.introspectSchema()).resolves.toEqual({ tables: [] });
         await helpers.seedTable('users', [{ id: 1 }]);
-        helpers.createQuerySetFixture({ meta: { table: 'users', pk: 'id', columns: {} }, harness });
-        helpers.createQuerySetFixture({ meta: { table: 'users', pk: 'id', columns: {} } });
+        helpers.createModelQuerySetFixture({ meta: { table: 'users', pk: 'id', columns: {} }, harness });
+        helpers.createModelQuerySetFixture({ meta: { table: 'users', pk: 'id', columns: {} }, harness });
+        helpers.createModelQuerySetFixture({ meta: { table: 'users', pk: 'id', columns: {} } });
         await helpers.expectQueryResult([1], [1]);
 
         expect(assertMigrationPlan).toHaveBeenCalled();
         expect(applyAndVerifyMigrations).toHaveBeenCalled();
         expect(introspectSchema).toHaveBeenCalled();
         expect(seedTable).toHaveBeenCalled();
-        expect(createQuerySetFixture).toHaveBeenCalled();
+        expect(createModelQuerySetFixture).toHaveBeenCalledTimes(3);
         expect(expectQueryResult).toHaveBeenCalled();
     });
 
@@ -58,7 +63,7 @@ describe('registerVitestTango', () => {
             applyAndVerifyMigrations: vi.fn(),
             introspectSchema: vi.fn(),
             seedTable: vi.fn(),
-            createQuerySetFixture: vi.fn(),
+            createModelQuerySetFixture: vi.fn(),
             expectQueryResult: vi.fn(),
         }));
 
@@ -87,5 +92,33 @@ describe('registerVitestTango', () => {
                 },
             })
         ).toThrow('expected data to match schema');
+    });
+
+    it('warns once when the deprecated vitest queryset helper alias is used', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.resetModules();
+        vi.doMock('../../integration', () => ({
+            TestHarness: { getRegistry: () => ({}) },
+            assertMigrationPlan: vi.fn(),
+            applyAndVerifyMigrations: vi.fn(),
+            introspectSchema: vi.fn(),
+            seedTable: vi.fn(),
+            createModelQuerySetFixture: vi.fn(() => ({ meta: { table: 'users' } })),
+            expectQueryResult: vi.fn(),
+        }));
+
+        await import('../registerVitestTango');
+        const helpers = (vi as unknown as { tango: TangoVitestHelpers }).tango;
+        const harness: IntegrationHarness = anIntegrationHarness();
+        await helpers.useHarness(harness);
+
+        helpers.createQuerySetFixture({ meta: { table: 'users', pk: 'id', columns: {} } });
+        helpers.createQuerySetFixture({ meta: { table: 'users', pk: 'id', columns: {} } });
+
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy).toHaveBeenCalledWith(
+            '[tango.testing.vitest]',
+            '`vi.tango.createQuerySetFixture(...)` is deprecated. Use `vi.tango.createModelQuerySetFixture(...)` instead.'
+        );
     });
 });

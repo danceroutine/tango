@@ -13,7 +13,16 @@ export type ResourceModelMetadata = {
     fields: ResourceModelFieldMetadata[];
 };
 
-export type ResourceModelLike<TModel extends Record<string, unknown>> = {
-    readonly objects: ManagerLike<TModel>;
+export type ResourceModelLike<
+    TModel extends Record<string, unknown>,
+    TModelRecord extends Record<string, unknown> = TModel,
+> = {
+    /**
+     * Resource-layer contracts own the outward representation. The underlying
+     * model may materialize a richer ORM record, so the manager record type is kept
+     * separate from the serializer-facing model shape.
+     */
+    readonly objects: ManagerLike<TModelRecord>;
     readonly metadata?: ResourceModelMetadata;
+    readonly __tangoModelShape?: TModel;
 };

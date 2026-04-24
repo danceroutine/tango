@@ -303,8 +303,8 @@ describe(ModelRegistry, () => {
             kind: 'manyToMany',
             capabilities: {
                 migratable: false,
-                queryable: false,
-                hydratable: false,
+                queryable: true,
+                hydratable: true,
             },
         });
         expect(userRelations?.get('posts')).toMatchObject({
@@ -526,7 +526,7 @@ describe(ModelRegistry, () => {
         });
     });
 
-    it('supports object-form many-to-many names without changing capability fences', () => {
+    it('honors object-form many-to-many names for implicit joins', () => {
         const registry = new ModelRegistry();
 
         const TagModel = Model({
@@ -551,8 +551,8 @@ describe(ModelRegistry, () => {
             alias: 'post_labels',
             capabilities: {
                 migratable: false,
-                queryable: false,
-                hydratable: false,
+                queryable: true,
+                hydratable: true,
             },
         });
     });

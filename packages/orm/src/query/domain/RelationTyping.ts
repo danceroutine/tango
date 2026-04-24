@@ -5,6 +5,7 @@ import type {
     InternalDecoratedFieldKind,
     RelationDecoratedSchema,
 } from '@danceroutine/tango-schema/model';
+import type { ManyToManyRelatedManager } from '../../manager/relations/ManyToManyRelatedManager';
 
 export const InternalRelationHydrationCardinality = {
     SINGLE: 'single',
@@ -109,6 +110,22 @@ type NextGeneratedCycleBudget<TTargetModel, TSeen extends readonly string[], TCy
 type GeneratedCardinalityIncludesMany<TCardinality extends RelationHydrationCardinality> =
     TCardinality extends typeof InternalRelationHydrationCardinality.MANY ? true : false;
 
+/**
+ * Generated path keys accepted by `selectRelated(...)`.
+ *
+ * Walks the ambient relation registry one hop at a time. Each hop contributes:
+ *   (a) the bare relation key (e.g. `author`) as a valid path terminus, and
+ *   (b) a dunder-joined extension (`author__profile`, ...) that recurses into
+ *       the target model.
+ *
+ * Because `selectRelated` only composes single-valued hops, the mapped type
+ * filters relations whose `cardinality` is not `SINGLE`. The `TSeen` tuple
+ * tracks which model keys the recursion has visited so cyclic schemas
+ * (`manager -> manager`) are allowed a bounded number of revisits before
+ * typing falls back to `never`. `TCycleBudget` is that revisit budget; see
+ * `CanTraverseGeneratedTarget` / `NextGeneratedCycleBudget` for how it
+ * shrinks only when the next hop actually re-enters a seen model.
+ */
 export type GeneratedSelectRelatedPathKeys<
     TSourceModel,
     TSeen extends readonly string[] = [ModelKey<TSourceModel>],
@@ -130,6 +147,22 @@ export type GeneratedSelectRelatedPathKeys<
         : never;
 }[GeneratedRelationKeys<TSourceModel>];
 
+/**
+ * Generated path keys accepted by `prefetchRelated(...)`.
+ *
+ * Similar in shape to {@link GeneratedSelectRelatedPathKeys}, but relaxes two
+ * constraints because prefetch can cross and continue past collection edges:
+ *   1. Any hop whose cardinality is `MANY` is a valid terminus. The
+ *      `THasMany` flag threads through recursion so once a collection edge
+ *      has been crossed, every subsequent hop is also a valid terminus
+ *      (matches Django's `prefetch_related` semantics).
+ *   2. Single-valued hops are still accepted as terminators so paths like
+ *      `posts__author` survive the join.
+ *
+ * Cycle handling reuses the same `TSeen` / `TCycleBudget` machinery described
+ * in {@link GeneratedSelectRelatedPathKeys}: cyclic schemas are typed up to
+ * the bound, then fall back to weaker typing rather than failing.
+ */
 export type GeneratedPrefetchRelatedPathKeys<
     TSourceModel,
     THasMany extends boolean = false,
@@ -157,6 +190,20 @@ export type GeneratedPrefetchRelatedPathKeys<
         : never;
 }[GeneratedRelationKeys<TSourceModel>];
 
+/**
+ * Generated relation-path filter keys accepted by `filter(...)`, `exclude(...)`,
+ * and `Q(...)`.
+ *
+ * This stays intentionally lighter than the eager-loading path typing:
+ * applications with generated relation registries get completion for the
+ * relation path prefix, while the terminal field and lookup suffix remain a
+ * string tail so the compiler does not explode on deep recursive field
+ * extraction.
+ */
+export type GeneratedRelationFilterKeys<TSourceModel> =
+    | `${GeneratedSelectRelatedPathKeys<TSourceModel>}__${string}`
+    | `${GeneratedPrefetchRelatedPathKeys<TSourceModel>}__${string}`;
+
 // Hydrated target values recurse through the remaining path suffix, so a path
 // like `posts__author` becomes `{ posts: Array<{ author: ... }> }`.
 type GeneratedHydratedTarget<TDescriptor, TPath extends string | never> = TDescriptor extends {
@@ -168,12 +215,15 @@ type GeneratedHydratedTarget<TDescriptor, TPath extends string | never> = TDescr
     : never;
 
 type GeneratedHydratedValue<TDescriptor, TPath extends string | never> = TDescriptor extends {
-    cardinality: infer TCardinality extends RelationHydrationCardinality;
+    target: infer TTarget extends AnyModel;
+    kind: 'manyToMany';
 }
-    ? TCardinality extends typeof InternalRelationHydrationCardinality.SINGLE
-        ? GeneratedHydratedTarget<TDescriptor, TPath> | null
-        : GeneratedHydratedTarget<TDescriptor, TPath>[]
-    : never;
+    ? ManyToManyRelatedManager<ModelRow<TTarget>>
+    : TDescriptor extends { cardinality: infer TCardinality extends RelationHydrationCardinality }
+      ? TCardinality extends typeof InternalRelationHydrationCardinality.SINGLE
+          ? GeneratedHydratedTarget<TDescriptor, TPath> | null
+          : GeneratedHydratedTarget<TDescriptor, TPath>[]
+      : never;
 
 // Turn one path string into the object fragment it contributes before all path
 // fragments are merged into the final hydrated relation map.

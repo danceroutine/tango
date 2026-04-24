@@ -76,6 +76,7 @@ export class PostgresHarnessStrategy implements HarnessStrategy {
 
         const harness: IntegrationHarness = {
             dialect: Dialect.Postgres,
+            adapter,
             capabilities: this.capabilities,
             resetMode,
             get dbClient(): DBClient {

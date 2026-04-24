@@ -1,6 +1,10 @@
 import type { LoadedConfig } from '@danceroutine/tango-config';
 import type { DBClient } from '../connection/index';
+import type { Adapter } from '../connection/adapters/Adapter';
+import { PostgresAdapter } from '../connection/adapters/dialects/PostgresAdapter';
+import { SqliteAdapter } from '../connection/adapters/dialects/SqliteAdapter';
 import type { Dialect } from '../query/domain/index';
+import { InternalDialect } from '../query/domain/internal/InternalDialect';
 import { RuntimeBoundClient } from '../manager/internal/RuntimeBoundClient';
 import type { DBClientProvider, TransactionClientLease } from './internal/DBClientProvider';
 import { createDBClientProvider } from './internal/createDBClientProvider';
@@ -15,6 +19,7 @@ export class TangoRuntime {
     private readonly loadedConfig: LoadedConfig;
     private providerPromise: Promise<DBClientProvider> | null = null;
     private runtimeClientPromise: Promise<DBClient> | null = null;
+    private cachedAdapter: Adapter | null = null;
 
     constructor(loadLoadedConfig: () => LoadedConfig) {
         this.loadedConfig = loadLoadedConfig();
@@ -43,6 +48,18 @@ export class TangoRuntime {
      */
     getDialect(): Dialect {
         return this.loadedConfig.current.db.adapter;
+    }
+
+    /**
+     * Return the adapter backing the configured dialect. Manager-side
+     * compilers use this to obtain placeholder formatters and dialect
+     * capabilities without branching on the raw dialect string.
+     */
+    getAdapter(): Adapter {
+        if (!this.cachedAdapter) {
+            this.cachedAdapter = this.buildAdapterForDialect(this.getDialect());
+        }
+        return this.cachedAdapter;
     }
 
     /**
@@ -85,6 +102,15 @@ export class TangoRuntime {
         this.providerPromise = null;
         this.runtimeClientPromise = null;
         await provider.reset();
+    }
+
+    private buildAdapterForDialect(dialect: Dialect): Adapter {
+        switch (dialect) {
+            case InternalDialect.POSTGRES:
+                return new PostgresAdapter();
+            case InternalDialect.SQLITE:
+                return new SqliteAdapter();
+        }
     }
 
     private async getProvider(): Promise<DBClientProvider> {

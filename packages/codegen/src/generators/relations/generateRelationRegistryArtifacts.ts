@@ -1,5 +1,6 @@
 import {
     GENERATED_RELATION_REGISTRY_METADATA_VERSION,
+    ImplicitManyToManyIdentifier,
     type GeneratedRelationRegistryArtifact,
     type ResolvedRelationGraphSnapshot,
 } from '@danceroutine/tango-schema';
@@ -24,8 +25,15 @@ export function generateRelationRegistryArtifacts({
     fingerprint,
     modelTypeAccessors,
 }: GenerateRelationRegistryArtifactsInput): GeneratedRelationRegistryArtifacts {
-    for (const model of snapshot.models) {
+    const publicModels = snapshot.models.filter(
+        (model) => !ImplicitManyToManyIdentifier.isImplicitManyToManyModel(model.key)
+    );
+
+    for (const model of publicModels) {
         for (const relation of model.relations) {
+            if (ImplicitManyToManyIdentifier.isImplicitManyToManyModel(relation.targetModelKey)) {
+                continue;
+            }
             if (!relation.capabilities.hydratable) {
                 continue;
             }
@@ -44,14 +52,18 @@ export function generateRelationRegistryArtifacts({
         ' */',
         'declare global {',
         '    interface TangoGeneratedRelationRegistry {',
-        ...snapshot.models.map((model: ResolvedRelationGraphSnapshot['models'][number]) => {
-            const hydratableRelations = model.relations.filter((relation) => relation.capabilities.hydratable);
+        ...publicModels.map((model: ResolvedRelationGraphSnapshot['models'][number]) => {
+            const hydratableRelations = model.relations.filter(
+                (relation) =>
+                    relation.capabilities.hydratable &&
+                    !ImplicitManyToManyIdentifier.isImplicitManyToManyModel(relation.targetModelKey)
+            );
             const relationLines =
                 hydratableRelations.length === 0
                     ? ['            [key: string]: never;']
                     : hydratableRelations.map(
                           (relation: ResolvedRelationGraphSnapshot['models'][number]['relations'][number]) =>
-                              `            ${JSON.stringify(relation.name)}: { target: ${modelTypeAccessors[relation.targetModelKey]}; cardinality: ${JSON.stringify(relation.cardinality)} };`
+                              `            ${JSON.stringify(relation.name)}: { target: ${modelTypeAccessors[relation.targetModelKey]}; cardinality: ${JSON.stringify(relation.cardinality)}; kind: ${JSON.stringify(relation.kind)} };`
                       );
 
             return [`        ${JSON.stringify(model.key)}: {`, ...relationLines, '        };'].join('\n');

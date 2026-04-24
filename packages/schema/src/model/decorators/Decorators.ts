@@ -381,6 +381,17 @@ function manyToMany<T extends ZodTypeAny>(
     }
 
     const config = schemaOrConfig;
+
+    const hasPartialThroughConfig =
+        (config?.through !== undefined ||
+            config?.throughSourceFieldName !== undefined ||
+            config?.throughTargetFieldName !== undefined) &&
+        !(config?.through && config.throughSourceFieldName && config.throughTargetFieldName);
+    if (hasPartialThroughConfig) {
+        throw new Error(
+            't.manyToMany(...) through config requires through, throughSourceFieldName, and throughTargetFieldName.'
+        );
+    }
     const schema = config?.field ?? z.array(z.number().int());
     return applyRelationMetadata(
         schema,
@@ -388,6 +399,9 @@ function manyToMany<T extends ZodTypeAny>(
             relationKind: InternalDecoratedFieldKind.MANY_TO_MANY,
             references: {
                 target,
+                through: config?.through,
+                throughSourceFieldName: config?.throughSourceFieldName,
+                throughTargetFieldName: config?.throughTargetFieldName,
             },
         },
         config

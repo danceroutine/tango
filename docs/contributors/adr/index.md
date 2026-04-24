@@ -6,5 +6,6 @@ Each ADR records the problem, the considered options, the decision, and the cons
 
 ## Records
 
+- [Implicit many-to-many through tables](/contributors/adr/implicit-many-to-many-through-tables)
 - [Deep relation hydration with generated path typing](/contributors/adr/deep-relation-hydration-with-generated-path-typing)
 - [Relation target typing without codegen](/contributors/adr/relation-target-typing-without-codegen)

@@ -1,5 +1,19 @@
-export type SqlInjectionApplicablePosition = 'identifier' | 'value' | 'order' | 'relation' | 'lookup_key';
-export type SqlInjectionExpectedBehavior = 'reject' | 'parameterize';
+export const InternalSqlInjectionApplicablePosition = {
+    IDENTIFIER: 'identifier',
+    VALUE: 'value',
+    ORDER: 'order',
+    RELATION: 'relation',
+    LOOKUP_KEY: 'lookup_key',
+} as const;
+export type SqlInjectionApplicablePosition =
+    (typeof InternalSqlInjectionApplicablePosition)[keyof typeof InternalSqlInjectionApplicablePosition];
+
+export const InternalSqlInjectionExpectedBehavior = {
+    REJECT: 'reject',
+    PARAMETERIZE: 'parameterize',
+} as const;
+export type SqlInjectionExpectedBehavior =
+    (typeof InternalSqlInjectionExpectedBehavior)[keyof typeof InternalSqlInjectionExpectedBehavior];
 
 export interface SqlInjectionCase {
     id: string;

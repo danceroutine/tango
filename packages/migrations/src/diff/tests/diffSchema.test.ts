@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { isTrustedSqlFragment } from '@danceroutine/tango-core';
+import { Model, ModelRegistry, t } from '@danceroutine/tango-schema';
+import { z } from 'zod';
 import { diffSchema } from '../diffSchema';
 import type { DbSchema } from '../../introspect/PostgresIntrospector';
+import { buildMigrationModelMetadataProjection } from '../../schema/buildMigrationModelMetadataProjection';
 
 type Models = Parameters<typeof diffSchema>[1];
 
@@ -378,7 +381,7 @@ describe(diffSchema, () => {
         expect(ops.some((op) => op.kind === 'column.drop' && op.column === 'old_field')).toBe(true);
     });
 
-    it('generates drop table for removed model', () => {
+    it('does not drop extra database tables that have no modeled representation', () => {
         const dbSchema: DbSchema = {
             tables: {
                 old_table: {
@@ -395,7 +398,24 @@ describe(diffSchema, () => {
 
         const ops = diffSchema(dbSchema, models as Models);
 
-        expect(ops.some((op) => op.kind === 'table.drop' && op.table === 'old_table')).toBe(true);
+        expect(ops.some((op) => op.kind === 'table.drop' && op.table === 'old_table')).toBe(false);
+    });
+
+    it('skips unmanaged models when generating migration operations', () => {
+        const dbSchema: DbSchema = { tables: {} };
+        const models = [
+            {
+                name: 'Legacy',
+                table: 'legacy_rows',
+                managed: false,
+                fields: [{ name: 'id', type: 'serial', primaryKey: true, notNull: true }],
+                indexes: [],
+            },
+        ];
+
+        const ops = diffSchema(dbSchema, models as Models);
+
+        expect(ops).toHaveLength(0);
     });
 
     it('handles no changes', () => {
@@ -491,7 +511,7 @@ describe(diffSchema, () => {
 
         const ops = diffSchema(dbSchema, models as Models);
         expect(ops.some((operation) => operation.kind === 'index.drop' && operation.name === 'users_legacy_idx')).toBe(
-            true
+            false
         );
         expect(
             ops.some((operation) => operation.kind === 'table.drop' && operation.table === '_tango_migrations')
@@ -540,5 +560,149 @@ describe(diffSchema, () => {
         const ops = diffSchema(dbSchema, models as Models);
         expect(ops.some((operation) => operation.kind === 'index.create')).toBe(false);
         expect(ops.some((operation) => operation.kind === 'index.drop')).toBe(false);
+    });
+
+    it('adds tag and implicit join tables without dropping unrelated existing indexes', () => {
+        ModelRegistry.clear();
+
+        const dbSchema: DbSchema = {
+            tables: {
+                users: {
+                    name: 'users',
+                    columns: {
+                        id: { name: 'id', type: 'integer', notNull: true, default: null, isPk: true, isUnique: false },
+                        email: {
+                            name: 'email',
+                            type: 'text',
+                            notNull: true,
+                            default: null,
+                            isPk: false,
+                            isUnique: true,
+                        },
+                    },
+                    pks: ['id'],
+                    indexes: {},
+                    fks: {},
+                },
+                posts: {
+                    name: 'posts',
+                    columns: {
+                        id: { name: 'id', type: 'integer', notNull: true, default: null, isPk: true, isUnique: false },
+                        authorId: {
+                            name: 'authorId',
+                            type: 'integer',
+                            notNull: true,
+                            default: null,
+                            isPk: false,
+                            isUnique: false,
+                        },
+                        published: {
+                            name: 'published',
+                            type: 'boolean',
+                            notNull: true,
+                            default: 'false',
+                            isPk: false,
+                            isUnique: false,
+                        },
+                    },
+                    pks: ['id'],
+                    indexes: {
+                        idx_posts_authorId: {
+                            name: 'idx_posts_authorId',
+                            table: 'posts',
+                            unique: false,
+                            columns: ['authorId'],
+                            where: null,
+                        },
+                        idx_posts_published: {
+                            name: 'idx_posts_published',
+                            table: 'posts',
+                            unique: false,
+                            columns: ['published'],
+                            where: null,
+                        },
+                    },
+                    fks: {},
+                },
+                comments: {
+                    name: 'comments',
+                    columns: {
+                        id: { name: 'id', type: 'integer', notNull: true, default: null, isPk: true, isUnique: false },
+                        postId: {
+                            name: 'postId',
+                            type: 'integer',
+                            notNull: true,
+                            default: null,
+                            isPk: false,
+                            isUnique: false,
+                        },
+                    },
+                    pks: ['id'],
+                    indexes: {
+                        idx_comments_postId: {
+                            name: 'idx_comments_postId',
+                            table: 'comments',
+                            unique: false,
+                            columns: ['postId'],
+                            where: null,
+                        },
+                    },
+                    fks: {},
+                },
+            },
+        };
+
+        Model({
+            namespace: 'blog',
+            name: 'User',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                email: t.unique(z.string()),
+            }),
+        });
+        Model({
+            namespace: 'blog',
+            name: 'Tag',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                slug: t.unique(z.string()),
+            }),
+        });
+        Model({
+            namespace: 'blog',
+            name: 'Post',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                authorId: t.foreignKey('blog/User', { field: z.number().int() }),
+                published: z.boolean(),
+                tagIds: t.manyToMany('blog/Tag', { name: 'tags' }),
+            }),
+        });
+        Model({
+            namespace: 'blog',
+            name: 'Comment',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                postId: t.foreignKey('blog/Post', { field: z.number().int() }),
+            }),
+        });
+
+        const projection = buildMigrationModelMetadataProjection(ModelRegistry.global());
+        const ops = diffSchema(dbSchema, projection as Models);
+
+        expect(ops.some((operation) => operation.kind === 'index.drop')).toBe(false);
+        expect(ops.some((operation) => operation.kind === 'table.create' && operation.table === 'tags')).toBe(true);
+        expect(ops.some((operation) => operation.kind === 'table.create' && operation.table.startsWith('m2m_'))).toBe(
+            true
+        );
+        expect(
+            ops.some(
+                (operation) =>
+                    operation.kind === 'index.create' &&
+                    operation.table.startsWith('m2m_') &&
+                    operation.unique === true &&
+                    operation.on.length === 2
+            )
+        ).toBe(true);
     });
 });

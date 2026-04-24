@@ -1,15 +1,14 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
-import { MultipleObjectsReturned, NotFoundError } from '@danceroutine/tango-core';
-import type { QNode } from '../domain/QNode';
 import { aQueryExecutor, aRelationMeta } from '@danceroutine/tango-testing';
 import { Model, t, type PersistedModelOutput } from '@danceroutine/tango-schema';
 import { z } from 'zod';
+import { ModelQuerySet } from '../ModelQuerySet';
 import { QuerySet } from '../QuerySet';
-import type { QueryResult } from '../domain/QueryResult';
 import { QBuilder as Q } from '../QBuilder';
 import type { HydratedQueryResult } from '../domain/RelationTyping';
 import type { TableMeta } from '../domain/TableMeta';
 import type { CompiledQuery } from '../domain/CompiledQuery';
+import { InternalPrefetchQueryKind } from '../domain/internal/InternalPrefetchQueryKind';
 import { InternalRelationKind } from '../domain/internal/InternalRelationKind';
 
 type User = {
@@ -20,11 +19,6 @@ type User = {
 
 type MultiBoolUser = User & {
     verified: boolean;
-};
-
-type QuerySetPrivateHelpers = {
-    normalizeHydratedRowsForParserShape(rows: readonly User[]): User[];
-    shapeFetchedRow<Out>(row: User, shape: { parse(value: User): Out }): Out;
 };
 
 const TypedUserModel = Model({
@@ -146,8 +140,6 @@ function createQueryExecutorFixture(
     dialect: 'postgres' | 'sqlite' = 'postgres',
     tableMeta: TableMeta = meta
 ) {
-    // TODO: relation metadata setup is becoming noisy in local QuerySet tests. Move this fixture shape into
-    // aQueryExecutor once the relation-hydration test cases settle.
     const run = vi.fn(async (_compiled: { sql: string; params: readonly unknown[] }) => rows);
     const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => ({ rows: [{ count: rows.length }] }));
     const queryExecutor = aQueryExecutor<User>({ meta: tableMeta, dialect, query, run });
@@ -161,7 +153,7 @@ describe(QuerySet, () => {
             'postgres',
             relatedMeta
         );
-        const qs = new QuerySet<User>(queryExecutor);
+        const qs = new ModelQuerySet<User>(queryExecutor);
 
         const result = await qs
             .filter({ active: true })
@@ -174,76 +166,22 @@ describe(QuerySet, () => {
             .prefetchRelated('posts')
             .fetch();
 
-        expect(result.items).toEqual([{ id: 1, email: 'a@a.com', team: null, posts: [] }]);
+        expect(result.results).toEqual([{ id: 1, email: 'a@a.com', team: null, posts: [] }]);
         expect(run).toHaveBeenCalledOnce();
         expect(QuerySet.isQuerySet(qs)).toBe(true);
         expect(QuerySet.isQuerySet({})).toBe(false);
     });
 
-    it('yields fetched rows when async-iterating a queryset', async () => {
-        const { queryExecutor } = createQueryExecutorFixture(
-            [{ id: 1, email: 'a@a.com', active: true } as User, { id: 2, email: 'b@a.com', active: false } as User],
-            'postgres',
-            relatedMeta
-        );
-        const qs = new QuerySet<User>(queryExecutor).orderBy('id');
-        const collected: User[] = [];
-        for await (const record of qs) {
-            collected.push(record);
-        }
-        expect(collected).toEqual([
-            { id: 1, email: 'a@a.com', active: true },
-            { id: 2, email: 'b@a.com', active: false },
-        ]);
-    });
+    it('clones the current queryset state when all() is called', async () => {
+        const { queryExecutor, run } = createQueryExecutorFixture([{ id: 1, email: 'all@a.com', active: true }]);
+        const base = new ModelQuerySet<User>(queryExecutor).filter({ active: true }).orderBy('-id');
 
-    it('issues a single database read per async-iteration of a queryset', async () => {
-        const { queryExecutor, run } = createQueryExecutorFixture(
-            [{ id: 1, email: 'a@a.com', active: true } as User],
-            'postgres',
-            relatedMeta
-        );
-        const qs = new QuerySet<User>(queryExecutor);
-        for await (const _ of qs) {
-            break;
-        }
-        expect(run).toHaveBeenCalledTimes(1);
-    });
+        const cloned = base.all();
+        await cloned.fetch();
 
-    it('reuses the cached result across repeated fetch calls on the same queryset', async () => {
-        const { queryExecutor, run } = createQueryExecutorFixture(
-            [{ id: 1, email: 'a@a.com', active: true } as User],
-            'postgres',
-            relatedMeta
-        );
-        const qs = new QuerySet<User>(queryExecutor);
-
-        const first = await qs.fetch();
-        const second = await qs.fetch();
-
-        expect(first).toBe(second);
+        expect(cloned).not.toBe(base);
         expect(run).toHaveBeenCalledOnce();
-    });
-
-    it('reuses the cached result across repeated async iterations of the same queryset', async () => {
-        const { queryExecutor, run } = createQueryExecutorFixture(
-            [{ id: 1, email: 'a@a.com', active: true } as User, { id: 2, email: 'b@a.com', active: false } as User],
-            'postgres',
-            relatedMeta
-        );
-        const qs = new QuerySet<User>(queryExecutor);
-        const firstPass: User[] = [];
-        const secondPass: User[] = [];
-
-        for await (const row of qs) {
-            firstPass.push(row);
-        }
-        for await (const row of qs) {
-            secondPass.push(row);
-        }
-
-        expect(firstPass).toEqual(secondPass);
-        expect(run).toHaveBeenCalledOnce();
+        expect(run.mock.calls[0]?.[0]?.sql ?? '').toContain('ORDER BY users.id DESC');
     });
 
     it('hydrates single-valued selectRelated rows from aliased target columns', async () => {
@@ -265,9 +203,9 @@ describe(QuerySet, () => {
         ]);
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('team').fetch();
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor).selectRelated('team').fetch();
 
-        expect(result.items).toEqual([
+        expect(result.results).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -281,7 +219,7 @@ describe(QuerySet, () => {
                 team: null,
             },
         ]);
-        expect(Object.keys(result.items[0]!)).not.toContain('__tango_hydrate_team_id');
+        expect(Object.keys(result.results[0]!)).not.toContain('__tango_hydrate_team_id');
     });
 
     it('hydrates hasMany prefetch rows with stable grouping and base row order', async () => {
@@ -299,9 +237,9 @@ describe(QuerySet, () => {
         }));
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run, query });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('posts').fetch();
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('posts').fetch();
 
-        expect(result.items).toEqual([
+        expect(result.results).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -344,9 +282,9 @@ describe(QuerySet, () => {
         ]);
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('team').fetch();
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor).selectRelated('team').fetch();
 
-        expect(result.items[0]!.team).toBe(result.items[1]!.team);
+        expect(result.results[0]!.team).toBe(result.results[1]!.team);
     });
 
     it('normalizes sqlite target booleans during relation hydration', async () => {
@@ -388,12 +326,12 @@ describe(QuerySet, () => {
             query,
         });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor)
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor)
             .selectRelated('team')
             .prefetchRelated('posts')
             .fetch({ parse: (row) => row });
 
-        expect(result.items).toEqual([
+        expect(result.results).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -412,12 +350,12 @@ describe(QuerySet, () => {
         const query = vi.fn(async () => ({ rows: [] as Record<string, unknown>[] }));
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run, query });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor)
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor)
             .select(['email'] as const)
             .prefetchRelated('posts')
             .fetch();
 
-        expect(result.items).toEqual([{ email: 'a@a.com', posts: [] }]);
+        expect(result.results).toEqual([{ email: 'a@a.com', posts: [] }]);
         expect(query).toHaveBeenCalledWith(expect.stringContaining('author_id IN'), [1]);
     });
 
@@ -436,19 +374,19 @@ describe(QuerySet, () => {
         }));
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run, query });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor)
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor)
             .select(['email'] as const)
             .prefetchRelated('posts', 'articles')
             .fetch();
 
-        expect(result.items).toEqual([
+        expect(result.results).toEqual([
             {
                 email: 'a@a.com',
                 posts: [{ id: 100, author_id: 1, title: 'Hydration' }],
                 articles: [{ id: 200, author_id: 1, headline: 'Type-safe relations' }],
             },
         ]);
-        expect(result.items[0]).not.toHaveProperty('__tango_prefetch_posts_id');
+        expect(result.results[0]).not.toHaveProperty('__tango_prefetch_posts_id');
         expect(query).toHaveBeenCalledTimes(2);
         expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('author_id IN'), [1]);
         expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('author_id IN'), [1]);
@@ -489,11 +427,11 @@ describe(QuerySet, () => {
         }));
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: nestedMeta, run, query });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor)
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor)
             .prefetchRelated('posts__comments')
             .fetch();
 
-        expect(result.items).toEqual([
+        expect(result.results).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -558,11 +496,11 @@ describe(QuerySet, () => {
             query,
         });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor)
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor)
             .prefetchRelated('team__posts')
             .fetch();
 
-        expect(result.items).toEqual([
+        expect(result.results).toEqual([
             {
                 id: 1,
                 email: 'a@a.com',
@@ -599,7 +537,7 @@ describe(QuerySet, () => {
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run, query });
 
         await expect(
-            new QuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('posts').fetch()
+            new ModelQuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('posts').fetch()
         ).rejects.toThrow(/failed validation/i);
         expect(query).not.toHaveBeenCalled();
     });
@@ -609,9 +547,9 @@ describe(QuerySet, () => {
         const query = vi.fn(async () => ({ rows: [] as Record<string, unknown>[] }));
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run, query });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('posts').fetch();
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('posts').fetch();
 
-        expect(result.items).toEqual([{ email: 'a@a.com', posts: [] }]);
+        expect(result.results).toEqual([{ email: 'a@a.com', posts: [] }]);
         expect(query).not.toHaveBeenCalled();
     });
 
@@ -639,14 +577,14 @@ describe(QuerySet, () => {
         ]);
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: shadowMeta, run });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('author').fetch();
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor).selectRelated('author').fetch();
 
-        expect(result.items).toEqual([{ id: 1, author: { id: 99, email: 'a@a.com' } }]);
+        expect(result.results).toEqual([{ id: 1, author: { id: 99, email: 'a@a.com' } }]);
     });
 
     it('skips join nodes without compiled join descriptors and no-ops empty prefetch owner batches', async () => {
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta });
-        const querySet = new QuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
+        const querySet = new ModelQuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
             hydrateJoinNodesForOwner: (
                 owner: Record<string, unknown>,
                 rawRow: Record<string, unknown>,
@@ -689,15 +627,22 @@ describe(QuerySet, () => {
     });
 
     it('can attach a private single-valued prefetch node for internal recursion branches', async () => {
-        const query = vi.fn(async () => ({ rows: [{ id: 10, owner_id: 1, email: 'team@example.com' }] }));
+        const query = vi.fn(async () => ({
+            rows: [
+                { id: 10, owner_id: 1, email: 'team@example.com' },
+                { id: 11, owner_id: 1, email: 'other@example.com' },
+                { id: null, owner_id: 1, email: 'ignored@example.com' },
+            ],
+        }));
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, query });
-        const querySet = new QuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
+        const querySet = new ModelQuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
             hydratePrefetchNode: (
                 node: Record<string, unknown>,
                 owners: readonly Record<string, unknown>[],
                 canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>,
                 compiler: {
                     compilePrefetch: () => {
+                        kind: typeof InternalPrefetchQueryKind.DIRECT;
                         sql: string;
                         params: readonly unknown[];
                         targetKey: string;
@@ -722,6 +667,7 @@ describe(QuerySet, () => {
             new Map(),
             {
                 compilePrefetch: () => ({
+                    kind: InternalPrefetchQueryKind.DIRECT,
                     sql: 'SELECT * FROM profiles WHERE owner_id IN ($1)',
                     params: [1],
                     targetKey: 'owner_id',
@@ -733,7 +679,7 @@ describe(QuerySet, () => {
         expect(owners).toEqual([{ id: 1, profile: { id: 10, owner_id: 1, email: 'team@example.com' } }]);
     });
 
-    it('rejects relation hydration collisions and unsupported many-to-many hydration', async () => {
+    it('rejects relation hydration collisions and unsupported hydration paths', async () => {
         const collisionMeta: TableMeta = {
             ...relatedMeta,
             columns: {
@@ -761,16 +707,325 @@ describe(QuerySet, () => {
         };
 
         await expect(
-            new QuerySet<Record<string, unknown>>(aQueryExecutor({ meta: collisionMeta })).selectRelated('team').fetch()
+            new ModelQuerySet<Record<string, unknown>>(aQueryExecutor({ meta: collisionMeta }))
+                .selectRelated('team')
+                .fetch()
         ).rejects.toThrow(/collides with an existing field/i);
         await expect(
-            new QuerySet<Record<string, unknown>>(aQueryExecutor({ meta: manyToManyMeta }))
+            new ModelQuerySet<Record<string, unknown>>(aQueryExecutor({ meta: manyToManyMeta }))
                 .prefetchRelated('tags')
                 .fetch()
-        ).rejects.toThrow(/many-to-many/i);
-        await expect(
-            new QuerySet<Record<string, unknown>>(aQueryExecutor({ meta: relatedMeta })).prefetchRelated('team').fetch()
-        ).rejects.toThrow(/prefetchRelated/);
+        ).rejects.toThrow(/cannot be hydrated/i);
+        const teamResult = await new ModelQuerySet<Record<string, unknown>>(aQueryExecutor({ meta: relatedMeta }))
+            .prefetchRelated('team')
+            .fetch();
+        expect(teamResult.results).toEqual([]);
+    });
+
+    it('can prefetch many-to-many relations and preserves duplicates', async () => {
+        const run = vi.fn(async () => [{ id: 1 }]);
+        const query = vi.fn(async (sql: string) => {
+            if (sql.includes('FROM post_tags')) {
+                return {
+                    rows: [
+                        { __tango_m2m_owner: 1, __tango_m2m_target: 10 },
+                        { __tango_m2m_owner: null, __tango_m2m_target: 10 },
+                        { __tango_m2m_owner: 2, __tango_m2m_target: 10 },
+                        { __tango_m2m_owner: 1, __tango_m2m_target: 10 },
+                        { __tango_m2m_owner: 1, __tango_m2m_target: 11 },
+                    ],
+                };
+            }
+            if (sql.includes('FROM tags')) {
+                return {
+                    rows: [
+                        { id: 10, name: 'a' },
+                        { id: 11, name: 'b' },
+                    ],
+                };
+            }
+            if (sql.includes('FROM posts')) {
+                return { rows: [] };
+            }
+            return { rows: [] };
+        });
+        const m2mMeta: TableMeta = {
+            table: 'posts',
+            pk: 'id',
+            columns: { id: 'int' },
+            relations: {
+                tags: {
+                    edgeId: 'tests/Post:tags',
+                    sourceModelKey: 'tests/Post',
+                    targetModelKey: 'tests/Tag',
+                    kind: InternalRelationKind.MANY_TO_MANY,
+                    cardinality: 'many',
+                    capabilities: {
+                        queryable: true,
+                        hydratable: true,
+                        joinable: false,
+                        prefetchable: true,
+                    },
+                    table: 'tags',
+                    sourceKey: 'id',
+                    targetKey: 'id',
+                    throughTable: 'post_tags',
+                    throughSourceKey: 'post_id',
+                    throughTargetKey: 'tag_id',
+                    targetPrimaryKey: 'id',
+                    targetColumns: { id: 'int', name: 'text' },
+                    alias: '__tango_join_posts_tags',
+                    targetMeta: {
+                        table: 'tags',
+                        pk: 'id',
+                        columns: { id: 'int', name: 'text' },
+                        relations: {
+                            posts: {
+                                edgeId: 'tests/Tag:posts',
+                                sourceModelKey: 'tests/Tag',
+                                targetModelKey: 'tests/Post',
+                                kind: InternalRelationKind.HAS_MANY,
+                                cardinality: 'many',
+                                capabilities: {
+                                    queryable: true,
+                                    hydratable: true,
+                                    joinable: false,
+                                    prefetchable: true,
+                                },
+                                table: 'posts',
+                                sourceKey: 'id',
+                                targetKey: 'tag_id',
+                                targetPrimaryKey: 'id',
+                                targetColumns: { id: 'int', tag_id: 'int' },
+                                alias: '__tango_join_tags_posts',
+                                targetMeta: {
+                                    table: 'posts',
+                                    pk: 'id',
+                                    columns: { id: 'int', tag_id: 'int' },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: m2mMeta, run, query });
+
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor)
+            .prefetchRelated('tags__posts')
+            .fetch();
+
+        const first = (result.results[0] as Record<string, unknown>).tags as Array<Record<string, unknown>>;
+        expect(first.map((tag) => tag.id)).toEqual([10, 10, 11]);
+        expect(first[0]).toBe(first[1]);
+        expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM posts'), expect.anything());
+    });
+
+    it('chunks prefetch owner ids deterministically', async () => {
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta });
+        const querySet = new ModelQuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
+            chunkValues: <T>(values: readonly T[], size: number) => T[][];
+        };
+
+        expect(querySet.chunkValues([], 2)).toEqual([]);
+        expect(querySet.chunkValues([1, 2], 2)).toEqual([[1, 2]]);
+        expect(querySet.chunkValues([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    });
+
+    it('primes the prefetch cache on attached managers when many-to-many rows are hydrated', async () => {
+        const run = vi.fn(async () => [{ id: 1 }, { id: 2 }]);
+        const query = vi.fn(async (sql: string) => {
+            if (sql.includes('FROM post_tags')) {
+                return {
+                    rows: [
+                        { __tango_m2m_owner: 1, __tango_m2m_target: 10 },
+                        { __tango_m2m_owner: 1, __tango_m2m_target: 11 },
+                    ],
+                };
+            }
+            if (sql.includes('FROM tags')) {
+                return {
+                    rows: [
+                        { id: 10, name: 'a' },
+                        { id: 11, name: 'b' },
+                    ],
+                };
+            }
+            return { rows: [] };
+        });
+        const m2mMeta: TableMeta = {
+            table: 'posts',
+            pk: 'id',
+            columns: { id: 'int' },
+            relations: {
+                tags: {
+                    edgeId: 'tests/Post:tags',
+                    sourceModelKey: 'tests/Post',
+                    targetModelKey: 'tests/Tag',
+                    kind: InternalRelationKind.MANY_TO_MANY,
+                    cardinality: 'many',
+                    capabilities: {
+                        queryable: true,
+                        hydratable: true,
+                        joinable: false,
+                        prefetchable: true,
+                    },
+                    table: 'tags',
+                    sourceKey: 'id',
+                    targetKey: 'id',
+                    throughTable: 'post_tags',
+                    throughSourceKey: 'post_id',
+                    throughTargetKey: 'tag_id',
+                    targetPrimaryKey: 'id',
+                    targetColumns: { id: 'int', name: 'text' },
+                    alias: '__tango_join_posts_tags',
+                    targetMeta: {
+                        table: 'tags',
+                        pk: 'id',
+                        columns: { id: 'int', name: 'text' },
+                    },
+                },
+            },
+        };
+        const primeCalls: Array<{ ownerId: unknown; rows: readonly Record<string, unknown>[] }> = [];
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({
+            meta: m2mMeta,
+            run,
+            query,
+            attachPersistedRecordAccessors: (record) => {
+                Object.defineProperty(record, 'tags', {
+                    enumerable: false,
+                    configurable: true,
+                    writable: true,
+                    value: {
+                        primePrefetchCache: (rows: readonly Record<string, unknown>[]) => {
+                            primeCalls.push({ ownerId: record.id, rows });
+                        },
+                    },
+                });
+            },
+        });
+
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('tags').fetch();
+
+        expect(primeCalls).toEqual([
+            {
+                ownerId: 1,
+                rows: [
+                    { id: 10, name: 'a' },
+                    { id: 11, name: 'b' },
+                ],
+            },
+            { ownerId: 2, rows: [] },
+        ]);
+        const results = result.results as Array<Record<string, unknown>>;
+        expect(results[0]!.tags).toBeDefined();
+        expect(results[1]!.tags).toBeDefined();
+        expect(Object.keys(results[0]!)).toEqual(['id']);
+    });
+
+    it('hydrates many-to-many relations as empty when no through pairs exist', async () => {
+        const run = vi.fn(async () => [{ id: 1 }]);
+        const query = vi.fn(async (sql: string) => {
+            if (sql.includes('FROM post_tags')) {
+                return { rows: [] };
+            }
+            if (sql.includes('FROM tags')) {
+                return { rows: [{ id: 10, name: 'a' }] };
+            }
+            return { rows: [] };
+        });
+        const m2mMeta: TableMeta = {
+            table: 'posts',
+            pk: 'id',
+            columns: { id: 'int' },
+            relations: {
+                tags: {
+                    edgeId: 'tests/Post:tags',
+                    sourceModelKey: 'tests/Post',
+                    targetModelKey: 'tests/Tag',
+                    kind: InternalRelationKind.MANY_TO_MANY,
+                    cardinality: 'many',
+                    capabilities: {
+                        queryable: true,
+                        hydratable: true,
+                        joinable: false,
+                        prefetchable: true,
+                    },
+                    table: 'tags',
+                    sourceKey: 'id',
+                    targetKey: 'id',
+                    throughTable: 'post_tags',
+                    throughSourceKey: 'post_id',
+                    throughTargetKey: 'tag_id',
+                    targetPrimaryKey: 'id',
+                    targetColumns: { id: 'int', name: 'text' },
+                    alias: '__tango_join_posts_tags',
+                    targetMeta: {
+                        table: 'tags',
+                        pk: 'id',
+                        columns: { id: 'int', name: 'text' },
+                    },
+                },
+            },
+        };
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: m2mMeta, run, query });
+
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('tags').fetch();
+        expect((result.results[0] as Record<string, unknown>).tags).toEqual([]);
+        expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM post_tags'), expect.anything());
+        expect(query).not.toHaveBeenCalledWith(expect.stringContaining('FROM tags'), expect.anything());
+    });
+
+    it('skips many-to-many target rows without a primary key', async () => {
+        const run = vi.fn(async () => [{ id: 1 }]);
+        const query = vi.fn(async (sql: string) => {
+            if (sql.includes('FROM post_tags')) {
+                return { rows: [{ __tango_m2m_owner: 1, __tango_m2m_target: 999 }] };
+            }
+            if (sql.includes('FROM tags')) {
+                return { rows: [{ id: null, name: 'a' }] };
+            }
+            return { rows: [] };
+        });
+        const m2mMeta: TableMeta = {
+            table: 'posts',
+            pk: 'id',
+            columns: { id: 'int' },
+            relations: {
+                tags: {
+                    edgeId: 'tests/Post:tags',
+                    sourceModelKey: 'tests/Post',
+                    targetModelKey: 'tests/Tag',
+                    kind: InternalRelationKind.MANY_TO_MANY,
+                    cardinality: 'many',
+                    capabilities: {
+                        queryable: true,
+                        hydratable: true,
+                        joinable: false,
+                        prefetchable: true,
+                    },
+                    table: 'tags',
+                    sourceKey: 'id',
+                    targetKey: 'id',
+                    throughTable: 'post_tags',
+                    throughSourceKey: 'post_id',
+                    throughTargetKey: 'tag_id',
+                    targetPrimaryKey: 'id',
+                    targetColumns: { id: 'int', name: 'text' },
+                    alias: '__tango_join_posts_tags',
+                    targetMeta: {
+                        table: 'tags',
+                        pk: 'id',
+                        columns: { id: 'int', name: 'text' },
+                    },
+                },
+            },
+        };
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: m2mMeta, run, query });
+
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('tags').fetch();
+        expect((result.results[0] as Record<string, unknown>).tags).toEqual([]);
     });
 
     it('merges duplicate prefetch requests and rejects unknown or invalid eager-loading paths', async () => {
@@ -778,68 +1033,68 @@ describe(QuerySet, () => {
         const query = vi.fn(async () => ({ rows: [] as Record<string, unknown>[] }));
         const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, run, query });
 
-        const result = await new QuerySet<Record<string, unknown>>(queryExecutor)
+        const result = await new ModelQuerySet<Record<string, unknown>>(queryExecutor)
             .prefetchRelated('posts', 'posts')
             .fetch();
 
-        expect(result.items).toEqual([{ id: 1, email: 'a@a.com', active: true, posts: [] }]);
+        expect(result.results).toEqual([{ id: 1, email: 'a@a.com', active: true, posts: [] }]);
         expect(query).toHaveBeenCalledOnce();
         await expect(
-            new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('missing').fetch()
+            new ModelQuerySet<Record<string, unknown>>(queryExecutor).selectRelated('missing').fetch()
         ).rejects.toThrow(/unknown relation/i);
         await expect(
-            new QuerySet<Record<string, unknown>>(queryExecutor).selectRelated('posts').fetch()
+            new ModelQuerySet<Record<string, unknown>>(queryExecutor).selectRelated('posts').fetch()
         ).rejects.toThrow(/selectRelated/i);
         await expect(
-            new QuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('team').fetch()
-        ).rejects.toThrow(/prefetchRelated/i);
+            new ModelQuerySet<Record<string, unknown>>(queryExecutor).prefetchRelated('team').fetch()
+        ).resolves.toBeDefined();
     });
 
     it('narrows fetched row types from literal select projections', async () => {
         const { queryExecutor } = createQueryExecutorFixture([{ id: 1, email: 'a@a.com', active: true }]);
-        const qs = new QuerySet<User>(queryExecutor).select(['id', 'email'] as const);
+        const qs = new ModelQuerySet<User>(queryExecutor).select(['id', 'email'] as const);
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User, Pick<User, 'id' | 'email'>>>();
-        expectTypeOf(result).toEqualTypeOf<QueryResult<Pick<User, 'id' | 'email'>>>();
+        expectTypeOf(result.items).toEqualTypeOf<ReadonlyArray<Pick<User, 'id' | 'email'>>>();
     });
 
     it('resets empty select projections back to the full row type', async () => {
         const { queryExecutor } = createQueryExecutorFixture([{ id: 1, email: 'a@a.com', active: true }]);
-        const qs = new QuerySet<User>(queryExecutor).select([]);
+        const qs = new ModelQuerySet<User>(queryExecutor).select([]);
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User>>();
-        expectTypeOf(result).toEqualTypeOf<QueryResult<User>>();
+        expectTypeOf(result.items).toEqualTypeOf<ReadonlyArray<User>>();
     });
 
     it('replaces prior projections when select is called again', async () => {
         const { queryExecutor } = createQueryExecutorFixture([{ id: 1, email: 'a@a.com', active: true }]);
-        const qs = new QuerySet<User>(queryExecutor).select(['id'] as const).select(['email'] as const);
+        const qs = new ModelQuerySet<User>(queryExecutor).select(['id'] as const).select(['email'] as const);
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User, Pick<User, 'email'>>>();
-        expectTypeOf(result).toEqualTypeOf<QueryResult<Pick<User, 'email'>>>();
+        expectTypeOf(result.items).toEqualTypeOf<ReadonlyArray<Pick<User, 'email'>>>();
     });
 
     it('types one-level relation hydration from field-authored relation metadata', () => {
         const postExecutor = aQueryExecutor<TypedPostRow>();
         const userExecutor = aQueryExecutor<TypedUserRow>();
 
-        const forward = new QuerySet<TypedPostRow, TypedPostRow, typeof TypedPostModel>(postExecutor).selectRelated(
-            'author'
-        );
+        const forward = new ModelQuerySet<TypedPostRow, TypedPostRow, typeof TypedPostModel>(
+            postExecutor
+        ).selectRelated('author');
 
-        const projected = new QuerySet<TypedPostRow, TypedPostRow, typeof TypedPostModel>(postExecutor)
+        const projected = new ModelQuerySet<TypedPostRow, TypedPostRow, typeof TypedPostModel>(postExecutor)
             .select(['id'] as const)
             .selectRelated('author')
             .select(['title'] as const);
 
-        const reverseSingle = new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
+        const reverseSingle = new ModelQuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
             userExecutor
         ).selectRelated<typeof TypedProfileModel>('profile');
 
-        const reverseMany = new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
+        const reverseMany = new ModelQuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
             userExecutor
         ).prefetchRelated<typeof TypedPostModel>('posts');
 
@@ -856,7 +1111,7 @@ describe(QuerySet, () => {
         expectTypeOf<ReverseSingleRow['profile']>().toMatchTypeOf<TypedProfileRow | null>();
         expectTypeOf<ReverseManyRow['posts']>().toMatchTypeOf<TypedPostRow[]>();
 
-        const reverseManyFromGenerated = new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
+        const reverseManyFromGenerated = new ModelQuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
             userExecutor
         ).prefetchRelated('posts');
         // This is still a compile-time assertion, not a runtime noop: it
@@ -867,14 +1122,14 @@ describe(QuerySet, () => {
             QuerySetRows<typeof reverseManyFromGenerated>[number]['posts'][number]
         >().toMatchTypeOf<TypedPostRow>();
 
-        new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(userExecutor).prefetchRelated<
+        new ModelQuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(userExecutor).prefetchRelated<
             typeof UnrelatedModel
         >('posts');
-        new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(userExecutor).selectRelated<
+        new ModelQuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(userExecutor).selectRelated<
             typeof TypedPostModel
             // @ts-expect-error collection relations cannot be loaded through selectRelated.
         >('posts');
-        new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(userExecutor).prefetchRelated<
+        new ModelQuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(userExecutor).prefetchRelated<
             typeof TypedProfileModel
             // @ts-expect-error single relations cannot be loaded through prefetchRelated.
         >('profile');
@@ -883,10 +1138,10 @@ describe(QuerySet, () => {
     it('types nested generated relation paths without explicit reverse generics', () => {
         const userExecutor = aQueryExecutor<TypedUserRow>();
 
-        const nestedSingle = new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
+        const nestedSingle = new ModelQuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
             userExecutor
         ).selectRelated('profile__user');
-        const nestedMany = new QuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
+        const nestedMany = new ModelQuerySet<TypedUserRow, TypedUserRow, typeof TypedUserModel>(
             userExecutor
         ).prefetchRelated('posts__author');
 
@@ -907,23 +1162,23 @@ describe(QuerySet, () => {
     it('falls back to the full row type for widened but key-safe select arrays', async () => {
         const cols: ReadonlyArray<keyof User> = ['id', 'email'];
         const { queryExecutor } = createQueryExecutorFixture([{ id: 1, email: 'a@a.com', active: true }]);
-        const qs = new QuerySet<User>(queryExecutor).select(cols);
+        const qs = new ModelQuerySet<User>(queryExecutor).select(cols);
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User>>();
-        expectTypeOf(result).toEqualTypeOf<QueryResult<User>>();
+        expectTypeOf(result.items).toEqualTypeOf<ReadonlyArray<User>>();
     });
 
     it('rejects non-key select arrays at compile time', () => {
         const cols = ['id', 'email'] as string[];
-        const qs = new QuerySet<User>(createQueryExecutorFixture().queryExecutor);
+        const qs = new ModelQuerySet<User>(createQueryExecutorFixture().queryExecutor);
 
         // @ts-expect-error select only accepts keys from the model row
         qs.select(cols);
     });
 
     it('surfaces a meaningful compile error when a projected queryset is widened back to QuerySet<TModel>', () => {
-        const projected = new QuerySet<User>(createQueryExecutorFixture().queryExecutor).select(['id'] as const);
+        const projected = new ModelQuerySet<User>(createQueryExecutorFixture().queryExecutor).select(['id'] as const);
 
         // @ts-expect-error projected querysets no longer satisfy QuerySet<TModel>
         const widened: QuerySet<User> = projected;
@@ -934,7 +1189,7 @@ describe(QuerySet, () => {
 
     it('merges filters when chaining filter twice', async () => {
         const { queryExecutor, run } = createQueryExecutorFixture([{ id: 9, email: 'merge@a.com', active: true }]);
-        const qs = new QuerySet<User>(queryExecutor).filter({ active: true }).filter({ email: 'merge@a.com' });
+        const qs = new ModelQuerySet<User>(queryExecutor).filter({ active: true }).filter({ email: 'merge@a.com' });
         await qs.fetch();
         const sql = run.mock.calls[0]?.[0]?.sql ?? '';
         expect(sql).toContain('AND');
@@ -942,27 +1197,27 @@ describe(QuerySet, () => {
 
     it('accepts QNode filters and supports shape function/object in fetch', async () => {
         const { queryExecutor } = createQueryExecutorFixture([{ id: 2, email: 'b@a.com', active: false }]);
-        const qs = new QuerySet<User>(queryExecutor)
+        const qs = new ModelQuerySet<User>(queryExecutor)
             .filter(Q.or<User>({ id: 2 }, { email: 'x@x.com' }))
             .exclude(Q.not<User>({ email: 'blocked@example.com' }));
 
         const byFunction = await qs.fetch((row) => row.email);
         const byParser = await qs.fetch({ parse: (row) => ({ id: row.id }) });
 
-        expect(byFunction.items).toEqual(['b@a.com']);
-        expect(byParser.items).toEqual([{ id: 2 }]);
+        expect(byFunction.results).toEqual(['b@a.com']);
+        expect(byParser.results).toEqual([{ id: 2 }]);
     });
 
     it('accepts wrapper-forwarded optional shape unions', async () => {
         const { queryExecutor } = createQueryExecutorFixture([{ id: 2, email: 'b@a.com', active: false }]);
-        const qs = new QuerySet<User>(queryExecutor);
+        const qs = new ModelQuerySet<User>(queryExecutor);
         const shape: ((row: User) => string) | { parse: (row: User) => { id: number } } | undefined =
             Math.random() > 0.5 ? (row) => row.email : undefined;
 
         const fetched = await qs.fetch(shape);
         const fetchedOne = await qs.fetchOne(shape);
 
-        const fetchedResults: Array<User | string | { id: number }> = [...fetched];
+        const fetchedResults: ReadonlyArray<User | string | { id: number }> = fetched.items;
         const fetchedOneResult: User | string | { id: number } | null = fetchedOne;
         expect(fetchedResults).toHaveLength(1);
         expect(fetchedOneResult).toBeTruthy();
@@ -970,7 +1225,7 @@ describe(QuerySet, () => {
 
     it('preserves narrowed result types when filtering and ordering after select', async () => {
         const { queryExecutor } = createQueryExecutorFixture([{ id: 2, email: 'b@a.com', active: false }]);
-        const qs = new QuerySet<User>(queryExecutor)
+        const qs = new ModelQuerySet<User>(queryExecutor)
             .select(['id'] as const)
             .filter({ email: 'b@a.com' })
             .orderBy('-email')
@@ -979,7 +1234,7 @@ describe(QuerySet, () => {
         const result = await qs.fetch();
 
         expectTypeOf(qs).toEqualTypeOf<QuerySet<User, Pick<User, 'id'>>>();
-        expectTypeOf(result).toEqualTypeOf<QueryResult<Pick<User, 'id'>>>();
+        expectTypeOf(result.items).toEqualTypeOf<ReadonlyArray<Pick<User, 'id'>>>();
     });
 
     it('returns first row or null in fetchOne', async () => {
@@ -988,17 +1243,123 @@ describe(QuerySet, () => {
         ]).queryExecutor;
         const emptyQueryExecutor = createQueryExecutorFixture([]).queryExecutor;
 
-        expect(await new QuerySet<User>(firstQueryExecutor).fetchOne()).toEqual({
+        expect(await new ModelQuerySet<User>(firstQueryExecutor).fetchOne()).toEqual({
             id: 1,
             email: 'first@a.com',
             active: true,
         });
-        expect(await new QuerySet<User>(emptyQueryExecutor).fetchOne()).toBeNull();
+        expect(await new ModelQuerySet<User>(emptyQueryExecutor).fetchOne()).toBeNull();
+    });
+
+    it('supports async iteration by materializing the queryset once and yielding each row', async () => {
+        const { queryExecutor, run } = createQueryExecutorFixture([
+            { id: 1, email: 'iter-1@a.com', active: true },
+            { id: 2, email: 'iter-2@a.com', active: false },
+        ]);
+
+        const rows: User[] = [];
+        for await (const row of new ModelQuerySet<User>(queryExecutor)) {
+            rows.push(row);
+        }
+
+        expect(rows).toEqual([
+            { id: 1, email: 'iter-1@a.com', active: true },
+            { id: 2, email: 'iter-2@a.com', active: false },
+        ]);
+        expect(run).toHaveBeenCalledOnce();
+    });
+
+    it('returns first() values with function and parser shapes', async () => {
+        const { queryExecutor } = createQueryExecutorFixture([{ id: 1, email: 'first@a.com', active: true }]);
+        const qs = new ModelQuerySet<User>(queryExecutor);
+        const parser = { parse: vi.fn((row: User) => ({ id: row.id })) };
+
+        expect(await qs.first((row) => row.email)).toBe('first@a.com');
+        expect(await qs.first(parser)).toEqual({ id: 1 });
+        expect(parser.parse).toHaveBeenCalledWith({ id: 1, email: 'first@a.com', active: true });
+    });
+
+    it('falls back to the hydrated row when parser-shape normalization yields no replacement row', async () => {
+        const { queryExecutor } = createQueryExecutorFixture(
+            [{ id: 9, email: 'fallback@a.com', active: true }],
+            'sqlite'
+        );
+        const qs = new ModelQuerySet<User>(queryExecutor);
+        const parser = { parse: vi.fn((row: User) => ({ id: row.id, email: row.email })) };
+
+        (
+            qs as unknown as {
+                normalizeHydratedRowsForParserShape: (rows: readonly User[]) => Array<User>;
+            }
+        ).normalizeHydratedRowsForParserShape = vi.fn(() => []);
+
+        expect(await qs.first(parser)).toEqual({ id: 9, email: 'fallback@a.com' });
+        expect(parser.parse).toHaveBeenCalledWith({ id: 9, email: 'fallback@a.com', active: true });
+    });
+
+    it('uses the original row when shapeFetchedRow cannot read a normalized parser row', () => {
+        const { queryExecutor } = createQueryExecutorFixture(
+            [{ id: 10, email: 'direct@a.com', active: true }],
+            'sqlite'
+        );
+        const qs = new ModelQuerySet<User>(queryExecutor);
+        const parser = { parse: vi.fn((row: User) => row.email) };
+
+        (
+            qs as unknown as {
+                normalizeHydratedRowsForParserShape: (rows: readonly User[]) => Array<User>;
+                shapeFetchedRow: (row: User, shape: typeof parser) => string;
+            }
+        ).normalizeHydratedRowsForParserShape = vi.fn(() => []);
+
+        const shaped = (
+            qs as unknown as { shapeFetchedRow: (row: User, shape: typeof parser) => string }
+        ).shapeFetchedRow({ id: 10, email: 'direct@a.com', active: true }, parser);
+
+        expect(shaped).toBe('direct@a.com');
+        expect(parser.parse).toHaveBeenCalledWith({ id: 10, email: 'direct@a.com', active: true });
+    });
+
+    it('returns last() from the current page when limit or offset are already applied', async () => {
+        const { queryExecutor, run } = createQueryExecutorFixture([
+            { id: 1, email: 'first@a.com', active: true },
+            { id: 3, email: 'last@a.com', active: false },
+        ]);
+
+        const qs = new ModelQuerySet<User>(queryExecutor).limit(2);
+        const parser = { parse: vi.fn((row: User) => ({ id: row.id })) };
+
+        expect(await qs.last()).toEqual({ id: 3, email: 'last@a.com', active: false });
+        expect(await qs.last((row) => row.email)).toBe('last@a.com');
+        expect(await qs.last(parser)).toEqual({ id: 3 });
+        expect(parser.parse).toHaveBeenCalledWith({ id: 3, email: 'last@a.com', active: false });
+        expect(run).toHaveBeenCalledOnce();
+    });
+
+    it('returns null from last() when the current page is empty', async () => {
+        const { queryExecutor } = createQueryExecutorFixture([]);
+
+        await expect(new ModelQuerySet<User>(queryExecutor).offset(10).last()).resolves.toBeNull();
+    });
+
+    it('reverses ordering in last() and falls back to descending primary key order', async () => {
+        const ordered = createQueryExecutorFixture([{ id: 1, email: 'ordered@a.com', active: true }]);
+        const unordered = createQueryExecutorFixture([{ id: 2, email: 'unordered@a.com', active: false }]);
+
+        await new ModelQuerySet<User>(ordered.queryExecutor).orderBy('email', '-id').last();
+        await new ModelQuerySet<User>(unordered.queryExecutor).last();
+
+        const orderedSql = ordered.run.mock.calls[0]?.[0]?.sql ?? '';
+        const unorderedSql = unordered.run.mock.calls[0]?.[0]?.sql ?? '';
+
+        expect(orderedSql).toContain('ORDER BY users.email DESC, users.id ASC');
+        expect(unorderedSql).toContain('ORDER BY users.id DESC');
+        expect(unorderedSql).toContain('LIMIT 1');
     });
 
     it('narrows fetchOne parser and shape inputs from the selected result type', async () => {
         const { queryExecutor } = createQueryExecutorFixture([{ id: 1, email: 'first@a.com', active: true }]);
-        const selected = new QuerySet<User>(queryExecutor).select(['id'] as const);
+        const selected = new ModelQuerySet<User>(queryExecutor).select(['id'] as const);
         const parser = { parse: vi.fn((row: Pick<User, 'id'>) => row.id) };
 
         const byFunction = await selected.fetchOne((row) => row.id);
@@ -1011,7 +1372,7 @@ describe(QuerySet, () => {
 
     it('counts and checks existence using compiled query params', async () => {
         const { queryExecutor, query } = createQueryExecutorFixture([{ id: 1, email: 'a@a.com', active: true }]);
-        const qs = new QuerySet<User>(queryExecutor).filter({ active: true });
+        const qs = new ModelQuerySet<User>(queryExecutor).filter({ active: true });
 
         const count = await qs.count();
         const exists = await qs.exists();
@@ -1027,7 +1388,7 @@ describe(QuerySet, () => {
         const query = vi.fn(async () => ({ rows: [] as Array<{ count: number }> }));
         const queryExecutor = aQueryExecutor<User>({ meta, query, run });
 
-        const exists = await new QuerySet<User>(queryExecutor).exists();
+        const exists = await new ModelQuerySet<User>(queryExecutor).exists();
         expect(exists).toBe(false);
     });
 
@@ -1039,28 +1400,9 @@ describe(QuerySet, () => {
         const parser = {
             parse: vi.fn((row: User) => row),
         };
-        const result = await new QuerySet<User>(queryExecutor).fetch(parser);
-        expect(result.items[0]?.active).toBe(true);
+        const result = await new ModelQuerySet<User>(queryExecutor).fetch(parser);
+        expect(result.results[0]?.active).toBe(true);
         expect(parser.parse).toHaveBeenCalledWith({ id: 4, email: 'bool@a.com', active: true });
-    });
-
-    it('reuses the cached sqlite evaluation for parser-based schema reads', async () => {
-        const { queryExecutor, run } = createQueryExecutorFixture(
-            [{ id: 11, email: 'cached@a.com', active: 1 as unknown as boolean }],
-            'sqlite'
-        );
-        const qs = new QuerySet<User>(queryExecutor);
-        const parser = {
-            parse: vi.fn((row: User) => row),
-        };
-
-        const first = await qs.fetch();
-        const parsed = await qs.fetch(parser);
-
-        expect(first.items[0]?.active).toBe(1);
-        expect(parsed.items[0]?.active).toBe(true);
-        expect(parser.parse).toHaveBeenCalledWith({ id: 11, email: 'cached@a.com', active: true });
-        expect(run).toHaveBeenCalledOnce();
     });
 
     it('leaves sqlite bool columns untouched for function-shape projections', async () => {
@@ -1068,8 +1410,8 @@ describe(QuerySet, () => {
             [{ id: 5, email: 'func@a.com', active: 0 as unknown as boolean }],
             'sqlite'
         );
-        const result = await new QuerySet<User>(queryExecutor).fetch((row) => row.active);
-        expect(result.items).toEqual([0]);
+        const result = await new ModelQuerySet<User>(queryExecutor).fetch((row) => row.active);
+        expect(result.results).toEqual([false]);
     });
 
     it('normalizes sqlite bool zero values to false for parser-based schema reads', async () => {
@@ -1080,8 +1422,8 @@ describe(QuerySet, () => {
         const parser = {
             parse: vi.fn((row: User) => row),
         };
-        const result = await new QuerySet<User>(queryExecutor).fetch(parser);
-        expect(result.items[0]?.active).toBe(false);
+        const result = await new ModelQuerySet<User>(queryExecutor).fetch(parser);
+        expect(result.results[0]?.active).toBe(false);
         expect(parser.parse).toHaveBeenCalledWith({ id: 6, email: 'zero@a.com', active: false });
     });
 
@@ -1096,9 +1438,9 @@ describe(QuerySet, () => {
         });
         const parser = { parse: vi.fn((row: User) => row) };
 
-        const result = await new QuerySet<User>(queryExecutor).fetch(parser);
+        const result = await new ModelQuerySet<User>(queryExecutor).fetch(parser);
 
-        expect(result.items[0]?.active).toBe(1);
+        expect(result.results[0]?.active).toBe(1);
         expect(parser.parse).toHaveBeenCalledWith({ id: 7, email: 'nobool@a.com', active: 1 });
     });
 
@@ -1108,8 +1450,8 @@ describe(QuerySet, () => {
             'sqlite'
         );
         const parser = { parse: vi.fn((row: User) => row) };
-        const result = await new QuerySet<User>(queryExecutor).fetch(parser);
-        expect(result.items[0]?.active).toBe(2);
+        const result = await new ModelQuerySet<User>(queryExecutor).fetch(parser);
+        expect(result.results[0]?.active).toBe(2);
         expect(parser.parse).toHaveBeenCalledWith({ id: 8, email: 'other@a.com', active: 2 });
     });
 
@@ -1119,9 +1461,9 @@ describe(QuerySet, () => {
             parse: vi.fn((row: Pick<User, 'id' | 'email'>) => row),
         };
 
-        const result = await new QuerySet<User>(queryExecutor).select(['id', 'email'] as const).fetch(parser);
+        const result = await new ModelQuerySet<User>(queryExecutor).select(['id', 'email'] as const).fetch(parser);
 
-        expect(result.items[0]).toEqual({ id: 10, email: 'skip@a.com' });
+        expect(result.results[0]).toEqual({ id: 10, email: 'skip@a.com' });
         expect(parser.parse).toHaveBeenCalledWith({ id: 10, email: 'skip@a.com' });
     });
 
@@ -1138,193 +1480,9 @@ describe(QuerySet, () => {
         });
         const parser = { parse: vi.fn((row: MultiBoolUser) => row) };
 
-        const result = await new QuerySet<MultiBoolUser>(queryExecutor).fetch(parser);
+        const result = await new ModelQuerySet<MultiBoolUser>(queryExecutor).fetch(parser);
 
-        expect(result.items[0]).toEqual({ id: 9, email: 'multi@a.com', active: true, verified: false });
+        expect(result.results[0]).toEqual({ id: 9, email: 'multi@a.com', active: true, verified: false });
         expect(parser.parse).toHaveBeenCalledWith({ id: 9, email: 'multi@a.com', active: true, verified: false });
-    });
-
-    describe('django-style aliases', () => {
-        it('exposes all as a fresh queryset with the same state', () => {
-            const queryExecutor = aQueryExecutor<User>({ meta });
-            const qs = new QuerySet<User>(queryExecutor).filter({ active: true });
-            const all = qs.all();
-            expect(all).not.toBe(qs);
-        });
-
-        it('returns the same row from first as from fetchOne', async () => {
-            const row = { id: 1, email: 'a@a.com', active: true };
-            const run = vi.fn(async () => [row]);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            await expect(qs.first()).resolves.toEqual(row);
-            await expect(qs.fetchOne()).resolves.toEqual(row);
-            expect(run).toHaveBeenCalledTimes(2);
-        });
-
-        it('returns the last row when ordering is inverted', async () => {
-            const rows = [
-                { id: 1, email: 'a@a.com', active: true },
-                { id: 2, email: 'b@b.com', active: true },
-            ];
-            const run = vi.fn(async (): Promise<User[]> => [rows[1]!]);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor).orderBy('id');
-
-            await expect(qs.last()).resolves.toEqual(rows[1]);
-            expect(run).toHaveBeenCalledOnce();
-            const calls = run.mock.calls as unknown as Array<[{ sql: string }]>;
-            expect(calls.length).toBeGreaterThan(0);
-            const compiled = calls[0]![0];
-            expect(String(compiled.sql)).toMatch(/ORDER BY users\.id DESC/i);
-        });
-
-        it('returns the last row from the current slice when the queryset is already limited', async () => {
-            const rows = [
-                { id: 1, email: 'a@a.com', active: true },
-                { id: 2, email: 'b@b.com', active: true },
-            ];
-            const run = vi.fn(async (): Promise<User[]> => rows);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor).orderBy('id').limit(2);
-
-            await expect(qs.last()).resolves.toEqual(rows[1]);
-            expect(run).toHaveBeenCalledOnce();
-            const calls = run.mock.calls as unknown as Array<[{ sql: string }]>;
-            expect(calls.length).toBeGreaterThan(0);
-            const compiled = calls[0]![0];
-            expect(String(compiled.sql)).toMatch(/ORDER BY users\.id ASC/i);
-            expect(String(compiled.sql)).toMatch(/LIMIT 2/i);
-        });
-
-        it('returns null when last evaluates an empty sliced queryset', async () => {
-            const run = vi.fn(async (): Promise<User[]> => []);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor).orderBy('id').limit(2);
-
-            await expect(qs.last()).resolves.toBeNull();
-            expect(run).toHaveBeenCalledOnce();
-        });
-
-        it('inverts multi-field ordering for last', async () => {
-            const run = vi.fn(async () => [] as User[]);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor).orderBy('email', '-id');
-
-            await expect(qs.last()).resolves.toBeNull();
-            const calls = run.mock.calls as unknown as Array<[{ sql: string }]>;
-            expect(calls.length).toBeGreaterThan(0);
-            const sql = String(calls[0]![0].sql);
-            expect(sql).toMatch(/ORDER BY users\.email DESC/i);
-            expect(sql).toContain('users.id ASC');
-        });
-
-        it('orders by primary key descending when last runs without explicit ordering', async () => {
-            const row = { id: 2, email: 'b@b.com', active: true };
-            const run = vi.fn(async () => [row]);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            await expect(qs.last()).resolves.toEqual(row);
-            const calls = run.mock.calls as unknown as Array<[{ sql: string }]>;
-            expect(calls.length).toBeGreaterThan(0);
-            const compiled = calls[0]![0];
-            expect(String(compiled.sql)).toMatch(/ORDER BY users\.id DESC/i);
-        });
-
-        it('returns the single matching row from get', async () => {
-            const row = { id: 1, email: 'a@a.com', active: true };
-            const run = vi.fn(async () => [row]);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            await expect(qs.get({ id: 1 })).resolves.toEqual(row);
-            expect(run).toHaveBeenCalledOnce();
-        });
-
-        it('throws when get finds no rows', async () => {
-            const run = vi.fn(async () => []);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            await expect(qs.get({ id: 9 })).rejects.toBeInstanceOf(NotFoundError);
-        });
-
-        it('throws when get finds more than one row', async () => {
-            const run = vi.fn(async () => [
-                { id: 1, email: 'a@a.com', active: true },
-                { id: 2, email: 'b@b.com', active: true },
-            ]);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            await expect(qs.get({ active: true })).rejects.toBeInstanceOf(MultipleObjectsReturned);
-        });
-
-        it('checks cardinality before applying a get shape', async () => {
-            const run = vi.fn(async () => [
-                { id: 1, email: 'a@a.com', active: true },
-                { id: 2, email: 'b@b.com', active: true },
-            ]);
-            const shape = vi.fn((row: User) => row.email);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            await expect(qs.get({ active: true }, shape)).rejects.toBeInstanceOf(MultipleObjectsReturned);
-            expect(shape).not.toHaveBeenCalled();
-        });
-
-        it('narrows get output when a shape is provided', async () => {
-            const row = { id: 1, email: 'a@a.com', active: true };
-            const run = vi.fn(async () => [row]);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            const email = await qs.get({ id: 1 }, (r) => r.email);
-            expectTypeOf(email).toEqualTypeOf<string>();
-            expect(email).toBe('a@a.com');
-        });
-
-        it('throws when get uses Q composition without matches', async () => {
-            const row = { id: 1, email: 'a@a.com', active: true };
-            const q: QNode<User> = Q.and<User>({ active: false }, { id: row.id });
-            const run = vi.fn(async () => []);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            await expect(qs.get(q)).rejects.toBeInstanceOf(NotFoundError);
-        });
-
-        it('narrows parser output when get receives a parser shape', async () => {
-            const row = { id: 1, email: 'a@a.com', active: true };
-            const run = vi.fn(async () => [row]);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            const parsed = await qs.get({ id: 1 }, { parse: (r) => ({ title: r.email }) });
-            expectTypeOf(parsed).toEqualTypeOf<{ title: string }>();
-            expect(parsed).toEqual({ title: 'a@a.com' });
-        });
-
-        it('falls back to the hydrated row when parser-shape normalization yields no row', () => {
-            const row = { id: 1, email: 'a@a.com', active: true };
-            const { queryExecutor } = createQueryExecutorFixture([row], 'sqlite');
-            const qs = new QuerySet<User>(queryExecutor);
-            const privateHelpers = qs as unknown as QuerySetPrivateHelpers;
-
-            vi.spyOn(privateHelpers, 'normalizeHydratedRowsForParserShape').mockReturnValue([]);
-
-            expect(privateHelpers.shapeFetchedRow(row, { parse: (value) => value.email })).toBe('a@a.com');
-        });
-
-        it('runs the shaped get branch without an undefined shape sentinel', async () => {
-            const row = { id: 1, email: 'a@a.com', active: true };
-            const run = vi.fn(async () => [row]);
-            const queryExecutor = aQueryExecutor<User>({ meta, run });
-            const qs = new QuerySet<User>(queryExecutor);
-
-            await expect(qs.get({ id: 1 }, (r) => r.email)).resolves.toBe('a@a.com');
-        });
     });
 });

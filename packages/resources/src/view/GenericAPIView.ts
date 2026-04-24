@@ -7,17 +7,19 @@ import { RequestContext } from '../context/index';
 import type { FilterSet } from '../filters/index';
 import { inferModelFieldParsers } from '../filters/inferModelFieldParsers';
 import type { GenericAPIViewOpenAPIDescription } from '../resource/index';
-import type { ModelSerializerClass, SerializerOutput, SerializerSchema } from '../serializer/index';
+import type { AnyModelSerializer, SerializerOutput } from '../serializer/index';
 import type { ResourceModelLike } from '../resource/index';
+
+type SearchFieldRef<TModel extends Record<string, unknown>> = Extract<keyof TModel, string> | string;
 
 export interface GenericAPIViewConfig<
     TModel extends Record<string, unknown>,
-    TSerializer extends ModelSerializerClass<TModel, SerializerSchema, SerializerSchema, SerializerSchema>,
+    TSerializer extends AnyModelSerializer<TModel>,
 > {
     serializer: TSerializer;
     filters?: FilterSet<TModel>;
     orderingFields?: (keyof TModel)[];
-    searchFields?: (keyof TModel)[];
+    searchFields?: SearchFieldRef<TModel>[];
     lookupField?: keyof TModel;
     lookupParam?: string;
     paginatorFactory?: (queryset: QuerySet<TModel>) => Paginator<TModel, SerializerOutput<TSerializer>>;
@@ -28,12 +30,12 @@ export interface GenericAPIViewConfig<
  */
 export abstract class GenericAPIView<
     TModel extends Record<string, unknown>,
-    TSerializer extends ModelSerializerClass<TModel, SerializerSchema, SerializerSchema, SerializerSchema>,
+    TSerializer extends AnyModelSerializer<TModel>,
 > extends APIView {
     protected readonly serializerClass: TSerializer;
     protected readonly filters?: FilterSet<TModel>;
     protected readonly orderingFields: readonly (keyof TModel)[];
-    protected readonly searchFields: readonly (keyof TModel)[];
+    protected readonly searchFields: readonly SearchFieldRef<TModel>[];
     protected readonly lookupField?: keyof TModel;
     protected readonly lookupParam: string;
     protected readonly paginatorFactory?: (
@@ -166,10 +168,10 @@ export abstract class GenericAPIView<
                 : Promise.resolve<number | undefined>(undefined);
             const [result, totalCount] = await Promise.all([resultPromise, totalCountPromise]);
             const serializer = this.getSerializer();
-            const response = paginator.toResponse(
-                result.map((row) => serializer.toRepresentation(row)) as SerializerOutput<TSerializer>[],
-                { totalCount }
-            ) as OffsetPaginatedResponse<SerializerOutput<TSerializer>>;
+            const rows = await serializer.serializeMany(result.items);
+            const response = paginator.toResponse(rows as SerializerOutput<TSerializer>[], {
+                totalCount,
+            }) as OffsetPaginatedResponse<SerializerOutput<TSerializer>>;
 
             return TangoResponse.json(response as unknown as JsonValue, { status: 200 });
         } catch (error) {
@@ -204,7 +206,7 @@ export abstract class GenericAPIView<
                 );
             }
 
-            return TangoResponse.json(this.getSerializer().toRepresentation(result) as JsonValue, { status: 200 });
+            return TangoResponse.json((await this.getSerializer().serialize(result)) as JsonValue, { status: 200 });
         } catch (error) {
             return this.handleError(error);
         }

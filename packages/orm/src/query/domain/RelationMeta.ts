@@ -41,6 +41,15 @@ export interface RelationMeta {
     sourceKey: string;
     /** Target-side column matched against the source key. */
     targetKey: string;
+    /** Many-to-many through table name when applicable. */
+    throughTable?: string;
+    throughModelKey?: string;
+    /** Many-to-many through column that matches the owner source key. */
+    throughSourceKey?: string;
+    /** Many-to-many through column that matches the target primary key. */
+    throughTargetKey?: string;
+    throughSourceColumnType?: string;
+    throughTargetColumnType?: string;
     /** Primary key column for the target model. */
     targetPrimaryKey: string;
     /** Target model columns and their storage types. */

@@ -52,7 +52,7 @@ export class SqliteClient implements DBClient {
      */
     async begin(): Promise<void> {
         if (!this.inTransaction) {
-            this.db.prepare('BEGIN').run();
+            this.db.prepare('BEGIN IMMEDIATE').run();
             this.inTransaction = true;
         }
     }

@@ -94,11 +94,47 @@ describe(QueryPlanner, () => {
             },
         });
 
-        expect(() => planner.plan({ prefetchRelated: ['tags'] })).toThrow(/many-to-many/i);
+        expect(() => planner.plan({ prefetchRelated: ['tags'] })).toThrow(/cannot be hydrated/i);
         expect(() => planner.plan({ selectRelated: ['disabledTeam'] })).toThrow(/cannot be hydrated/i);
         expect(() => planner.plan({ prefetchRelated: ['archivedPosts'] })).toThrow(/prefetchRelated/i);
         expect(() => planner.plan({ prefetchRelated: ['profile'] })).toThrow(/prefetchRelated/i);
         expect(() => planner.plan({ selectRelated: ['ghost'] })).toThrow(/missing target metadata/i);
+    });
+
+    it('accepts prefetchRelated for single-valued and many-to-many relations', () => {
+        const planner = new QueryPlanner({
+            ...baseMeta,
+            relations: {
+                organization: aRelationMeta({
+                    kind: InternalRelationKind.BELONGS_TO,
+                    table: 'organizations',
+                    alias: 'organization',
+                    sourceKey: 'organization_id',
+                    targetKey: 'id',
+                    targetColumns: { id: 'int' },
+                    targetMeta: { table: 'teams', pk: 'id', columns: { id: 'int' } },
+                }),
+                tags: aRelationMeta({
+                    kind: InternalRelationKind.MANY_TO_MANY,
+                    table: 'tags',
+                    alias: 'tags',
+                    sourceKey: 'id',
+                    targetKey: 'id',
+                    targetColumns: { id: 'int' },
+                    capabilities: {
+                        queryable: true,
+                        hydratable: true,
+                        joinable: false,
+                        prefetchable: true,
+                    },
+                    targetMeta: { table: 'tags', pk: 'id', columns: { id: 'int' } },
+                }),
+            },
+        });
+
+        expect(() => planner.plan({ prefetchRelated: ['organization'] })).not.toThrow();
+        expect(() => planner.plan({ prefetchRelated: ['tags'] })).not.toThrow();
+        expect(() => planner.plan({ selectRelated: ['tags'] })).toThrow(/selectRelated/i);
     });
 
     it('rejects relation names that collide with unrelated base columns', () => {
