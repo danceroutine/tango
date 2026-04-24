@@ -32,7 +32,9 @@ describe(TemplateBuilder, () => {
         expect(oneLiner).toContain('npm install ');
         expect(oneLiner).toContain('npm install -D ');
         expect(oneLiner).toContain('@danceroutine/tango-adapters-express@');
+        expect(oneLiner).toContain('better-sqlite3@^11.10.0');
         expect(oneLiner).toContain('pg@^8.16.3');
+        expect(oneLiner).toContain('@types/better-sqlite3@^7.6.12');
     });
 
     it('formats Nuxt install instructions with the Nuxt adapter package', () => {
@@ -40,5 +42,19 @@ describe(TemplateBuilder, () => {
 
         expect(oneLiner).toContain('@danceroutine/tango-adapters-nuxt@');
         expect(oneLiner).toContain('better-sqlite3@^11.10.0');
+        expect(oneLiner).toContain('pg@^8.16.3');
+        expect(oneLiner).toContain('@types/better-sqlite3@^7.6.12');
+    });
+
+    it('formats npm script forwarding with an explicit separator', () => {
+        expect(TemplateBuilder.getRunScriptCommand('npm', 'make:migrations', ['--name', 'initial'])).toBe(
+            'npm run make:migrations -- --name initial'
+        );
+    });
+
+    it('formats pnpm script forwarding without a literal separator arg', () => {
+        expect(TemplateBuilder.getRunScriptCommand('pnpm', 'make:migrations', ['--name', 'initial'])).toBe(
+            'pnpm run make:migrations --name initial'
+        );
     });
 });

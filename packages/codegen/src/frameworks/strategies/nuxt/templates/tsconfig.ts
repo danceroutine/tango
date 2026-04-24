@@ -12,6 +12,7 @@ export class TsConfigTemplateBuilder extends TemplateBuilder {
                 extends: './.nuxt/tsconfig.json',
                 compilerOptions: {
                     strict: true,
+                    skipLibCheck: true,
                 },
                 include: ['.nuxt/**/*.d.ts', '**/*.ts', '**/*.vue', 'migrations/**/*.ts', '.tango/**/*.d.ts'],
             },
