@@ -202,6 +202,55 @@ describe(GenericAPIView, () => {
         });
     });
 
+    it('counts the filtered queryset before applying offset pagination', async () => {
+        const baseQuerySet = aQuerySet<UserRecord>();
+        const filteredQuerySet = aQuerySet<UserRecord>();
+        const paginatedQuerySet = aQuerySet<UserRecord>();
+
+        vi.mocked(baseQuerySet.filter).mockReturnValue(filteredQuerySet);
+        vi.mocked(filteredQuerySet.limit).mockReturnValue(filteredQuerySet);
+        vi.mocked(filteredQuerySet.offset).mockReturnValue(paginatedQuerySet);
+        vi.mocked(filteredQuerySet.count).mockResolvedValue(5);
+        vi.mocked(paginatedQuerySet.fetch).mockResolvedValue(
+            aQueryResult({
+                items: [
+                    { id: 3, email: 'c@example.com', name: 'C' },
+                    { id: 4, email: 'd@example.com', name: 'D' },
+                ],
+            })
+        );
+        vi.mocked(paginatedQuerySet.count).mockResolvedValue(2);
+
+        currentUserModel = {
+            objects: aManager<UserRecord>({
+                meta: { table: 'users', pk: 'id', columns: { id: 'int', email: 'text', name: 'text' } },
+                query: vi.fn(() => baseQuerySet),
+            }),
+        };
+
+        const view = new UserListCreateView({
+            serializer: UserSerializer,
+            searchFields: ['email'],
+        });
+
+        const response = await view.dispatch(
+            aResourcesRequestContext('GET', 'https://example.test/users?search=example&limit=2&offset=2')
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toEqual({
+            count: 5,
+            next: '?limit=2&offset=4',
+            previous: '?limit=2&offset=0',
+            results: [
+                { id: 3, email: 'c@example.com', name: 'C' },
+                { id: 4, email: 'd@example.com', name: 'D' },
+            ],
+        });
+        expect(vi.mocked(filteredQuerySet.count)).toHaveBeenCalledOnce();
+        expect(vi.mocked(paginatedQuerySet.count)).not.toHaveBeenCalled();
+    });
+
     it('reads, updates, and deletes an existing record', async () => {
         const querySetDouble = aQuerySet<UserRecord>();
         vi.mocked(querySetDouble.fetchOne).mockResolvedValue({ id: 1, email: 'a@example.com', name: 'A' });
