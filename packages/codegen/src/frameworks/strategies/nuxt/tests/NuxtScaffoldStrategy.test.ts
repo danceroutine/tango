@@ -55,6 +55,9 @@ describe(NuxtScaffoldStrategy, () => {
             const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
 
             expect(packageJson).toContain('"nuxt"');
+            expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"pg"');
+            expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(packageJson).toContain('"codegen:relations"');
             expect(scripts['make:migrations']).not.toContain('--name');
             expect(scripts['make:migrations']).not.toContain('npm_config_name');
@@ -62,6 +65,7 @@ describe(NuxtScaffoldStrategy, () => {
             expect(nuxtConfig).toContain("route: '/api/todos/**:tango'");
             expect(tsconfig).toContain('".tango/**/*.d.ts"');
             expect(page).toContain('<script setup lang="ts">');
+            expect(page).toContain("from '~~/lib/models'");
             expect(route).toContain('defineEventHandler');
             expect(openapiRoute).toContain("from '~~/lib/openapi'");
             expect(openapiSource).toContain('describeViewSet');
@@ -69,7 +73,12 @@ describe(NuxtScaffoldStrategy, () => {
             expect(serializerSource).toContain("from '~~/lib/models'");
             expect(viewsetSource).toContain("from '~~/serializers'");
             expect(readme).toContain('tango new --framework nuxt');
-            expect(readme).toContain('make:migrations -- --name initial');
+            expect(readme).toContain('pnpm run make:migrations --name initial');
+            expect(readme).toContain('GET /');
+            expect(readme).toContain('Nuxt owns the public page route at `/`');
+            expect(readme).toContain('## Durable app code');
+            expect(readme).toContain('## Generated artifacts');
+            expect(readme).toContain('## Utility surface');
             expect(readme).toContain('codegen:relations');
             expect(readme).toContain('server/tango/todos.ts');
             expect(migrationsKeep).toBe('');
@@ -91,7 +100,8 @@ describe(NuxtScaffoldStrategy, () => {
             const config = renderTemplate(templates, 'tango.config.ts', context);
 
             expect(packageJson).toContain('"pg"');
-            expect(packageJson).not.toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(config).toContain("adapter: 'postgres'");
         });
 
@@ -109,6 +119,16 @@ describe(NuxtScaffoldStrategy, () => {
 
             expect(modelSource).toContain('export const TodoModel = Model(');
             expect(modelSource).toContain('export const TodoReadSchema = z.object({');
+        });
+
+        it('does not emit Express or Next-specific files', () => {
+            const strategy = new NuxtScaffoldStrategy();
+            const templatePaths = new Set(strategy.getTemplates().map((template) => template.path));
+
+            expect(templatePaths.has('src/tango.ts')).toBe(false);
+            expect(templatePaths.has('src/index.ts')).toBe(false);
+            expect(templatePaths.has('src/app/layout.tsx')).toBe(false);
+            expect(templatePaths.has('next.config.mjs')).toBe(false);
         });
     });
 });

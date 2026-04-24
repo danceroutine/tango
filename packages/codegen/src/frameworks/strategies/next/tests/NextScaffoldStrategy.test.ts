@@ -52,6 +52,9 @@ describe(NextScaffoldStrategy, () => {
             const migrationsKeep = renderTemplate(templates, 'migrations/.gitkeep', context);
             const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
 
+            expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"pg"');
+            expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(packageJson).toContain('"codegen:relations"');
             expect(scripts['make:migrations']).not.toContain('--name');
             expect(scripts['make:migrations']).not.toContain('npm_config_name');
@@ -67,7 +70,11 @@ describe(NextScaffoldStrategy, () => {
             expect(serializerSource).toContain('export class TodoSerializer extends ModelSerializer');
             expect(viewsetSource).toContain('serializer: TodoSerializer');
             expect(readme).toContain('First-time setup');
-            expect(readme).toContain('make:migrations -- --name initial');
+            expect(readme).toContain('pnpm run make:migrations --name initial');
+            expect(readme).toContain('GET /');
+            expect(readme).toContain('## Durable app code');
+            expect(readme).toContain('## Generated artifacts');
+            expect(readme).toContain('## Utility surface');
             expect(readme).toContain('codegen:relations');
             expect(migrationsKeep).toBe('');
         });
@@ -88,8 +95,19 @@ describe(NextScaffoldStrategy, () => {
             const config = renderTemplate(templates, 'tango.config.ts', context);
 
             expect(packageJson).toContain('"pg"');
-            expect(packageJson).not.toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(config).toContain("adapter: 'postgres'");
+        });
+
+        it('does not emit Express or Nuxt-specific files', () => {
+            const strategy = new NextScaffoldStrategy();
+            const templatePaths = new Set(strategy.getTemplates().map((template) => template.path));
+
+            expect(templatePaths.has('src/tango.ts')).toBe(false);
+            expect(templatePaths.has('src/index.ts')).toBe(false);
+            expect(templatePaths.has('nuxt.config.ts')).toBe(false);
+            expect(templatePaths.has('server/tango/todos.ts')).toBe(false);
         });
     });
 });
