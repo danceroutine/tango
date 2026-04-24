@@ -2,14 +2,7 @@ import type { APIViewMethod, AnyModelSerializer, AnyModelSerializerClass } from 
 import type { OpenAPIViewSetDescriptor, OpenAPIGenericAPIViewDescriptor, OpenAPIAPIViewDescriptor } from './types';
 
 export function describeViewSet(
-    descriptor: Omit<
-        OpenAPIViewSetDescriptor<
-            Record<string, unknown>,
-            // oxlint-disable-next-line typescript/no-explicit-any
-            AnyModelSerializerClass
-        >,
-        'kind'
-    >
+    descriptor: Omit<OpenAPIViewSetDescriptor<Record<string, unknown>, AnyModelSerializerClass>, 'kind'>
 ): OpenAPIViewSetDescriptor;
 export function describeViewSet<
     TModel extends Record<string, unknown>,
@@ -25,14 +18,7 @@ export function describeViewSet(descriptor: Omit<OpenAPIViewSetDescriptor, 'kind
 }
 
 export function describeGenericAPIView(
-    descriptor: Omit<
-        OpenAPIGenericAPIViewDescriptor<
-            Record<string, unknown>,
-            // oxlint-disable-next-line typescript/no-explicit-any
-            AnyModelSerializerClass
-        >,
-        'kind'
-    >
+    descriptor: Omit<OpenAPIGenericAPIViewDescriptor<Record<string, unknown>, AnyModelSerializerClass>, 'kind'>
 ): OpenAPIGenericAPIViewDescriptor;
 export function describeGenericAPIView<
     TModel extends Record<string, unknown>,

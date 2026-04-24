@@ -21,7 +21,7 @@ export class TsConfigTemplateBuilder extends TemplateBuilder {
                     resolveJsonModule: true,
                     types: ['node'],
                 },
-                include: ['src', 'migrations/**/*.ts', 'tango.config.ts'],
+                include: ['src', 'migrations/**/*.ts', 'tango.config.ts', '.tango/**/*.d.ts'],
                 exclude: ['node_modules', 'dist'],
             },
             null,

@@ -25,7 +25,7 @@ export class TsConfigTemplateBuilder extends TemplateBuilder {
                         '@/*': ['src/*'],
                     },
                 },
-                include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', 'migrations/**/*.ts'],
+                include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', 'migrations/**/*.ts', '.tango/**/*.d.ts'],
                 exclude: ['node_modules'],
             },
             null,

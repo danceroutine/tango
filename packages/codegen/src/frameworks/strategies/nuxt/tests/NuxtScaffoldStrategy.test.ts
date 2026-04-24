@@ -43,6 +43,7 @@ describe(NuxtScaffoldStrategy, () => {
             const templates = strategy.getTemplates();
             const packageJson = renderTemplate(templates, 'package.json', context);
             const nuxtConfig = renderTemplate(templates, 'nuxt.config.ts', context);
+            const tsconfig = renderTemplate(templates, 'tsconfig.json', context);
             const page = renderTemplate(templates, 'app/pages/index.server.vue', context);
             const route = renderTemplate(templates, 'server/tango/health.ts', context);
             const openapiRoute = renderTemplate(templates, 'server/tango/openapi.ts', context);
@@ -56,6 +57,7 @@ describe(NuxtScaffoldStrategy, () => {
             expect(packageJson).toContain('"codegen:relations"');
             expect(packageJson).toContain('"start": "NUXT_TELEMETRY_DISABLED=1 nuxt preview"');
             expect(nuxtConfig).toContain("route: '/api/todos/**:tango'");
+            expect(tsconfig).toContain('".tango/**/*.d.ts"');
             expect(page).toContain('<script setup lang="ts">');
             expect(route).toContain('defineEventHandler');
             expect(openapiRoute).toContain("from '~~/lib/openapi'");

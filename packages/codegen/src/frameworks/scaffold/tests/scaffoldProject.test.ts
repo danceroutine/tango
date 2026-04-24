@@ -74,6 +74,7 @@ describe(scaffoldProject, () => {
             expect(serializerSource).toContain('TodoSerializer');
             expect(layoutSource).toContain('RootLayout');
             expect(tsconfig).toContain('"migrations/**/*.ts"');
+            expect(tsconfig).toContain('".tango/**/*.d.ts"');
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -113,6 +114,7 @@ describe(scaffoldProject, () => {
             expect(appShell).toContain('<NuxtPage />');
             expect(pageSource).toContain('<script setup lang="ts">');
             expect(tsconfig).toContain('"migrations/**/*.ts"');
+            expect(tsconfig).toContain('".tango/**/*.d.ts"');
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
