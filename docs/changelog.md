@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.9.1 - 2026-04-24
+
+Make scaffolded `make:migrations` scripts forward a normal `--name` argument so migration naming works the same way across Express, Next, and Nuxt apps.
+
 ## 1.9.0 - 2026-04-24
 
 Add `ManyToManyRelatedManager.set(...)` so Tango can replace many-to-many memberships in one Django-shaped relation-manager call.
