@@ -25,7 +25,7 @@ export class PackageJsonTemplateBuilder extends TemplateBuilder {
                     typecheck: 'NUXT_TELEMETRY_DISABLED=1 nuxt typecheck',
                     'setup:schema': 'pnpm exec tango migrate --config ./tango.config.ts',
                     'make:migrations':
-                        'pnpm exec tango make:migrations --config ./tango.config.ts --models ./lib/models/index.ts --name "${npm_config_name:-manual_change}"',
+                        'tango make:migrations --config ./tango.config.ts --models ./lib/models/index.ts',
                     'codegen:relations': 'pnpm exec tango codegen relations --models ./lib/models/index.ts',
                     prebootstrap: 'pnpm run setup:schema',
                     bootstrap: 'tsx scripts/bootstrap.ts',

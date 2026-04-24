@@ -25,7 +25,7 @@ export class PackageJsonTemplateBuilder extends TemplateBuilder {
                     'setup:schema':
                         "node -e \"require('node:fs').mkdirSync('./.data',{recursive:true})\" && tango migrate --config ./tango.config.ts",
                     'make:migrations':
-                        'tango make:migrations --config ./tango.config.ts --models ./src/models/index.ts --name "${npm_config_name:-manual_change}"',
+                        'tango make:migrations --config ./tango.config.ts --models ./src/models/index.ts',
                     'codegen:relations': 'tango codegen relations --models ./src/models/index.ts',
                     prebootstrap:
                         "node -e \"require('node:fs').mkdirSync('./.data',{recursive:true})\" && tango migrate --config ./tango.config.ts",

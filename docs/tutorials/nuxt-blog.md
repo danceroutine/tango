@@ -242,7 +242,7 @@ The OpenAPI document is generated from the existing Tango resources. Once the sc
 From the repository root, generate a migration for the new column:
 
 ```bash
-pnpm --filter @danceroutine/tango-example-nuxt-blog make:migrations --name add_post_summary
+pnpm --filter @danceroutine/tango-example-nuxt-blog run make:migrations -- --name add_post_summary
 ```
 
 Open the new migration file in `examples/nuxt-blog/migrations/` and confirm that it adds the new `summary` column to the posts table.
