@@ -64,6 +64,8 @@ describe('ModelManager many-to-many related-manager attachment', () => {
         type PostRecord = MaterializedModelRecord<typeof PostModel.schema>;
 
         expectTypeOf<PostRecord['tags']>().toMatchTypeOf<ManyToManyRelatedManager<{ id: number }>>();
+        expectTypeOf<Parameters<PostRecord['tags']['create']>>().toEqualTypeOf<[Partial<{ id: number }>]>();
+        expectTypeOf<Awaited<ReturnType<PostRecord['tags']['create']>>>().toEqualTypeOf<{ id: number }>();
     });
 
     it('skips relations that already carry a hydration-assigned value on the record', () => {

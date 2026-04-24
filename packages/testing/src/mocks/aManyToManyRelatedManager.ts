@@ -25,7 +25,9 @@ export interface ManyToManyRelatedManagerFixtureOverrides<TTarget extends Record
     insertLinks?: (ownerPrimaryKey: unknown, targetPrimaryKeys: readonly unknown[]) => Promise<void>;
     deleteLink?: (ownerPrimaryKey: unknown, targetPrimaryKey: unknown) => Promise<void>;
     deleteLinks?: (ownerPrimaryKey: unknown, targetPrimaryKeys: readonly unknown[]) => Promise<void>;
+    deleteAllLinksForOwner?: (ownerPrimaryKey: unknown) => Promise<void>;
     selectTargetIdsForOwner?: (ownerPrimaryKey: unknown) => Promise<readonly (string | number)[]>;
+    createTarget?: (input: Partial<TTarget>) => Promise<TTarget>;
     runAtomic?: <T>(work: () => Promise<T>) => Promise<T>;
 }
 
@@ -40,7 +42,9 @@ export interface ManyToManyRelatedManagerFixture<TTarget extends Record<string, 
     insertLinks: ReturnType<typeof vi.fn>;
     deleteLink: ReturnType<typeof vi.fn>;
     deleteLinks: ReturnType<typeof vi.fn>;
+    deleteAllLinksForOwner: ReturnType<typeof vi.fn>;
     selectTargetIdsForOwner: ReturnType<typeof vi.fn>;
+    createTarget: ReturnType<typeof vi.fn>;
     runAtomic: ReturnType<typeof vi.fn>;
 }
 
@@ -57,8 +61,15 @@ export function aManyToManyRelatedManager<TTarget extends Record<string, unknown
     const insertLinks = vi.fn(overrides.insertLinks ?? (async () => {}));
     const deleteLink = vi.fn(overrides.deleteLink ?? (async () => {}));
     const deleteLinks = vi.fn(overrides.deleteLinks ?? (async () => {}));
+    const deleteAllLinksForOwner = vi.fn(overrides.deleteAllLinksForOwner ?? (async () => {}));
     const selectTargetIdsForOwner = vi.fn(
         overrides.selectTargetIdsForOwner ?? (async (): Promise<readonly (string | number)[]> => [])
+    );
+    const createTarget = vi.fn(
+        overrides.createTarget ??
+            (async (input: Partial<TTarget>) => {
+                return input as TTarget;
+            })
     );
     const runAtomicImpl: ManagerConstructorInputs['runAtomic'] =
         overrides.runAtomic ?? (async <T>(work: () => Promise<T>) => work());
@@ -69,6 +80,7 @@ export function aManyToManyRelatedManager<TTarget extends Record<string, unknown
         insertLinks,
         deleteLink,
         deleteLinks,
+        deleteAllLinksForOwner,
         selectTargetIdsForOwner,
     } as unknown as ManagerConstructorInputs['throughTableManager'];
 
@@ -80,6 +92,7 @@ export function aManyToManyRelatedManager<TTarget extends Record<string, unknown
         throughTableManager,
         targetExecutorProvider: () =>
             overrides.targetExecutor === undefined ? ({} as QueryExecutor<TTarget>) : overrides.targetExecutor,
+        createTarget,
         runAtomic: runAtomicSpy as ManagerConstructorInputs['runAtomic'],
     });
 
@@ -89,7 +102,9 @@ export function aManyToManyRelatedManager<TTarget extends Record<string, unknown
         insertLinks,
         deleteLink,
         deleteLinks,
+        deleteAllLinksForOwner,
         selectTargetIdsForOwner,
+        createTarget,
         runAtomic: runAtomicSpy,
     };
 }
