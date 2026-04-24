@@ -15,7 +15,7 @@ pnpm --filter @danceroutine/tango-example-express-blog-api dev
 When you change model metadata, use:
 
 ```bash
-pnpm --filter @danceroutine/tango-example-express-blog-api make:migrations --name add_field
+pnpm --filter @danceroutine/tango-example-express-blog-api run make:migrations -- --name add_field
 ```
 
 That workflow generates the migration and refreshes the generated relation registry at the same time. If you only changed relation metadata and do not need a new migration file, run:

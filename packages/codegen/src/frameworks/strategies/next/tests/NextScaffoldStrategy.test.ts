@@ -50,8 +50,11 @@ describe(NextScaffoldStrategy, () => {
             const viewsetSource = renderTemplate(templates, 'src/viewsets/TodoViewSet.ts', context);
             const readme = renderTemplate(templates, 'README.md', context);
             const migrationsKeep = renderTemplate(templates, 'migrations/.gitkeep', context);
+            const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
 
             expect(packageJson).toContain('"codegen:relations"');
+            expect(scripts['make:migrations']).not.toContain('--name');
+            expect(scripts['make:migrations']).not.toContain('npm_config_name');
             expect(tsconfig).toContain('"migrations/**/*.ts"');
             expect(tsconfig).toContain('".tango/**/*.d.ts"');
             expect(layout).toContain('RootLayout');
@@ -64,7 +67,7 @@ describe(NextScaffoldStrategy, () => {
             expect(serializerSource).toContain('export class TodoSerializer extends ModelSerializer');
             expect(viewsetSource).toContain('serializer: TodoSerializer');
             expect(readme).toContain('First-time setup');
-            expect(readme).toContain('make:migrations --name initial');
+            expect(readme).toContain('make:migrations -- --name initial');
             expect(readme).toContain('codegen:relations');
             expect(migrationsKeep).toBe('');
         });

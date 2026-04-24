@@ -195,7 +195,7 @@ The OpenAPI document is generated from the existing resource classes. Once the p
 From the repository root, generate a migration for the new column:
 
 ```bash
-pnpm --filter @danceroutine/tango-example-express-blog-api make:migrations --name add_post_summary
+pnpm --filter @danceroutine/tango-example-express-blog-api run make:migrations -- --name add_post_summary
 ```
 
 Open the new migration file in `examples/blog-api/migrations/` and confirm that it adds the new `summary` column to the posts table.

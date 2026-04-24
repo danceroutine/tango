@@ -13,7 +13,7 @@
         "start": "NUXT_TELEMETRY_DISABLED=1 nuxt preview",
         "typecheck": "NUXT_TELEMETRY_DISABLED=1 nuxt typecheck",
         "setup:schema": "pnpm exec tango migrate --config ./tango.config.ts",
-        "make:migrations": "pnpm exec tango make:migrations --config ./tango.config.ts --models ./lib/models.ts --name \"${npm_config_name:-manual_change}\"",
+        "make:migrations": "tango make:migrations --config ./tango.config.ts --models ./lib/models.ts",
         "codegen:relations": "pnpm exec tango codegen relations --models ./lib/models.ts",
         "prebootstrap": "pnpm run prepare:tango && pnpm run setup:schema",
         "bootstrap": "tsx scripts/bootstrap.ts"
