@@ -159,15 +159,18 @@ function aTaggableManagerFixture(
             }
         },
         insertLinks: async (_ownerPrimaryKey, targetPrimaryKeys) => {
-            currentTargets = targetPrimaryKeys
-                .map((targetPrimaryKey) => resolveTarget(targetPrimaryKey))
-                .filter((candidate): candidate is TagRecord => !!candidate);
+            currentTargets = [
+                ...currentTargets,
+                ...targetPrimaryKeys
+                    .map((targetPrimaryKey) => resolveTarget(targetPrimaryKey))
+                    .filter((candidate): candidate is TagRecord => !!candidate),
+            ];
         },
         deleteLink: async (_ownerPrimaryKey, targetPrimaryKey) => {
             currentTargets = currentTargets.filter((tag) => tag.id !== Number(targetPrimaryKey));
         },
         deleteLinks: async (_ownerPrimaryKey, targetPrimaryKeys) => {
-            const toRemove = new Set(targetPrimaryKeys.map((value) => Number(value)));
+            const toRemove = new Set(targetPrimaryKeys.map(Number));
             currentTargets = currentTargets.filter((tag) => !toRemove.has(tag.id));
         },
     });
@@ -445,6 +448,135 @@ describe(ModelSerializer, () => {
         expect(createdTargetRows).toEqual([{ id: 3, slug: 'orm', name: 'ORM' }]);
     });
 
+    it('applies many-to-many replacements through the manager set diff instead of clearing shared rows first', async () => {
+        const existingTags: TagRecord[] = [
+            { id: 2, slug: 'staff', name: 'Staff' },
+            { id: 3, slug: 'orm', name: 'ORM' },
+        ];
+        const availableBySlug = new Map(existingTags.map((tag) => [tag.slug, tag]));
+        const availableById = new Map(existingTags.map((tag) => [tag.id, tag]));
+        const relationFixture = aTaggableManagerFixture([existingTags[0]!], (targetPrimaryKey) =>
+            availableById.get(Number(targetPrimaryKey))
+        );
+
+        const tagQuerySet = {
+            filter: vi.fn((where: Record<string, unknown>) => {
+                const slugs = (where['slug__in'] as string[]) ?? [];
+                return {
+                    fetch: vi.fn(async () =>
+                        aQueryResult({
+                            items: slugs
+                                .map((slug) => availableBySlug.get(slug))
+                                .filter((candidate): candidate is TagRecord => !!candidate),
+                        })
+                    ),
+                } as Pick<QuerySet<TagRecord>, 'fetch'>;
+            }),
+        };
+
+        const tagModel: ResourceModelLike<TagRecord, TagRecord> = {
+            objects: aManager<TagRecord>({
+                meta: { table: 'tags', pk: 'id', columns: { id: 'int', slug: 'text', name: 'text' } },
+                query: vi.fn(() => tagQuerySet as unknown as QuerySet<TagRecord>),
+                create: vi.fn(async () => {
+                    throw new Error('not used');
+                }),
+                update: vi.fn(async () => {
+                    throw new Error('not used');
+                }),
+                delete: vi.fn(async () => {}),
+                bulkCreate: vi.fn(async () => []),
+            }),
+        };
+
+        const relationModel: ResourceModelLike<UserRecord, TaggedUserRecord> = {
+            objects: aManager<TaggedUserRecord>({
+                meta: {
+                    table: 'users',
+                    pk: 'id',
+                    columns: { id: 'int', email: 'text', slug: 'text' },
+                    relations: {
+                        tags: {
+                            edgeId: 'users:tags',
+                            sourceModelKey: 'test/User',
+                            targetModelKey: 'test/Tag',
+                            kind: 'manyToMany',
+                            cardinality: 'many',
+                            capabilities: { queryable: true, hydratable: true, joinable: false, prefetchable: true },
+                            table: 'tags',
+                            sourceKey: 'id',
+                            targetKey: 'id',
+                            throughTable: 'm2m_tags',
+                            throughSourceKey: 'userId',
+                            throughTargetKey: 'tagId',
+                            targetPrimaryKey: 'id',
+                            targetColumns: { id: 'int', slug: 'text', name: 'text' },
+                            alias: 'tag_tags',
+                        },
+                    },
+                },
+                create: vi.fn(
+                    async (input) => ({ id: 41, ...input, tags: relationFixture.manager }) as TaggedUserRecord
+                ),
+                update: vi.fn(
+                    async (id, patch) =>
+                        ({
+                            id: Number(id),
+                            email: 'existing@example.com',
+                            ...patch,
+                            tags: relationFixture.manager,
+                        }) as TaggedUserRecord
+                ),
+            }),
+        };
+
+        const relationCreateSchema = z.object({
+            email: z.string().email(),
+            tags: z.array(z.string()).default([]),
+        });
+        const relationUpdateSchema = relationCreateSchema.partial();
+        const relationOutputSchema = outputSchema.extend({
+            tags: z.array(tagSummarySchema),
+        });
+
+        class SlugRelatedUserSerializer extends ModelSerializer<
+            UserRecord,
+            typeof relationCreateSchema,
+            typeof relationUpdateSchema,
+            typeof relationOutputSchema,
+            TaggedUserRecord
+        > {
+            static readonly model = relationModel;
+            static readonly createSchema = relationCreateSchema;
+            static readonly updateSchema = relationUpdateSchema;
+            static readonly outputSchema = relationOutputSchema;
+            static readonly relationFields = {
+                tags: relation.manyToMany({
+                    read: relation.nested(tagSummarySchema),
+                    write: relation.slugList<TagRecord>({
+                        model: tagModel,
+                        lookupField: 'slug',
+                    }),
+                }),
+            };
+        }
+
+        const serializer = new SlugRelatedUserSerializer();
+
+        await expect(serializer.update(41, { tags: ['staff', 'orm'] })).resolves.toEqual({
+            id: 41,
+            email: 'existing@example.com',
+            tags: [
+                { id: 2, slug: 'staff', name: 'Staff' },
+                { id: 3, slug: 'orm', name: 'ORM' },
+            ],
+        });
+        expect(relationFixture.deleteLink).not.toHaveBeenCalled();
+        expect(relationFixture.deleteLinks).not.toHaveBeenCalled();
+        expect(relationFixture.insertLink).toHaveBeenCalledWith(7, 3, { onDuplicate: 'ignore' });
+        expect(relationFixture.insertLinks).not.toHaveBeenCalled();
+    });
+
     it('resolves serializer-owned async output fields before parsing the outward schema', async () => {
         const serializer = new TaggedUserSerializer();
         const fixture = aTaggableManagerFixture([{ id: 1, slug: 'staff', name: 'Staff' }], (targetPrimaryKey) =>
@@ -489,9 +621,9 @@ describe(ModelSerializer, () => {
         await expect(serializer.syncManyToManyRelation(record, 'tags', [])).resolves.toBeUndefined();
         await expect(serializer.applyRelationWrites(record, { missing: ['ignored'] })).resolves.toBeUndefined();
 
-        await expect(
-            serializer.resolveWriteTargets('tags', relation.pkList(), 'not-an-array')
-        ).rejects.toThrow(/primary-key values/i);
+        await expect(serializer.resolveWriteTargets('tags', relation.pkList(), 'not-an-array')).rejects.toThrow(
+            /primary-key values/i
+        );
         await expect(
             serializer.resolveWriteTargets(
                 'tags',
@@ -513,9 +645,9 @@ describe(ModelSerializer, () => {
             )
         ).resolves.toEqual([]);
 
-        expect(() => serializer.getManyToManyManager({ id: 1, email: 'bad@example.com', tags: [] } as never, 'tags')).toThrow(
-            /many-to-many related manager/i
-        );
+        expect(() =>
+            serializer.getManyToManyManager({ id: 1, email: 'bad@example.com', tags: [] } as never, 'tags')
+        ).toThrow(/many-to-many related manager/i);
         expect(() => serializer.getManyToManyRelationMeta('missing')).toThrow(/persisted many-to-many edge/i);
     });
 
@@ -526,7 +658,9 @@ describe(ModelSerializer, () => {
         const clearingFixture = aTaggableManagerFixture([availableTags[0]!], (targetPrimaryKey) =>
             availableById.get(Number(targetPrimaryKey))
         );
-        const createFixture = aTaggableManagerFixture([], (targetPrimaryKey) => availableById.get(Number(targetPrimaryKey)));
+        const createFixture = aTaggableManagerFixture([], (targetPrimaryKey) =>
+            availableById.get(Number(targetPrimaryKey))
+        );
 
         const tagQuerySet = {
             filter: vi.fn((where: Record<string, unknown>) => {
@@ -594,7 +728,12 @@ describe(ModelSerializer, () => {
                 create: vi.fn(async (input) => ({ id: 31, ...input, tags: createFixture.manager }) as TaggedUserRecord),
                 update: vi.fn(
                     async (id, patch) =>
-                        ({ id: Number(id), email: 'existing@example.com', ...patch, tags: clearingFixture.manager }) as TaggedUserRecord
+                        ({
+                            id: Number(id),
+                            email: 'existing@example.com',
+                            ...patch,
+                            tags: clearingFixture.manager,
+                        }) as TaggedUserRecord
                 ),
             }),
         };

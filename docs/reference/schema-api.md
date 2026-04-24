@@ -324,7 +324,7 @@ The config object supports `field`, `name`, `through`, `throughSourceFieldName`,
 
 The forward many-to-many edge stays `migratable: false` on the owner model because there is still no owner-row column for the collection; DDL for the join rows is owned by the synthesized or explicit through model that appears in migration metadata.
 
-Persisted records returned by the manager carry a related-manager accessor named after the published relation. For the example above, `post.tags.add(tag, featuredTag)`, `post.tags.remove(tag)`, and `post.tags.all()` insert, delete, and read membership rows through the resolved through model. `add(...)` and `remove(...)` accept one or more targets, and duplicate `add(...)` calls are ignored. The accessor stays a manager even after `prefetchRelated('tags')`; eager loading only warms its cache. The accessor is documented in the [ORM query API reference](/reference/orm-query-api).
+Persisted records returned by the manager carry a related-manager accessor named after the published relation. For the example above, `post.tags.add(tag, featuredTag)`, `post.tags.remove(tag)`, `post.tags.set(featuredTag)`, and `post.tags.all()` insert, delete, replace, and read membership rows through the resolved through model. `add(...)`, `remove(...)`, and `set(...)` accept one or more targets, and duplicate `add(...)` calls are ignored. The accessor stays a manager even after `prefetchRelated('tags')`; eager loading only warms its cache. The accessor is documented in the [ORM query API reference](/reference/orm-query-api).
 
 Reverse many-to-many naming, the bulk `set(...)` helper, the `clear()` helper, and `create(...)` on the related manager remain roadmap work.
 

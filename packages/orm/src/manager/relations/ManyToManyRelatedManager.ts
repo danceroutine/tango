@@ -9,8 +9,9 @@ import { ManyToManyRelatedQuerySet } from './ManyToManyRelatedQuerySet';
 import { ThroughTableManager } from './internal/ThroughTableManager';
 
 /**
- * Accepted target reference shapes for {@link ManyToManyRelatedManager.add} and
- * {@link ManyToManyRelatedManager.remove}.
+ * Accepted target reference shapes for {@link ManyToManyRelatedManager.add},
+ * {@link ManyToManyRelatedManager.remove}, and
+ * {@link ManyToManyRelatedManager.set}.
  *
  * Application code may pass a target record, a primary-key carrier object, or
  * a bare primary-key value.
@@ -75,8 +76,12 @@ interface ManyToManyRelatedManagerInternalInputs<TTarget extends Record<string, 
  *
  * Prefetched memberships seed an internal cache that the queryset returned
  * from `all()` short-circuits to without re-querying. Mutations through
- * `add` and `remove` invalidate the cache so subsequent reads observe the
- * updated membership.
+ * `add`, `remove`, and `set` invalidate the cache so subsequent reads
+ * observe the updated membership. `set(...)` applies Django-shaped
+ * replacement semantics:
+ * it diffs the current relation membership against the supplied targets,
+ * removes any missing links, and inserts any new links inside one atomic
+ * write boundary.
  *
  * @template TTarget - The persisted target record shape returned by `all()`.
  */
@@ -151,15 +156,9 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
         }
 
         if (targetPrimaryKeys.length === 1) {
-            await this.inputs.throughTableManager.insertLink(this.inputs.ownerPrimaryKey, targetPrimaryKeys[0], {
-                onDuplicate: InternalDuplicateInsertPolicy.IGNORE,
-            });
+            await this.insertTargetPrimaryKeys(targetPrimaryKeys);
         } else {
-            await this.inputs.runAtomic(() =>
-                this.inputs.throughTableManager.insertLinks(this.inputs.ownerPrimaryKey, targetPrimaryKeys, {
-                    onDuplicate: InternalDuplicateInsertPolicy.IGNORE,
-                })
-            );
+            await this.inputs.runAtomic(() => this.insertTargetPrimaryKeys(targetPrimaryKeys));
         }
         this.invalidateCache();
     }
@@ -176,12 +175,48 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
         }
 
         if (targetPrimaryKeys.length === 1) {
-            await this.inputs.throughTableManager.deleteLink(this.inputs.ownerPrimaryKey, targetPrimaryKeys[0]);
+            await this.deleteTargetPrimaryKeys(targetPrimaryKeys);
         } else {
-            await this.inputs.runAtomic(() =>
-                this.inputs.throughTableManager.deleteLinks(this.inputs.ownerPrimaryKey, targetPrimaryKeys)
-            );
+            await this.inputs.runAtomic(() => this.deleteTargetPrimaryKeys(targetPrimaryKeys));
         }
+        this.invalidateCache();
+    }
+
+    /**
+     * Replace the current relation membership with exactly the supplied
+     * targets. Duplicate inputs are collapsed before diffing against the
+     * current through-table rows, so repeated values do not trigger extra
+     * writes. Calling `set()` with no targets clears the relation.
+     *
+     * When replacement requires writes, Tango performs the delete/insert
+     * sequence inside one `transaction.atomic(...)` boundary.
+     */
+    async set(...targets: ManyToManyTargetRef<TTarget>[]): Promise<void> {
+        const nextTargetPrimaryKeys = this.resolveTargetPrimaryKeys(targets);
+        const currentTargetPrimaryKeys = await this.inputs.throughTableManager.selectTargetIdsForOwner(
+            this.inputs.ownerPrimaryKey
+        );
+        const currentCanonical = new Set(
+            currentTargetPrimaryKeys.map((primaryKey) => this.canonicalizePrimaryKey(primaryKey))
+        );
+        const nextCanonical = new Set(
+            nextTargetPrimaryKeys.map((primaryKey) => this.canonicalizePrimaryKey(primaryKey))
+        );
+        const targetPrimaryKeysToRemove = currentTargetPrimaryKeys.filter(
+            (primaryKey) => !nextCanonical.has(this.canonicalizePrimaryKey(primaryKey))
+        );
+        const targetPrimaryKeysToAdd = nextTargetPrimaryKeys.filter(
+            (primaryKey) => !currentCanonical.has(this.canonicalizePrimaryKey(primaryKey))
+        );
+
+        if (targetPrimaryKeysToRemove.length === 0 && targetPrimaryKeysToAdd.length === 0) {
+            return;
+        }
+
+        await this.inputs.runAtomic(async () => {
+            await this.deleteTargetPrimaryKeys(targetPrimaryKeysToRemove);
+            await this.insertTargetPrimaryKeys(targetPrimaryKeysToAdd);
+        });
         this.invalidateCache();
     }
 
@@ -189,8 +224,8 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
      * Return a {@link QuerySet} for the related target rows of this many-to-many
      * relation. When the relation was already loaded by `prefetchRelated(...)`,
      * the first `fetch()` resolves with the cached materialization without
-     * re-querying. Mutating the membership through `add`/`remove` invalidates
-     * that cache.
+     * re-querying. Mutating the membership through `add`/`remove`/`set`
+     * invalidates that cache.
      */
     all(): QuerySet<TTarget> {
         const executor = this.inputs.targetExecutorProvider();
@@ -217,7 +252,7 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
 
     /**
      * Drop any cached prefetch results. Mutating helpers call this so reads
-     * after an `add`/`remove` go back to the database.
+     * after an `add`/`remove`/`set` go back to the database.
      */
     invalidateCache(): void {
         this.prefetchCache = null;
@@ -230,6 +265,32 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
      */
     snapshotCache(): readonly TTarget[] | null {
         return this.prefetchCache ? [...this.prefetchCache] : null;
+    }
+
+    private async insertTargetPrimaryKeys(targetPrimaryKeys: readonly unknown[]): Promise<void> {
+        if (targetPrimaryKeys.length === 0) {
+            return;
+        }
+        if (targetPrimaryKeys.length === 1) {
+            await this.inputs.throughTableManager.insertLink(this.inputs.ownerPrimaryKey, targetPrimaryKeys[0], {
+                onDuplicate: InternalDuplicateInsertPolicy.IGNORE,
+            });
+            return;
+        }
+        await this.inputs.throughTableManager.insertLinks(this.inputs.ownerPrimaryKey, targetPrimaryKeys, {
+            onDuplicate: InternalDuplicateInsertPolicy.IGNORE,
+        });
+    }
+
+    private async deleteTargetPrimaryKeys(targetPrimaryKeys: readonly unknown[]): Promise<void> {
+        if (targetPrimaryKeys.length === 0) {
+            return;
+        }
+        if (targetPrimaryKeys.length === 1) {
+            await this.inputs.throughTableManager.deleteLink(this.inputs.ownerPrimaryKey, targetPrimaryKeys[0]);
+            return;
+        }
+        await this.inputs.throughTableManager.deleteLinks(this.inputs.ownerPrimaryKey, targetPrimaryKeys);
     }
 
     private resolveTargetPrimaryKeys(targets: readonly ManyToManyTargetRef<TTarget>[]): unknown[] {

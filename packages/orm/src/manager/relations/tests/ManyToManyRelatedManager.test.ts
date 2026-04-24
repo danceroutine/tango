@@ -141,6 +141,95 @@ describe(ManyToManyRelatedManager, () => {
         });
     });
 
+    describe(ManyToManyRelatedManager.prototype.set, () => {
+        it('replaces a non-empty relation set by removing missing links and adding new ones', async () => {
+            const { manager, insertLink, insertLinks, deleteLink, deleteLinks, selectTargetIdsForOwner, runAtomic } =
+                aManyToManyRelatedManager<{ id: number }>({
+                    selectTargetIdsForOwner: async () => [11, 12],
+                });
+            manager.primePrefetchCache([{ id: 11 }, { id: 12 }]);
+
+            await manager.set({ id: 12 }, { id: 13 });
+
+            expect(selectTargetIdsForOwner).toHaveBeenCalledWith(7);
+            expect(runAtomic).toHaveBeenCalledTimes(1);
+            expect(deleteLink).toHaveBeenCalledWith(7, 11);
+            expect(deleteLinks).not.toHaveBeenCalled();
+            expect(insertLink).toHaveBeenCalledWith(7, 13, { onDuplicate: 'ignore' });
+            expect(insertLinks).not.toHaveBeenCalled();
+            expect(manager.snapshotCache()).toBeNull();
+        });
+
+        it('replaces the current relation set with an empty set when no targets are supplied', async () => {
+            const { manager, deleteLink, deleteLinks, insertLink, insertLinks, runAtomic } = aManyToManyRelatedManager<{
+                id: number;
+            }>({
+                selectTargetIdsForOwner: async () => [11, 12],
+            });
+
+            await manager.set();
+
+            expect(runAtomic).toHaveBeenCalledTimes(1);
+            expect(deleteLink).not.toHaveBeenCalled();
+            expect(deleteLinks).toHaveBeenCalledWith(7, [11, 12]);
+            expect(insertLink).not.toHaveBeenCalled();
+            expect(insertLinks).not.toHaveBeenCalled();
+        });
+
+        it('deduplicates duplicate targets before diffing the replacement set', async () => {
+            const { manager, insertLink, insertLinks, deleteLink, deleteLinks } = aManyToManyRelatedManager<{
+                id: number;
+            }>({
+                selectTargetIdsForOwner: async () => [11],
+            });
+
+            await manager.set(11, { id: 12 }, 11, { id: 12 });
+
+            expect(deleteLink).not.toHaveBeenCalled();
+            expect(deleteLinks).not.toHaveBeenCalled();
+            expect(insertLink).toHaveBeenCalledWith(7, 12, { onDuplicate: 'ignore' });
+            expect(insertLinks).not.toHaveBeenCalled();
+        });
+
+        it('returns without mutating or invalidating the cache when the target set is unchanged', async () => {
+            const { manager, insertLink, insertLinks, deleteLink, deleteLinks, runAtomic } = aManyToManyRelatedManager<{
+                id: number;
+            }>({
+                selectTargetIdsForOwner: async () => [11, 12],
+            });
+            manager.primePrefetchCache([{ id: 11 }, { id: 12 }]);
+
+            await manager.set(12, 11, 12);
+
+            expect(deleteLink).not.toHaveBeenCalled();
+            expect(deleteLinks).not.toHaveBeenCalled();
+            expect(insertLink).not.toHaveBeenCalled();
+            expect(insertLinks).not.toHaveBeenCalled();
+            expect(runAtomic).not.toHaveBeenCalled();
+            expect(manager.snapshotCache()).toEqual([{ id: 11 }, { id: 12 }]);
+        });
+
+        it('is idempotent across repeated calls with the same replacement set', async () => {
+            let currentTargetPrimaryKeys: readonly number[] = [11];
+            const { manager, insertLink, deleteLink, runAtomic } = aManyToManyRelatedManager<{ id: number }>({
+                selectTargetIdsForOwner: async () => currentTargetPrimaryKeys,
+                insertLink: async (_ownerPrimaryKey, targetPrimaryKey) => {
+                    currentTargetPrimaryKeys = [...currentTargetPrimaryKeys, Number(targetPrimaryKey)];
+                },
+                deleteLink: async (_ownerPrimaryKey, targetPrimaryKey) => {
+                    currentTargetPrimaryKeys = currentTargetPrimaryKeys.filter((id) => id !== Number(targetPrimaryKey));
+                },
+            });
+
+            await manager.set(11, 12);
+            await manager.set(12, 11);
+
+            expect(insertLink).toHaveBeenCalledTimes(1);
+            expect(deleteLink).not.toHaveBeenCalled();
+            expect(runAtomic).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe(ManyToManyRelatedManager.prototype.all, () => {
         it('throws a descriptive error when the target executor cannot be resolved', () => {
             const { manager } = aManyToManyRelatedManager<{ id: number }>({ targetExecutor: null });
