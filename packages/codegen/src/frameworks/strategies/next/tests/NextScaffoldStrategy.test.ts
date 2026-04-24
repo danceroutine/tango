@@ -53,6 +53,7 @@ describe(NextScaffoldStrategy, () => {
 
             expect(packageJson).toContain('"codegen:relations"');
             expect(tsconfig).toContain('"migrations/**/*.ts"');
+            expect(tsconfig).toContain('".tango/**/*.d.ts"');
             expect(layout).toContain('RootLayout');
             expect(route).toContain('Response.json');
             expect(openapiRoute).toContain("from '@/lib/openapi'");

@@ -13,7 +13,7 @@ export class TsConfigTemplateBuilder extends TemplateBuilder {
                 compilerOptions: {
                     strict: true,
                 },
-                include: ['.nuxt/**/*.d.ts', '**/*.ts', '**/*.vue', 'migrations/**/*.ts'],
+                include: ['.nuxt/**/*.d.ts', '**/*.ts', '**/*.vue', 'migrations/**/*.ts', '.tango/**/*.d.ts'],
             },
             null,
             4

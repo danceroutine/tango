@@ -48,6 +48,7 @@ describe(ExpressScaffoldStrategy, () => {
             expect(config).toContain("adapter: 'sqlite'");
             expect(config).toContain('./.data/express-sqlite.sqlite');
             expect((JSON.parse(tsconfig) as { include: string[] }).include).toContain('migrations/**/*.ts');
+            expect((JSON.parse(tsconfig) as { include: string[] }).include).toContain('.tango/**/*.d.ts');
             expect(indexSource).toContain("from './tango.js'");
             expect(openapiSource).toContain('describeViewSet');
             expect(openapiSource).toContain(
