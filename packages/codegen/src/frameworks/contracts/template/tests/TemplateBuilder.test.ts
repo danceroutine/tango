@@ -57,4 +57,20 @@ describe(TemplateBuilder, () => {
             'pnpm run make:migrations --name initial'
         );
     });
+
+    it('formats yarn and bun script forwarding without npm-specific separators', () => {
+        expect(TemplateBuilder.getRunScriptCommand('yarn', 'make:migrations', ['--name', 'initial'])).toBe(
+            'yarn run make:migrations --name initial'
+        );
+        expect(TemplateBuilder.getRunScriptCommand('bun', 'make:migrations', ['--name', 'initial'])).toBe(
+            'bun run make:migrations --name initial'
+        );
+    });
+
+    it('formats script invocations with no forwarded args', () => {
+        expect(TemplateBuilder.getRunScriptCommand('pnpm', 'dev')).toBe('pnpm run dev');
+        expect(TemplateBuilder.getRunScriptCommand('npm', 'dev')).toBe('npm run dev');
+        expect(TemplateBuilder.getRunScriptCommand('yarn', 'dev')).toBe('yarn run dev');
+        expect(TemplateBuilder.getRunScriptCommand('bun', 'dev')).toBe('bun run dev');
+    });
 });

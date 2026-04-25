@@ -45,10 +45,6 @@ function runCommand(
     );
 }
 
-function ensureScaffoldSmokeBuildPrerequisites(): void {
-    runCommand('build:test:packages', 'pnpm', ['run', 'build:test:packages'], workspaceRoot);
-}
-
 function discoverPackageDirs(dir: string): string[] {
     const entries = spawnSync('find', [dir, '-name', 'package.json', '-not', '-path', '*/node_modules/*'], {
         cwd: workspaceRoot,
@@ -196,7 +192,6 @@ smokeDescribe('fresh tango new scaffold smoke tests', () => {
     let packDir: string | null = null;
 
     beforeAll(async () => {
-        ensureScaffoldSmokeBuildPrerequisites();
         const packed = await packLocalTangoPackages();
         packDir = packed.packDir;
         packedPackages = packed.packages;
