@@ -78,9 +78,11 @@ describe(ManyToManyRelatedManager, () => {
                     insertLinks: async () => {},
                     deleteLink: async () => {},
                     deleteLinks: async () => {},
+                    deleteAllLinksForOwner: async () => {},
                     selectTargetIdsForOwner: async () => [],
                 } as unknown as ConstructorParameters<typeof ManyToManyRelatedManager>[0]['throughTableManager'],
                 targetExecutorProvider: () => null,
+                createTarget: async () => ({ id: 1 } as { id: number }),
                 runAtomic: async (work) => work(),
             });
             await expect(manager.add(true as unknown as { id: number })).rejects.toThrow(
@@ -138,6 +140,90 @@ describe(ManyToManyRelatedManager, () => {
             manager.primePrefetchCache([{ id: 7 }]);
             await manager.remove(7);
             expect(manager.snapshotCache()).toBeNull();
+        });
+    });
+
+    describe(ManyToManyRelatedManager.prototype.clear, () => {
+        it('deletes every link for the owning record', async () => {
+            const { manager, deleteAllLinksForOwner, runAtomic } = aManyToManyRelatedManager<{ id: number }>();
+
+            await manager.clear();
+
+            expect(deleteAllLinksForOwner).toHaveBeenCalledWith(7);
+            expect(runAtomic).not.toHaveBeenCalled();
+        });
+
+        it('invalidates the prefetch cache after a successful clear', async () => {
+            const { manager } = aManyToManyRelatedManager<{ id: number }>();
+            manager.primePrefetchCache([{ id: 7 }]);
+
+            await manager.clear();
+
+            expect(manager.snapshotCache()).toBeNull();
+        });
+    });
+
+    describe(ManyToManyRelatedManager.prototype.create, () => {
+        it('creates the target record and links it inside one atomic boundary', async () => {
+            const events: string[] = [];
+            const { manager, createTarget, insertLink, runAtomic } = aManyToManyRelatedManager<{
+                id: number;
+                name: string;
+            }>({
+                createTarget: async (input) => {
+                    events.push(`create:${String(input.name)}`);
+                    return { id: 23, name: String(input.name) };
+                },
+                insertLink: async (_ownerPrimaryKey, targetPrimaryKey) => {
+                    events.push(`link:${String(targetPrimaryKey)}`);
+                },
+            });
+
+            const created = await manager.create({ name: 'Featured' });
+
+            expect(runAtomic).toHaveBeenCalledTimes(1);
+            expect(createTarget).toHaveBeenCalledWith({ name: 'Featured' });
+            expect(insertLink).toHaveBeenCalledWith(7, 23, { onDuplicate: 'ignore' });
+            expect(created).toEqual({ id: 23, name: 'Featured' });
+            expect(events).toEqual(['create:Featured', 'link:23']);
+        });
+
+        it('invalidates the prefetch cache after a successful create', async () => {
+            const { manager } = aManyToManyRelatedManager<{ id: number }>({
+                createTarget: async () => ({ id: 29 }),
+            });
+            manager.primePrefetchCache([{ id: 7 }]);
+
+            await manager.create({});
+
+            expect(manager.snapshotCache()).toBeNull();
+        });
+
+        it('preserves the cache when target creation fails', async () => {
+            const { manager, insertLink } = aManyToManyRelatedManager<{ id: number }>({
+                createTarget: async () => {
+                    throw new Error('create failed');
+                },
+            });
+            manager.primePrefetchCache([{ id: 7 }]);
+
+            await expect(manager.create({})).rejects.toThrow('create failed');
+
+            expect(insertLink).not.toHaveBeenCalled();
+            expect(manager.snapshotCache()).toEqual([{ id: 7 }]);
+        });
+
+        it('throws when the created target record does not expose the configured primary key', async () => {
+            const { manager, insertLink } = aManyToManyRelatedManager<{ id: number }>({
+                targetPrimaryKeyField: 'id',
+                createTarget: async () => ({ slug: 'missing-id' } as unknown as { id: number }),
+            });
+
+            await expect(manager.create({})).rejects.toThrow(
+                /Cannot resolve target primary key 'id' for relation 'tags' on 'Post'/
+            );
+
+            expect(insertLink).not.toHaveBeenCalled();
         });
     });
 

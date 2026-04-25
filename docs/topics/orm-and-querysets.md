@@ -235,19 +235,21 @@ firstUser?.posts[0]?.comments[0]?.body;
 
 In that form, a user with no posts still receives `posts: []`, while a post with no comments receives `comments: []`.
 
-Persisted records returned by the manager carry a related-manager accessor for each many-to-many relation declared on the source model. The accessor is named after the published forward relation name, so a field such as `tagIds: t.manyToMany(..., { name: 'tags' })` exposes `post.tags.add(...)`, `post.tags.remove(...)`, `post.tags.set(...)`, and `post.tags.all()`. `add(...)`, `remove(...)`, and `set(...)` all accept one or more targets, and duplicate links are ignored so repeated `add(...)` calls stay idempotent. `set(...)` replaces the membership with exactly the supplied targets. The accessor is attached non-enumerably so persistence-style helpers such as `JSON.stringify(post)` continue to focus on the persisted columns.
+Persisted records returned by the manager carry a related-manager accessor for each many-to-many relation declared on the source model. The accessor is named after the published forward relation name, so a field such as `tagIds: t.manyToMany(..., { name: 'tags' })` exposes `post.tags.add(...)`, `post.tags.remove(...)`, `post.tags.set(...)`, `post.tags.clear()`, `post.tags.create(...)`, and `post.tags.all()`. `add(...)`, `remove(...)`, and `set(...)` all accept one or more targets, and duplicate links are ignored so repeated `add(...)` calls stay idempotent. `set(...)` replaces the membership with exactly the supplied targets, `clear()` removes every linked target for that owner, and `create(...)` follows the target model's normal `create(...)` path before attaching the new row to the relation in the same atomic write boundary. The accessor is attached non-enumerably so persistence-style helpers such as `JSON.stringify(post)` continue to focus on the persisted columns.
 
 ```ts
 const post = await PostModel.objects.getOrThrow(postId);
 
+const featuredTag = await post.tags.create({ name: 'featured' });
 await post.tags.add(tag, featuredTag);
 await post.tags.set(featuredTag);
 const linked = await post.tags.all().fetch();
+await post.tags.clear();
 ```
 
 `post.tags` stays a related manager on the model instance. `prefetchRelated('tags')` only warms that manager's cache, so application code still reads through `post.tags.all()` rather than expecting `post.tags` itself to become an array.
 
-When `prefetchRelated('tags')` ran in the same fetch, `post.tags.all()` reads from the prefetched cache. A successful `add(...)`, `remove(...)`, or `set(...)` invalidates that cache so the next read returns fresh data. If an API response or page helper needs an array-shaped value, materialize it explicitly with `await post.tags.all().fetch()`.
+When `prefetchRelated('tags')` ran in the same fetch, `post.tags.all()` reads from the prefetched cache. A successful `add(...)`, `remove(...)`, `set(...)`, `clear()`, or `create(...)` invalidates that cache so the next read returns fresh data. If an API response or page helper needs an array-shaped value, materialize it explicitly with `await post.tags.all().fetch()`.
 
 Forward many-to-many prefetch path typing comes from the generated relation registry. Without generated relation typing, the older explicit target-model generic still only describes reverse `hasMany` paths even though the runtime can execute the many-to-many prefetch.
 

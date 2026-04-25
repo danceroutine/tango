@@ -183,6 +183,25 @@ describe(ThroughTableManager, () => {
         ]);
     });
 
+    it('compiles parameterized DELETE statements when clearing all links for one owner', async () => {
+        const { client, calls } = buildHarness();
+        const manager = new ThroughTableManager(
+            client,
+            new MutationCompiler(postgresAdapter),
+            ThroughTableManager.buildLinkDescriptor(persistedRelation, throughFields),
+            postgresAdapter
+        );
+
+        await manager.deleteAllLinksForOwner(9);
+
+        expect(calls).toEqual([
+            {
+                sql: 'DELETE FROM m2m_post_tags WHERE postId = $1',
+                params: [9],
+            },
+        ]);
+    });
+
     it('selects target ids linked to the supplied owner via the join table', async () => {
         const { client, calls } = buildHarness(async () => ({
             rows: [{ target_id: 10 }, { target_id: 11 }, { target_id: null }],
@@ -220,6 +239,25 @@ describe(ThroughTableManager, () => {
             {
                 sql: 'SELECT tagId AS target_id FROM m2m_post_tags WHERE postId = ?',
                 params: [3],
+            },
+        ]);
+    });
+
+    it('uses positional placeholders for owner-wide deletes when the dialect is sqlite', async () => {
+        const { client, calls } = buildHarness();
+        const manager = new ThroughTableManager(
+            client,
+            new MutationCompiler(sqliteAdapter),
+            ThroughTableManager.buildLinkDescriptor(persistedRelation, throughFields),
+            sqliteAdapter
+        );
+
+        await manager.deleteAllLinksForOwner(4);
+
+        expect(calls).toEqual([
+            {
+                sql: 'DELETE FROM m2m_post_tags WHERE postId = ?',
+                params: [4],
             },
         ]);
     });

@@ -408,6 +408,15 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
             adapter: this.adapter,
             sqlSafetyAdapter,
             targetExecutorProvider: () => this.resolveTargetExecutor<TTarget>(relation.targetModelKey),
+            createTarget: async (input) => {
+                const targetManager = this.resolveTargetManager<TTarget>(relation.targetModelKey);
+                if (!targetManager) {
+                    throw new Error(
+                        `Cannot resolve a target manager for relation '${relationName}' on '${this.model.metadata.name}'.`
+                    );
+                }
+                return targetManager.create(input);
+            },
             runAtomic: (work) => TransactionEngine.forRuntime(this.runtime).atomic(() => work()),
         });
     }
@@ -527,11 +536,21 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
     private resolveTargetExecutor<TTarget extends Record<string, unknown>>(
         targetModelKey: string
     ): QueryExecutor<TTarget> | null {
-        const targetManager = this.resolveManagerForModelKey(targetModelKey);
+        const targetManager = this.resolveTargetManager<TTarget>(targetModelKey);
         if (!targetManager) {
             return null;
         }
         return (targetManager as unknown as { queryExecutor: QueryExecutor<TTarget> }).queryExecutor;
+    }
+
+    private resolveTargetManager<TTarget extends Record<string, unknown>>(
+        targetModelKey: string
+    ): ModelManager<TTarget> | null {
+        const targetManager = this.resolveManagerForModelKey(targetModelKey);
+        if (!targetManager) {
+            return null;
+        }
+        return targetManager as unknown as ModelManager<TTarget>;
     }
 
     private requireManyToManyEdge(relationName: string): NonNullable<TableMeta['relations']>[string] {
