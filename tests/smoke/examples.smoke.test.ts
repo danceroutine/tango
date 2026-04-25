@@ -6,36 +6,6 @@ import { AppProcessHarness } from '@danceroutine/tango-testing/integration';
 
 const smokeDescribe = process.env.TANGO_RUN_SMOKE === 'true' ? describe.sequential : describe.skip;
 
-function ensureSmokeBuildPrerequisites(): void {
-    const commands: ReadonlyArray<ReadonlyArray<string>> = [
-        ['--filter', '@danceroutine/tango-cli', 'build'],
-        ['--filter', '@danceroutine/tango-adapters-express', 'build'],
-        ['--filter', '@danceroutine/tango-adapters-next', 'build'],
-        ['--filter', '@danceroutine/tango-adapters-nuxt', 'build'],
-    ];
-
-    for (const args of commands) {
-        const result = spawnSync('pnpm', [...args], {
-            cwd: process.cwd(),
-            env: process.env,
-            encoding: 'utf8',
-        });
-
-        if (result.status === 0) {
-            continue;
-        }
-
-        throw new Error(
-            [
-                `smoke prerequisite build failed: pnpm ${args.join(' ')}`,
-                `exit=${String(result.status)}`,
-                result.stdout ?? '',
-                result.stderr ?? '',
-            ].join('\n')
-        );
-    }
-}
-
 function runSmokeCommand(label: string, args: readonly string[], env?: NodeJS.ProcessEnv): void {
     const result = spawnSync('pnpm', [...args], {
         cwd: process.cwd(),
@@ -91,8 +61,6 @@ smokeDescribe('example smoke tests', () => {
     const nuxtSqliteFile = `/tmp/tango-smoke-nuxt-${randomUUID()}.sqlite`;
 
     beforeAll(async () => {
-        ensureSmokeBuildPrerequisites();
-
         // Ensure a clean database state for repeatable smoke runs.
         await rm(expressSqliteFile, { force: true });
         await rm(nextSqliteFile, { force: true });

@@ -39,7 +39,7 @@ describe(scaffoldProject, () => {
             expect(packageJson).toContain('"@danceroutine/tango-openapi"');
             expect(packageJson).toContain('"setup:schema"');
             expect(scripts['make:migrations']).not.toContain('--name');
-            expect(readme).toContain('make:migrations -- --name initial');
+            expect(readme).toContain('pnpm run make:migrations --name initial');
             expect(appSource).toContain("from './tango.js'");
             expect(appSource).toContain('await registerTango(app)');
             expect(tangoSource).toContain("adapter.registerViewSet(app, '/api/todos'");
@@ -79,7 +79,7 @@ describe(scaffoldProject, () => {
             expect(packageJson).toContain('"next"');
             expect(packageJson).toContain('"@danceroutine/tango-openapi"');
             expect(scripts['make:migrations']).not.toContain('--name');
-            expect(readme).toContain('make:migrations -- --name initial');
+            expect(readme).toContain('pnpm run make:migrations --name initial');
             expect(routeSource).toContain('Response.json');
             expect(openapiRoute).toContain("from '@/lib/openapi'");
             expect(openapiSource).toContain('describeViewSet');
@@ -121,7 +121,7 @@ describe(scaffoldProject, () => {
             expect(packageJson).toContain('"nuxt"');
             expect(packageJson).toContain('"@danceroutine/tango-openapi"');
             expect(scripts['make:migrations']).not.toContain('--name');
-            expect(readme).toContain('make:migrations -- --name initial');
+            expect(readme).toContain('pnpm run make:migrations --name initial');
             expect(nuxtConfig).toContain('/api/todos/**:tango');
             expect(routeSource).toContain('NuxtAdapter');
             expect(openapiRoute).toContain("from '~~/lib/openapi'");
@@ -191,7 +191,7 @@ writeFileSync(join(process.cwd(), 'migrations', \`20260424120000_\${args[nameInd
                 );
                 await chmod(tangoStub, 0o755);
 
-                await execFileAsync('pnpm', ['run', 'make:migrations', '--', '--name', 'initial'], { cwd: dir });
+                await execFileAsync('pnpm', ['run', 'make:migrations', '--name', 'initial'], { cwd: dir });
 
                 const filenames = await readdir(join(dir, 'migrations'));
                 expect(filenames).toContain('20260424120000_initial.ts');

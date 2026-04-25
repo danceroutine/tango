@@ -25,6 +25,8 @@ describe(registerCodegenCommands, () => {
             const packageJson = await readFile(join(targetDir, 'package.json'), 'utf8');
             const tsconfig = await readFile(join(targetDir, 'tsconfig.json'), 'utf8');
             const source = await readFile(join(targetDir, 'src/index.ts'), 'utf8');
+            await expect(stat(join(targetDir, 'src/app/layout.tsx'))).rejects.toThrow();
+            await expect(stat(join(targetDir, 'nuxt.config.ts'))).rejects.toThrow();
             expect(packageJson).toContain('"name": "demo"');
             expect(packageJson).toContain('"@danceroutine/tango-migrations"');
             expect(packageJson).toContain('"@danceroutine/tango-openapi"');
@@ -46,6 +48,8 @@ describe(registerCodegenCommands, () => {
             await parser.parseAsync();
 
             const readme = await readFile(join(targetDir, 'README.md'), 'utf8');
+            await expect(stat(join(targetDir, 'src/tango.ts'))).rejects.toThrow();
+            await expect(stat(join(targetDir, 'nuxt.config.ts'))).rejects.toThrow();
             expect(readme).toContain('scaffolded by `tango new --framework next`');
         } finally {
             await rm(dir, { recursive: true, force: true });
@@ -119,10 +123,14 @@ describe(registerCodegenCommands, () => {
             const packageJson = await readFile(join(targetDir, 'package.json'), 'utf8');
             const nuxtConfig = await readFile(join(targetDir, 'nuxt.config.ts'), 'utf8');
             const routeSource = await readFile(join(targetDir, 'server/tango/todos.ts'), 'utf8');
+            const readme = await readFile(join(targetDir, 'README.md'), 'utf8');
+            await expect(stat(join(targetDir, 'src/index.ts'))).rejects.toThrow();
+            await expect(stat(join(targetDir, 'src/app/layout.tsx'))).rejects.toThrow();
             expect(packageJson).toContain('"nuxt"');
             expect(packageJson).toContain('"@danceroutine/tango-adapters-nuxt"');
             expect(nuxtConfig).toContain('/api/todos/**:tango');
             expect(routeSource).toContain('NuxtAdapter');
+            expect(readme).toContain('Nuxt owns the public page route at `/`');
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

@@ -43,7 +43,8 @@ describe(ExpressScaffoldStrategy, () => {
             const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
 
             expect(packageJson).toContain('"better-sqlite3"');
-            expect(packageJson).not.toContain('"pg"');
+            expect(packageJson).toContain('"pg"');
+            expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(packageJson).toContain('"@danceroutine/tango-openapi"');
             expect(packageJson).toContain('"codegen:relations"');
             expect(scripts['make:migrations']).not.toContain('--name');
@@ -61,7 +62,10 @@ describe(ExpressScaffoldStrategy, () => {
             expect(viewsetSource).toContain('serializer: TodoSerializer');
             expect(indexSource).toContain('await registerTango(app)');
             expect(readme).toContain('First-time setup');
-            expect(readme).toContain('make:migrations -- --name initial');
+            expect(readme).toContain('pnpm run make:migrations --name initial');
+            expect(readme).toContain('## Durable app code');
+            expect(readme).toContain('## Generated artifacts');
+            expect(readme).toContain('## Utility surface');
             expect(readme).toContain('codegen:relations');
             expect(migrationsKeep).toBe('');
         });
@@ -82,7 +86,8 @@ describe(ExpressScaffoldStrategy, () => {
             const config = renderTemplate(templates, 'tango.config.ts', context);
 
             expect(packageJson).toContain('"pg"');
-            expect(packageJson).not.toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(config).toContain("adapter: 'postgres'");
             expect(config).toContain('TANGO_DATABASE_URL');
         });
@@ -117,6 +122,17 @@ describe(ExpressScaffoldStrategy, () => {
             expect(tangoSource).toContain('export async function registerTango(app: Application)');
             expect(tangoSource).toContain("adapter.registerViewSet(app, '/api/todos'");
             expect(tangoSource).toContain('/api/openapi.json');
+        });
+
+        it('does not emit Next or Nuxt-specific files', () => {
+            const strategy = new ExpressScaffoldStrategy();
+            const templatePaths = new Set(strategy.getTemplates().map((template) => template.path));
+
+            expect(templatePaths.has('src/app/layout.tsx')).toBe(false);
+            expect(templatePaths.has('src/app/page.tsx')).toBe(false);
+            expect(templatePaths.has('next.config.mjs')).toBe(false);
+            expect(templatePaths.has('nuxt.config.ts')).toBe(false);
+            expect(templatePaths.has('server/tango/todos.ts')).toBe(false);
         });
     });
 });

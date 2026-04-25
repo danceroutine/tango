@@ -8,8 +8,10 @@ export class TodoModelTemplateBuilder extends TemplateBuilder {
 
     protected override resolveTemplate(_context: FrameworkScaffoldContext): string {
         return `import { z } from 'zod';
-import '@danceroutine/tango-orm/runtime';
+import { registerModelObjects } from '@danceroutine/tango-orm/runtime';
 import { Model, t } from '@danceroutine/tango-schema';
+
+registerModelObjects();
 
 export const TodoReadSchema = z.object({
     id: z.number(),

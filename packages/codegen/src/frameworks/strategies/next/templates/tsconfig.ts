@@ -20,6 +20,7 @@ export class TsConfigTemplateBuilder extends TemplateBuilder {
                     isolatedModules: true,
                     jsx: 'preserve',
                     esModuleInterop: true,
+                    skipLibCheck: true,
                     baseUrl: '.',
                     paths: {
                         '@/*': ['src/*'],

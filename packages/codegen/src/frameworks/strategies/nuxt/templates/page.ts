@@ -8,7 +8,7 @@ export class PageTemplateBuilder extends TemplateBuilder {
 
     protected override resolveTemplate(_context: FrameworkScaffoldContext): string {
         return `<script setup lang="ts">
-import { TodoModel, TodoReadSchema } from '~/lib/models';
+import { TodoModel, TodoReadSchema } from '~~/lib/models';
 
 const todos = await TodoModel.objects.query().orderBy('-createdAt').limit(10).fetch(TodoReadSchema);
 </script>
