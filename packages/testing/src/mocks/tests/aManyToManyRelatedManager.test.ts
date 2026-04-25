@@ -74,6 +74,19 @@ describe(aManyToManyRelatedManager, () => {
         expect(runAtomic).toHaveBeenCalledTimes(2);
     });
 
+    it('uses the default clear and createTarget spies when no overrides are supplied', async () => {
+        const { manager, deleteAllLinksForOwner, createTarget } = aManyToManyRelatedManager<{
+            id: number;
+            name?: string;
+        }>();
+
+        await manager.clear();
+        const created = await createTarget({ name: 'tagged' });
+
+        expect(deleteAllLinksForOwner).toHaveBeenCalledWith(7);
+        expect(created).toEqual({ name: 'tagged' });
+    });
+
     it('routes all().fetch through the default selectTargetIdsForOwner spy when no override is supplied', async () => {
         const targetExecutor = aQueryExecutor<{ id: number }>({
             meta: { table: 'tags', pk: 'id', columns: { id: 'int' } },
