@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-migrations",
-    "version": "1.9.2",
+    "version": "1.10.0",
     "description": "Auto-migration system with ops DSL for Tango",
     "type": "module",
     "main": "./dist/index.js",

@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-orm",
-    "version": "1.9.2",
+    "version": "1.10.0",
     "description": "Model-first querying, runtime-managed database access, and transactions for Tango",
     "type": "module",
     "main": "./dist/index.js",

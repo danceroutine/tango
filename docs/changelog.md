@@ -4,6 +4,12 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.10.0 - 2026-04-29
+
+Add `ManyToManyRelatedManager.clear()` and `create(...)`.
+
+`clear()` removes every join-row membership for one owner and invalidates the related-manager prefetch cache. `create(...)` now persists the related target through its normal model manager and inserts the join-row link inside the same atomic boundary, so target-manager hooks and defaults still run without leaking partial writes when the link step fails.
+
 ## 1.9.2 - 2026-04-29
 
 Fix resource list pagination so offset-paginated `count` reflects the full filtered queryset instead of the current page slice.
