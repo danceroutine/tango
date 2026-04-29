@@ -214,6 +214,42 @@ describe(ModelViewSet, () => {
         expect(vi.mocked(querySetDouble.orderBy)).toHaveBeenCalledWith('-name');
     });
 
+    it('counts the filtered queryset before applying offset pagination', async () => {
+        const filteredQuerySet = aQuerySet<UserRecord>();
+        const paginatedQuerySet = aQuerySet<UserRecord>();
+
+        vi.mocked(querySetDouble.filter).mockReturnValue(filteredQuerySet);
+        vi.mocked(filteredQuerySet.limit).mockReturnValue(filteredQuerySet);
+        vi.mocked(filteredQuerySet.offset).mockReturnValue(paginatedQuerySet);
+        vi.mocked(filteredQuerySet.count).mockResolvedValue(5);
+        vi.mocked(paginatedQuerySet.fetch).mockResolvedValue(
+            aQueryResult({
+                items: [
+                    { id: 3, email: 'c@example.com', name: 'C' },
+                    { id: 4, email: 'd@example.com', name: 'D' },
+                ],
+            })
+        );
+        vi.mocked(paginatedQuerySet.count).mockResolvedValue(2);
+
+        const response = await viewset.list(
+            aResourcesRequestContext('GET', 'https://example.test/users?search=example&limit=2&offset=2')
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toEqual({
+            count: 5,
+            next: '?limit=2&offset=4',
+            previous: '?limit=2&offset=0',
+            results: [
+                { id: 3, email: 'c@example.com', name: 'C' },
+                { id: 4, email: 'd@example.com', name: 'D' },
+            ],
+        });
+        expect(vi.mocked(filteredQuerySet.count)).toHaveBeenCalledOnce();
+        expect(vi.mocked(paginatedQuerySet.count)).not.toHaveBeenCalled();
+    });
+
     it('creates, retrieves, updates, and destroys a resource', async () => {
         vi.mocked(querySetDouble.fetchOne).mockResolvedValue({ id: 1, email: 'user@example.com', name: 'User' });
 
