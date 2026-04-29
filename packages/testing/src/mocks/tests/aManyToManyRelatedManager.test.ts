@@ -81,10 +81,11 @@ describe(aManyToManyRelatedManager, () => {
         }>();
 
         await manager.clear();
-        const created = await createTarget({ name: 'tagged' });
+        const created = await manager.create({ id: 99, name: 'tagged' });
 
         expect(deleteAllLinksForOwner).toHaveBeenCalledWith(7);
-        expect(created).toEqual({ name: 'tagged' });
+        expect(createTarget).toHaveBeenCalledWith({ id: 99, name: 'tagged' });
+        expect(created).toEqual({ id: 99, name: 'tagged' });
     });
 
     it('routes all().fetch through the default selectTargetIdsForOwner spy when no override is supplied', async () => {
