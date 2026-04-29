@@ -7,7 +7,11 @@ export class BootstrapTemplateBuilder extends TemplateBuilder {
     }
 
     protected override resolveTemplate(_context: FrameworkScaffoldContext): string {
-        return `import { TodoModel, type Todo } from '../src/lib/models';
+        return `import { initializeTangoRuntime } from '@danceroutine/tango-orm/runtime';
+import tangoConfig from '../tango.config.js';
+import { TodoModel, type Todo } from '../src/lib/models';
+
+initializeTangoRuntime(() => tangoConfig);
 
 async function seedExampleData(count = 100): Promise<void> {
     const existing = await TodoModel.objects.query().count();
