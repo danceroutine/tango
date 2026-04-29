@@ -1,4 +1,5 @@
 import packageJson from '../../../../package.json';
+import { PACKAGE_MANAGER, type PackageManager } from '../FrameworkScaffoldStrategy';
 import type { FrameworkScaffoldContext } from './ScaffoldTemplate';
 
 const { version } = packageJson as { version: string };
@@ -29,7 +30,7 @@ export abstract class TemplateBuilder implements BoundTemplate {
      * One-liner to install Tango + dialect deps and Tango CLI (for init success message).
      */
     static getTangoInstallOneLiner(
-        packageManager: string,
+        packageManager: PackageManager,
         dialect: 'sqlite' | 'postgres',
         framework: 'express' | 'next' | 'nuxt'
     ): string {
@@ -44,6 +45,28 @@ export abstract class TemplateBuilder implements BoundTemplate {
         const addCmd = packageManager === 'npm' ? 'npm install' : `${packageManager} add`;
         const addDevCmd = packageManager === 'npm' ? 'npm install -D' : `${packageManager} add -D`;
         return `${addCmd} ${depList} && ${addDevCmd} ${devList}`;
+    }
+
+    static getRunScriptCommand(
+        packageManager: PackageManager,
+        scriptName: string,
+        scriptArgs: readonly string[] = []
+    ): string {
+        const serializedArgs = scriptArgs.join(' ');
+
+        switch (packageManager) {
+            case PACKAGE_MANAGER.NPM:
+                return serializedArgs.length > 0
+                    ? `npm run ${scriptName} -- ${serializedArgs}`
+                    : `npm run ${scriptName}`;
+            case PACKAGE_MANAGER.YARN:
+                return serializedArgs.length > 0 ? `yarn run ${scriptName} ${serializedArgs}` : `yarn run ${scriptName}`;
+            case PACKAGE_MANAGER.BUN:
+                return serializedArgs.length > 0 ? `bun run ${scriptName} ${serializedArgs}` : `bun run ${scriptName}`;
+            case PACKAGE_MANAGER.PNPM:
+            default:
+                return serializedArgs.length > 0 ? `pnpm run ${scriptName} ${serializedArgs}` : `pnpm run ${scriptName}`;
+        }
     }
 
     /**
@@ -64,7 +87,7 @@ export abstract class TemplateBuilder implements BoundTemplate {
     }
 
     private static getTangoDependencyEntriesFor(
-        dialect: 'sqlite' | 'postgres',
+        _dialect: 'sqlite' | 'postgres',
         framework: 'express' | 'next' | 'nuxt'
     ): Record<string, string> {
         const v = TemplateBuilder.getTangoVersion();
@@ -83,13 +106,18 @@ export abstract class TemplateBuilder implements BoundTemplate {
                 : framework === 'next'
                   ? { '@danceroutine/tango-adapters-next': v }
                   : { '@danceroutine/tango-adapters-nuxt': v };
-        const dialectDeps: Record<string, string> =
-            dialect === 'sqlite' ? { 'better-sqlite3': '^11.10.0' } : { pg: '^8.16.3' };
+        const dialectDeps: Record<string, string> = {
+            'better-sqlite3': '^11.10.0',
+            pg: '^8.16.3',
+        };
         return { ...core, ...adapter, ...dialectDeps };
     }
 
     private static getTangoDevDependencyEntriesFor(): Record<string, string> {
-        return { '@danceroutine/tango-cli': TemplateBuilder.getTangoVersion() };
+        return {
+            '@danceroutine/tango-cli': TemplateBuilder.getTangoVersion(),
+            '@types/better-sqlite3': '^7.6.12',
+        };
     }
 
     /** Bind context and return this for chaining. Use before passing to add* methods. */

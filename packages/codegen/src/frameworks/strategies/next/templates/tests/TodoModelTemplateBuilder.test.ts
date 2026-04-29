@@ -17,7 +17,8 @@ describe(TodoModelTemplateBuilder, () => {
             const template = TodoModelTemplateBuilder.context(context);
 
             expect(template.getPath()).toBe('src/lib/models/TodoModel.ts');
-            expect(template.build()).toContain("import '@danceroutine/tango-orm/runtime';");
+            expect(template.build()).toContain("import { registerModelObjects } from '@danceroutine/tango-orm/runtime';");
+            expect(template.build()).toContain('registerModelObjects();');
         });
     });
 });
