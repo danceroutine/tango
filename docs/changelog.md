@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.9.2 - 2026-04-29
+
+Fix resource list pagination so offset-paginated `count` reflects the full filtered queryset instead of the current page slice.
+
 ## 1.9.1 - 2026-04-24
 
 Make scaffolded `make:migrations` scripts forward a normal `--name` argument so migration naming works the same way across Express, Next, and Nuxt apps.

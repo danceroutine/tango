@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-openapi",
-    "version": "1.9.1",
+    "version": "1.9.2",
     "description": "OpenAPI generation for Tango resources",
     "type": "module",
     "main": "./dist/index.js",

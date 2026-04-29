@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-core",
-    "version": "1.9.1",
+    "version": "1.9.2",
     "description": "Core types, errors, and result utilities for Tango",
     "type": "module",
     "main": "./dist/index.js",
