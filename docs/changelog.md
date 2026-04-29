@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.10.1 - 2026-04-29
+
+Clarify scaffold ownership in `tango new`, keep each host scaffold framework-specific, and add a fresh-app smoke that validates generated projects through local install, typecheck, and Tango setup commands.
+
 ## 1.10.0 - 2026-04-29
 
 Add `ManyToManyRelatedManager.clear()` and `create(...)`.
