@@ -194,4 +194,25 @@ export class ThroughTableManager {
         );
         await this.client.query(compiled.sql, compiled.params);
     }
+
+    /**
+     * Delete every join-table row linked to one owner record. Used by
+     * `ManyToManyRelatedManager.clear()` so the related manager can clear a
+     * relation without first loading the current target ids.
+     */
+    async deleteAllLinksForOwner(ownerPrimaryKey: unknown): Promise<void> {
+        const validated = this.sqlSafetyAdapter.validate({
+            kind: SqlPlanKind.SELECT,
+            meta: {
+                table: this.descriptor.table,
+                pk: this.descriptor.primaryKey,
+                columns: this.descriptor.columns,
+            },
+            filterKeys: [this.descriptor.sourceColumn],
+        });
+        const sourceColumn = validated.filterKeys[this.descriptor.sourceColumn]!.field;
+        const placeholder = this.adapter.placeholders.at(1);
+        const sql = `DELETE FROM ${validated.meta.table} WHERE ${sourceColumn} = ${placeholder}`;
+        await this.client.query(sql, [ownerPrimaryKey]);
+    }
 }

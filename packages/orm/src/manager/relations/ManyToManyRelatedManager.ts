@@ -51,6 +51,8 @@ export interface ManyToManyRelatedManagerCreateInputs<TTarget extends Record<str
     sqlSafetyAdapter: OrmSqlSafetyAdapter;
     /** Lazy resolver returning the target model's {@link QueryExecutor}. */
     targetExecutorProvider: () => QueryExecutor<TTarget> | null;
+    /** Model-manager-backed create path for new target records. */
+    createTarget: (input: Partial<TTarget>) => Promise<TTarget>;
     /** Internal transaction runner used for multi-target membership writes. */
     runAtomic: <T>(work: () => Promise<T>) => Promise<T>;
 }
@@ -62,6 +64,7 @@ interface ManyToManyRelatedManagerInternalInputs<TTarget extends Record<string, 
     targetPrimaryKeyField: string;
     throughTableManager: ThroughTableManager;
     targetExecutorProvider: () => QueryExecutor<TTarget> | null;
+    createTarget: (input: Partial<TTarget>) => Promise<TTarget>;
     runAtomic: <T>(work: () => Promise<T>) => Promise<T>;
 }
 
@@ -76,12 +79,14 @@ interface ManyToManyRelatedManagerInternalInputs<TTarget extends Record<string, 
  *
  * Prefetched memberships seed an internal cache that the queryset returned
  * from `all()` short-circuits to without re-querying. Mutations through
- * `add`, `remove`, and `set` invalidate the cache so subsequent reads
- * observe the updated membership. `set(...)` applies Django-shaped
- * replacement semantics:
+ * `add`, `remove`, `set`, `clear`, and `create` invalidate the cache so
+ * subsequent reads observe the updated membership. `set(...)` applies
+ * Django-shaped replacement semantics:
  * it diffs the current relation membership against the supplied targets,
  * removes any missing links, and inserts any new links inside one atomic
- * write boundary.
+ * write boundary. `clear()` removes every join row for the owner, and
+ * `create(...)` persists a new target row plus its join-row link inside one
+ * atomic boundary.
  *
  * @template TTarget - The persisted target record shape returned by `all()`.
  */
@@ -118,7 +123,7 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
      * The factory derives the join-table descriptor from the relation edge and
      * through-model fields, wires a {@link ThroughTableManager} against the
      * supplied runtime-bound client, and returns a manager whose `add`,
-     * `remove`, and `all` methods enroll in any active
+     * `remove`, `clear`, `create`, and `all` methods enroll in any active
      * `transaction.atomic(...)` boundary.
      */
     static create<TTarget extends Record<string, unknown>>(
@@ -139,6 +144,7 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
             targetPrimaryKeyField: inputs.relation.targetPrimaryKey,
             throughTableManager,
             targetExecutorProvider: inputs.targetExecutorProvider,
+            createTarget: inputs.createTarget,
             runAtomic: inputs.runAtomic,
         });
     }
@@ -183,6 +189,32 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
     }
 
     /**
+     * Delete every join-table row linked to the owning record and invalidate
+     * any prefetched membership cache after the delete succeeds.
+     */
+    async clear(): Promise<void> {
+        await this.inputs.throughTableManager.deleteAllLinksForOwner(this.inputs.ownerPrimaryKey);
+        this.invalidateCache();
+    }
+
+    /**
+     * Create a new target record through the related model's manager and link
+     * it to the owning record inside one `transaction.atomic(...)` boundary.
+     * This preserves target-manager hooks and defaults while preventing a
+     * created target row from leaking if the join-row insert fails.
+     */
+    async create(input: Partial<TTarget>): Promise<TTarget> {
+        const created = await this.inputs.runAtomic(async () => {
+            const target = await this.inputs.createTarget(input);
+            const targetPrimaryKey = this.resolveTargetPrimaryKey(target);
+            await this.insertTargetPrimaryKeys([targetPrimaryKey]);
+            return target;
+        });
+        this.invalidateCache();
+        return created;
+    }
+
+    /**
      * Replace the current relation membership with exactly the supplied
      * targets. Duplicate inputs are collapsed before diffing against the
      * current through-table rows, so repeated values do not trigger extra
@@ -224,8 +256,8 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
      * Return a {@link QuerySet} for the related target rows of this many-to-many
      * relation. When the relation was already loaded by `prefetchRelated(...)`,
      * the first `fetch()` resolves with the cached materialization without
-     * re-querying. Mutating the membership through `add`/`remove`/`set`
-     * invalidates that cache.
+     * re-querying. Mutating the membership through `add`/`remove`/`set`/
+     * `clear`/`create` invalidates that cache.
      */
     all(): QuerySet<TTarget> {
         const executor = this.inputs.targetExecutorProvider();
@@ -252,7 +284,7 @@ export class ManyToManyRelatedManager<TTarget extends Record<string, unknown>> {
 
     /**
      * Drop any cached prefetch results. Mutating helpers call this so reads
-     * after an `add`/`remove`/`set` go back to the database.
+     * after an `add`/`remove`/`set`/`clear`/`create` go back to the database.
      */
     invalidateCache(): void {
         this.prefetchCache = null;
