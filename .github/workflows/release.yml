@@ -148,7 +148,7 @@ jobs:
             - name: Generate release app token (stable)
               if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_type == 'stable')) && steps.stable-release.outputs.mode == 'release' && steps.publish-state.outputs.mode == 'publish'
               id: release-app-token
-              uses: actions/create-github-app-token@v2
+              uses: actions/create-github-app-token@v3
               with:
                   app-id: ${{ vars.RELEASE_APP_ID }}
                   private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
