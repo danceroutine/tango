@@ -50,7 +50,7 @@
         "@danceroutine/tango-testing": "workspace:*",
         "@types/express": "^5.0.0",
         "@types/node": "^22.9.0",
-        "express": "^4.21.1",
+        "express": "^5.2.1",
         "tsdown": "^0.4.0",
         "typescript": "^5.6.3",
         "vitest": "^4.0.6"
