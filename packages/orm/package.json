@@ -60,7 +60,7 @@
         "@danceroutine/tango-config": "workspace:*",
         "@danceroutine/tango-core": "workspace:*",
         "@danceroutine/tango-schema": "workspace:*",
-        "zod": "^4.0.0"
+        "zod": "^4.4.3"
     },
     "peerDependencies": {
         "pg": "^8.13.1",
