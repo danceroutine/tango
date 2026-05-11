@@ -285,10 +285,23 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Check changesets cover changed packages
-              if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changeset') }}
-              run: pnpm changeset status --since=origin/main
-
             - name: Changeset check skipped by maintainer
               if: ${{ contains(github.event.pull_request.labels.*.name, 'skip-changeset') }}
               run: echo "Changeset check skipped via skip-changeset label"
+
+            - name: Classify Dependabot changeset policy
+              id: policy
+              if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changeset') }}
+              env:
+                  PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+              run: node scripts/ci/evaluate-changeset-policy.mjs "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+
+            - name: Changeset check skipped by Dependabot policy
+              if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changeset') && !contains(github.event.pull_request.labels.*.name, 'force-changeset') && steps.policy.outputs.should_skip == 'true' }}
+              run: |
+                  echo "${{ steps.policy.outputs.reason }}"
+                  echo "${{ steps.policy.outputs.classified_files }}"
+
+            - name: Check changesets cover changed packages
+              if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changeset') && (contains(github.event.pull_request.labels.*.name, 'force-changeset') || steps.policy.outputs.should_skip != 'true') }}
+              run: pnpm changeset status --since=origin/main
