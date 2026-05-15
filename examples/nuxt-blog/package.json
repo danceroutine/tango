@@ -28,7 +28,7 @@
         "@danceroutine/tango-orm": "workspace:*",
         "@danceroutine/tango-resources": "workspace:*",
         "@danceroutine/tango-schema": "workspace:*",
-        "better-sqlite3": "^11.7.0",
+        "better-sqlite3": "^12.10.0",
         "nuxt": "^4.4.2",
         "vue": "^3.5.31",
         "zod": "^4.0.0"
