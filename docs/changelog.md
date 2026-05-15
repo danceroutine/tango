@@ -4,6 +4,12 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.10.2 - 2026-05-15
+
+Release updated runtime dependency support for `yargs`.
+
+Release updated peer dependency support for `better-sqlite3`.
+
 ## 1.10.1 - 2026-04-29
 
 Clarify scaffold ownership in `tango new`, keep each host scaffold framework-specific, and add a fresh-app smoke that validates generated projects through local install, typecheck, and Tango setup commands.
