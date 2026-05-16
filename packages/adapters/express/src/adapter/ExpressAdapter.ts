@@ -4,6 +4,7 @@ import { RequestContext } from '@danceroutine/tango-resources';
 import { TangoQueryParams, TangoResponse } from '@danceroutine/tango-core';
 import {
     FRAMEWORK_ADAPTER_BRAND,
+    FrameworkAdapterRequestExecutor,
     type FrameworkAdapter,
     type FrameworkAdapterOptions,
 } from '@danceroutine/tango-adapters-core/adapter';
@@ -53,6 +54,7 @@ export interface ExpressRouteRegistrar {
  */
 export class ExpressAdapter implements FrameworkAdapter<Response, RequestHandler, ExpressRequest> {
     readonly __tangoBrand: typeof FRAMEWORK_ADAPTER_BRAND = FRAMEWORK_ADAPTER_BRAND;
+    private readonly requestExecutor = new FrameworkAdapterRequestExecutor();
 
     /**
      * Normalize an Express request into Tango query params.
@@ -244,7 +246,9 @@ export class ExpressAdapter implements FrameworkAdapter<Response, RequestHandler
 
                 const rawId = req.params.id;
                 const id = Array.isArray(rawId) ? rawId[0] : rawId;
-                const response = (await this.callHandler(handler, ctx, id)).toWebResponse();
+                const response = await this.requestExecutor
+                    .forHandler({ handler, ctx, id })
+                    .runMaterializedResponse(req.method, options.transaction);
 
                 res.status(response.status);
 
@@ -257,29 +261,26 @@ export class ExpressAdapter implements FrameworkAdapter<Response, RequestHandler
                     return;
                 }
 
-                const text = await response.text();
-                res.send(text);
+                res.send(this.normalizeResponseBody(response.body, response.headers));
             } catch (error) {
                 next(error);
             }
         };
     }
 
+    private normalizeResponseBody(body: Uint8Array<ArrayBuffer>, headers: Headers): string | Buffer {
+        const contentType = headers.get('content-type')?.toLowerCase() ?? '';
+        if (contentType.startsWith('text/') || contentType.includes('json')) {
+            return new TextDecoder().decode(body);
+        }
+
+        return Buffer.from(body);
+    }
+
     private normalizeParams(params: Record<string, string | string[]>): Record<string, string> {
         return Object.fromEntries(
             Object.entries(params).map(([key, value]) => [key, Array.isArray(value) ? (value[0] ?? '') : value])
         );
-    }
-
-    private async callHandler(
-        handler: (ctx: RequestContext, ...args: unknown[]) => Promise<TangoResponse>,
-        ctx: RequestContext,
-        id?: string
-    ): Promise<TangoResponse> {
-        if (id && handler.length > 1) {
-            return handler(ctx, id);
-        }
-        return handler(ctx);
     }
 
     private toRequestFromExpress(req: ExpressRequest): Request {

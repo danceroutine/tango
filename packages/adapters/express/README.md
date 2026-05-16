@@ -90,6 +90,16 @@ async function main(): Promise<void> {
 
 `ExpressAdapter` also exposes `toQueryParams(req)` for application code that wants the same normalized query contract resources use internally. That helper returns `TangoQueryParams` from `@danceroutine/tango-core` and stays focused on Express-to-Tango normalization.
 
+If one resource should treat each write request as a single database unit of work, enable the adapter's writes-only transaction mode:
+
+```ts
+adapter.registerViewSet(app, '/api/todos', viewset, {
+    transaction: 'writes',
+});
+```
+
+That option wraps `POST`, `PUT`, `PATCH`, and `DELETE` requests in one `transaction.atomic(...)` boundary. `GET`, `HEAD`, and `OPTIONS` stay outside the wrapper. The current adapter transaction mode uses the Tango runtime your application installs as its default runtime.
+
 ## Public API
 
 The root export includes:

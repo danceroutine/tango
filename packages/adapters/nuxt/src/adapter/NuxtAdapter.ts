@@ -12,6 +12,7 @@ import {
 } from '@danceroutine/tango-core';
 import {
     FRAMEWORK_ADAPTER_BRAND,
+    FrameworkAdapterRequestExecutor,
     type FrameworkAdapter,
     type FrameworkAdapterOptions,
 } from '@danceroutine/tango-adapters-core/adapter';
@@ -120,6 +121,7 @@ export function toNuxtQueryParams(searchParams: URLSearchParams | NuxtQueryRecor
 export class NuxtAdapter implements FrameworkAdapter<Response, NuxtEventHandler, H3Event> {
     readonly __tangoBrand: typeof FRAMEWORK_ADAPTER_BRAND = FRAMEWORK_ADAPTER_BRAND;
     private readonly logger = getLogger('tango.adapter.nuxt');
+    private readonly requestExecutor = new FrameworkAdapterRequestExecutor();
 
     /**
      * Normalize h3 query params into Tango query params.
@@ -346,11 +348,15 @@ export class NuxtAdapter implements FrameworkAdapter<Response, NuxtEventHandler,
                 }
 
                 const id = params.id;
-                if (id && handler.length > 1) {
-                    return (await handler(ctx, id)).toWebResponse();
-                }
+                const response = await this.requestExecutor
+                    .forHandler({ handler, ctx, id })
+                    .runMaterializedResponse(event.method, options.transaction);
 
-                return (await handler(ctx)).toWebResponse();
+                return new Response(response.body, {
+                    headers: response.headers,
+                    status: response.status,
+                    statusText: response.statusText,
+                });
             } catch (error) {
                 return this.internalServerError(error);
             }

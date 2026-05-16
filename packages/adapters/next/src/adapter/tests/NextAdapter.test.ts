@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 import { TangoQueryParams, TangoRequest, TangoResponse } from '@danceroutine/tango-core';
 import { isFrameworkAdapter } from '@danceroutine/tango-adapters-core';
+import { BoundFrameworkAdapterRequestExecutor } from '@danceroutine/tango-adapters-core/adapter';
 import { NextAdapter } from '..';
 
 function jsonResponse(data: unknown, status: number = 200): TangoResponse {
@@ -12,7 +13,18 @@ function emptyResponse(status: number): TangoResponse {
     return new TangoResponse({ status });
 }
 
+type BoundRequestExecutorRunner = {
+    runMaterializedResponse: (
+        method: string | undefined,
+        transaction: 'writes' | undefined,
+    ) => Promise<unknown>;
+};
+
 describe(NextAdapter, () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('satisfies the shared framework adapter typeguard', () => {
         expect(isFrameworkAdapter(new NextAdapter())).toBe(true);
     });
@@ -129,6 +141,52 @@ describe(NextAdapter, () => {
         expect(body).toEqual({ error: 'boom', details: null });
         expect(consoleSpy).toHaveBeenCalled();
         consoleSpy.mockRestore();
+    });
+
+    it('forwards the POST request method and policy to request execution support', async () => {
+        const runMaterializedResponseSpy = vi
+            .spyOn(
+                BoundFrameworkAdapterRequestExecutor.prototype as unknown as BoundRequestExecutorRunner,
+                'runMaterializedResponse'
+            )
+            .mockImplementation(async (_method, _transaction) => ({
+                status: 201,
+                statusText: 'Created',
+                headers: new Headers({ 'content-type': 'application/json' }),
+                body: new TextEncoder().encode(JSON.stringify({ ok: true })),
+            }));
+        const adapter = new NextAdapter();
+        const routeHandler = adapter.adapt(async () => jsonResponse({ ok: true }, 201), { transaction: 'writes' });
+
+        const req = { method: 'POST', url: 'http://localhost/users' } as unknown as NextRequest;
+        const response = await routeHandler(req, { params: Promise.resolve({}) });
+
+        expect(response.status).toBe(201);
+        expect(runMaterializedResponseSpy).toHaveBeenCalledWith('POST', 'writes');
+        runMaterializedResponseSpy.mockRestore();
+    });
+
+    it('forwards the GET request method and policy to request execution support', async () => {
+        const runMaterializedResponseSpy = vi
+            .spyOn(
+                BoundFrameworkAdapterRequestExecutor.prototype as unknown as BoundRequestExecutorRunner,
+                'runMaterializedResponse'
+            )
+            .mockImplementation(async (_method, _transaction) => ({
+                status: 200,
+                statusText: 'OK',
+                headers: new Headers({ 'content-type': 'application/json' }),
+                body: new TextEncoder().encode(JSON.stringify({ ok: true })),
+            }));
+        const adapter = new NextAdapter();
+        const routeHandler = adapter.adapt(async () => jsonResponse({ ok: true }, 200), { transaction: 'writes' });
+
+        const req = { method: 'GET', url: 'http://localhost/users' } as unknown as NextRequest;
+        const response = await routeHandler(req, { params: Promise.resolve({}) });
+
+        expect(response.status).toBe(200);
+        expect(runMaterializedResponseSpy).toHaveBeenCalledWith('GET', 'writes');
+        runMaterializedResponseSpy.mockRestore();
     });
 
     it('adapts full CRUD handlers for catch-all routes', async () => {
