@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.10.3 - 2026-05-16
+
+Release updated peer dependency support for `pg`.
+
 ## 1.10.2 - 2026-05-15
 
 Release updated runtime dependency support for `yargs`.
