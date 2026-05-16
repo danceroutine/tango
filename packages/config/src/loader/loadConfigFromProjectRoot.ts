@@ -23,7 +23,7 @@ function unwrapLoadedConfigModule(loaded: unknown): unknown {
         return loaded;
     }
 
-    const defaultExport = (loaded as { default?: unknown }).default;
+    const defaultExport = Object.getOwnPropertyDescriptor(loaded, 'default')?.value;
     return defaultExport ?? loaded;
 }
 
