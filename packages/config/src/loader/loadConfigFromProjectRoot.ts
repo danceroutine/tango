@@ -18,6 +18,15 @@ export interface ProjectConfigLoadOptions {
     configPath?: string;
 }
 
+function unwrapLoadedConfigModule(loaded: unknown): unknown {
+    if (!loaded || typeof loaded !== 'object' || !('default' in loaded)) {
+        return loaded;
+    }
+
+    const defaultExport = (loaded as { default?: unknown }).default;
+    return defaultExport ?? loaded;
+}
+
 function resolveConfigPath(projectRoot: string, explicitPath?: string): string {
     if (explicitPath) {
         const absolutePath = resolve(projectRoot, explicitPath);
@@ -51,5 +60,6 @@ export function loadConfigFromProjectRoot(options: ProjectConfigLoadOptions = {}
     });
     const loaded = jiti(configPath);
 
-    return loadConfig(() => loaded);
+    // jiti may return an ESM module wrapper whose real config object lives under `default`.
+    return loadConfig(() => unwrapLoadedConfigModule(loaded));
 }
