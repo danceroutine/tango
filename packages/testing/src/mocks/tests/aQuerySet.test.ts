@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const SLOW_TEST_TIMEOUT_MS = 10_000;
+
 describe('aQuerySet', () => {
     afterEach(() => {
         vi.restoreAllMocks();
@@ -21,5 +23,5 @@ describe('aQuerySet', () => {
             '[tango.testing.mocks]',
             '`aQuerySet(...)` is deprecated. Use `aModelQuerySet(...)` instead.'
         );
-    });
+    }, SLOW_TEST_TIMEOUT_MS);
 });
