@@ -1,4 +1,6 @@
 import type { Request as ExpressRequest, Response as ExpressResponse, NextFunction, RequestHandler } from 'express';
+import { Readable } from 'node:stream';
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { Router } from 'express';
 import { RequestContext } from '@danceroutine/tango-resources';
 import { TangoQueryParams, TangoResponse } from '@danceroutine/tango-core';
@@ -246,9 +248,11 @@ export class ExpressAdapter implements FrameworkAdapter<Response, RequestHandler
 
                 const rawId = req.params.id;
                 const id = Array.isArray(rawId) ? rawId[0] : rawId;
-                const response = await this.requestExecutor
-                    .forHandler({ handler, ctx, id })
-                    .runMaterializedResponse(req.method, options.transaction);
+                const tangoResponse = await this.requestExecutor.forHandler({ handler, ctx, id }).runResponse(
+                    req.method,
+                    options.transaction
+                );
+                const response = tangoResponse.toWebResponse();
 
                 res.status(response.status);
 
@@ -256,16 +260,35 @@ export class ExpressAdapter implements FrameworkAdapter<Response, RequestHandler
                     res.setHeader(key, value);
                 });
 
-                if (!response.body) {
+                if (response.body === null) {
                     res.end();
                     return;
                 }
 
-                res.send(this.normalizeResponseBody(response.body, response.headers));
+                if (tangoResponse.body !== null) {
+                    await this.pipeReadableStream(response.body, res);
+                    return;
+                }
+
+                const body = new Uint8Array<ArrayBuffer>(await response.arrayBuffer());
+                res.send(this.normalizeResponseBody(body, response.headers));
             } catch (error) {
                 next(error);
             }
         };
+    }
+
+    private async pipeReadableStream(
+        body: ReadableStream<Uint8Array<ArrayBuffer>>,
+        res: ExpressResponse
+    ): Promise<void> {
+        await new Promise<void>((resolve, reject) => {
+            const stream = Readable.fromWeb(body as unknown as NodeReadableStream);
+            stream.on('error', reject);
+            res.on('error', reject);
+            res.on('finish', () => resolve());
+            stream.pipe(res);
+        });
     }
 
     private normalizeResponseBody(body: Uint8Array<ArrayBuffer>, headers: Headers): string | Buffer {

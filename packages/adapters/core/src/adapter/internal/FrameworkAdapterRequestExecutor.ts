@@ -1,4 +1,4 @@
-import type { TangoResponse } from '@danceroutine/tango-core';
+import { TangoResponse } from '@danceroutine/tango-core';
 import { atomic } from '@danceroutine/tango-orm/transaction';
 import { InternalHttpMethod } from '../../domain/internal/InternalHttpMethod';
 import type { FrameworkTransactionPolicy } from './InternalFrameworkTransactionPolicy';
@@ -10,13 +10,6 @@ const TRANSACTIONAL_HTTP_METHODS = new Set<string>([
     InternalHttpMethod.PATCH,
     InternalHttpMethod.DELETE,
 ]);
-
-export type MaterializedTangoResponse = {
-    status: number;
-    statusText: string;
-    headers: Headers;
-    body?: Uint8Array<ArrayBuffer>;
-};
 
 type FrameworkHandler<TContext> =
     | ((ctx: TContext) => Promise<TangoResponse>)
@@ -54,17 +47,8 @@ export class FrameworkAdapterRequestExecutor {
         return atomic(async () => work());
     }
 
-    async materializeTangoResponse(response: TangoResponse): Promise<MaterializedTangoResponse> {
-        const webResponse = response.toWebResponse();
-        const body =
-            webResponse.body === null ? undefined : new Uint8Array<ArrayBuffer>(await webResponse.arrayBuffer());
-
-        return {
-            status: webResponse.status,
-            statusText: webResponse.statusText,
-            headers: new Headers(webResponse.headers),
-            body,
-        };
+    toWebResponse(response: TangoResponse): Response {
+        return response.toWebResponse();
     }
 }
 
@@ -78,13 +62,16 @@ export class BoundFrameworkAdapterRequestExecutor<TContext> {
         private readonly invocation: FrameworkHandlerInvocation<TContext>
     ) {}
 
-    async runMaterializedResponse(
+    async runResponse(
         method: string | undefined,
         transaction: FrameworkTransactionPolicy | undefined
-    ): Promise<MaterializedTangoResponse> {
-        return this.requestExecutor.runRequestTransaction(method, transaction, async () =>
-            this.requestExecutor.materializeTangoResponse(await this.invokeHandler())
-        );
+    ): Promise<TangoResponse> {
+        return this.requestExecutor.runRequestTransaction(method, transaction, async () => this.invokeHandler());
+    }
+
+    async runWebResponse(method: string | undefined, transaction: FrameworkTransactionPolicy | undefined): Promise<Response> {
+        const response = await this.runResponse(method, transaction);
+        return this.requestExecutor.toWebResponse(response);
     }
 
     private async invokeHandler(): Promise<TangoResponse> {

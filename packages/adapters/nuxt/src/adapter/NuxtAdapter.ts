@@ -348,15 +348,9 @@ export class NuxtAdapter implements FrameworkAdapter<Response, NuxtEventHandler,
                 }
 
                 const id = params.id;
-                const response = await this.requestExecutor
+                return await this.requestExecutor
                     .forHandler({ handler, ctx, id })
-                    .runMaterializedResponse(event.method, options.transaction);
-
-                return new Response(response.body, {
-                    headers: response.headers,
-                    status: response.status,
-                    statusText: response.statusText,
-                });
+                    .runWebResponse(event.method, options.transaction);
             } catch (error) {
                 return this.internalServerError(error);
             }

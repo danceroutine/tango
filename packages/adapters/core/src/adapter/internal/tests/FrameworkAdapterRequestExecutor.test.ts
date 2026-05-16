@@ -12,6 +12,16 @@ vi.mock('@danceroutine/tango-orm/transaction', () => ({
     atomic: atomicSpy,
 }));
 
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+    const encoded = new TextEncoder().encode(text);
+    return new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(encoded);
+            controller.close();
+        },
+    });
+}
+
 describe(FrameworkAdapterRequestExecutor, () => {
     beforeEach(() => {
         atomicSpy.mockClear();
@@ -78,32 +88,49 @@ describe(FrameworkAdapterRequestExecutor, () => {
 });
 
 describe(BoundFrameworkAdapterRequestExecutor, () => {
-    describe(BoundFrameworkAdapterRequestExecutor.prototype.runMaterializedResponse, () => {
-        it('materializes the Tango response returned by application code', async () => {
+    describe(BoundFrameworkAdapterRequestExecutor.prototype.runResponse, () => {
+        it('returns the Tango response produced by application code', async () => {
             const executor = new FrameworkAdapterRequestExecutor();
             const boundExecutor = executor.forHandler({
                 ctx: { requestId: 'req-1' },
                 handler: async () => TangoResponse.text('hello', { status: 202 }),
             });
 
-            const materialized = await boundExecutor.runMaterializedResponse('GET', undefined);
+            const response = await boundExecutor.runResponse('GET', undefined);
+            const webResponse = response.toWebResponse();
 
-            expect(materialized.status).toBe(202);
-            expect(materialized.headers.get('content-type')).toContain('text/plain');
-            expect(new TextDecoder().decode(materialized.body)).toBe('hello');
+            expect(webResponse.status).toBe(202);
+            expect(webResponse.headers.get('content-type')).toContain('text/plain');
+            expect(await webResponse.text()).toBe('hello');
         });
 
-        it('materializes empty responses without a body payload', async () => {
+        it('preserves streaming responses without buffering them first', async () => {
+            const executor = new FrameworkAdapterRequestExecutor();
+            const boundExecutor = executor.forHandler({
+                ctx: { requestId: 'req-1' },
+                handler: async () => TangoResponse.stream(streamFromText('hello stream'), { status: 206 }),
+            });
+
+            const response = await boundExecutor.runResponse('GET', undefined);
+            const webResponse = response.toWebResponse();
+
+            expect(response.body).toBeInstanceOf(ReadableStream);
+            expect(webResponse.status).toBe(206);
+            expect(await webResponse.text()).toBe('hello stream');
+        });
+
+        it('returns empty responses without a body payload', async () => {
             const executor = new FrameworkAdapterRequestExecutor();
             const boundExecutor = executor.forHandler({
                 ctx: { requestId: 'req-1' },
                 handler: async () => new TangoResponse({ status: 204 }),
             });
 
-            const materialized = await boundExecutor.runMaterializedResponse('GET', undefined);
+            const response = await boundExecutor.runResponse('GET', undefined);
+            const webResponse = response.toWebResponse();
 
-            expect(materialized.status).toBe(204);
-            expect(materialized.body).toBeUndefined();
+            expect(webResponse.status).toBe(204);
+            expect(webResponse.body).toBeNull();
         });
 
         it('passes the bound id to handlers that expect it', async () => {
@@ -117,10 +144,11 @@ describe(BoundFrameworkAdapterRequestExecutor, () => {
                 id: 'post-42',
             });
 
-            const materialized = await boundExecutor.runMaterializedResponse('GET', undefined);
+            const response = await boundExecutor.runResponse('GET', undefined);
+            const webResponse = response.toWebResponse();
 
             expect(handler).toHaveBeenCalledWith({ requestId: 'req-1' }, 'post-42');
-            expect(new TextDecoder().decode(materialized.body)).toContain('post-42');
+            expect(await webResponse.text()).toContain('post-42');
         });
 
         it('omits the id when handlers only expect the request context', async () => {
@@ -134,10 +162,26 @@ describe(BoundFrameworkAdapterRequestExecutor, () => {
                 id: 'post-42',
             });
 
-            const materialized = await boundExecutor.runMaterializedResponse('GET', undefined);
+            const response = await boundExecutor.runResponse('GET', undefined);
+            const webResponse = response.toWebResponse();
 
             expect(handler).toHaveBeenCalledWith({ requestId: 'req-1' });
-            expect(new TextDecoder().decode(materialized.body)).toContain('req-1');
+            expect(await webResponse.text()).toContain('req-1');
+        });
+    });
+
+    describe(BoundFrameworkAdapterRequestExecutor.prototype.runWebResponse, () => {
+        it('converts Tango responses to native web responses after the handler runs', async () => {
+            const executor = new FrameworkAdapterRequestExecutor();
+            const boundExecutor = executor.forHandler({
+                ctx: { requestId: 'req-1' },
+                handler: async () => TangoResponse.text('native', { status: 203 }),
+            });
+
+            const response = await boundExecutor.runWebResponse('GET', undefined);
+
+            expect(response.status).toBe(203);
+            expect(await response.text()).toBe('native');
         });
     });
 });

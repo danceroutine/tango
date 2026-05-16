@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
+import { PassThrough } from 'node:stream';
 import { TangoQueryParams, TangoResponse } from '@danceroutine/tango-core';
 import { isFrameworkAdapter } from '@danceroutine/tango-adapters-core';
 import { aDBClient, aTangoConfig, anExpressRequest, anExpressResponse } from '@danceroutine/tango-testing';
@@ -19,6 +20,16 @@ function textResponse(text: string, status: number = 200, headers?: HeadersInit)
 
 function bodyResponse(body: BodyInit | null, status: number = 200, headers?: HeadersInit): TangoResponse {
     return new TangoResponse({ body, status, headers });
+}
+
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+    const encoded = new TextEncoder().encode(text);
+    return new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(encoded);
+            controller.close();
+        },
+    });
 }
 
 function emptyResponse(status: number): TangoResponse {
@@ -195,6 +206,35 @@ describe(ExpressAdapter, () => {
         expect(res.status).toHaveBeenCalledWith(204);
         expect(res.end).toHaveBeenCalled();
         expect(res.send).not.toHaveBeenCalled();
+    });
+
+    it('streams readable responses to Express without buffering them first', async () => {
+        const adapter = new ExpressAdapter();
+        const routeHandler = adapter.adapt(async () =>
+            TangoResponse.stream(streamFromText('streamed body'), {
+                status: 206,
+                headers: { 'content-type': 'text/plain' },
+            })
+        );
+
+        const req = anExpressRequest({ method: 'GET', originalUrl: '/stream', url: '/stream' });
+        const res = new PassThrough() as PassThrough & Response;
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        res.status = vi.fn().mockReturnValue(res);
+        res.setHeader = vi.fn().mockReturnValue(res);
+        res.send = vi.fn().mockReturnValue(res);
+        const next = vi.fn() as unknown as NextFunction;
+
+        await routeHandler(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(206);
+        expect(res.setHeader).toHaveBeenCalledWith('content-type', 'text/plain');
+        expect(res.send).not.toHaveBeenCalled();
+        expect(Buffer.concat(chunks).toString()).toBe('streamed body');
+        expect(next).not.toHaveBeenCalled();
     });
 
     it('passes handler failures to the next middleware', async () => {

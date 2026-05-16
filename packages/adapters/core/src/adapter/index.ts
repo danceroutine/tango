@@ -8,5 +8,4 @@ export type { FrameworkTransactionPolicy } from './internal/InternalFrameworkTra
 export {
     BoundFrameworkAdapterRequestExecutor,
     FrameworkAdapterRequestExecutor,
-    type MaterializedTangoResponse,
 } from './internal/FrameworkAdapterRequestExecutor';

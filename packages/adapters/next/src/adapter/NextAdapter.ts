@@ -350,15 +350,9 @@ export class NextAdapter implements FrameworkAdapter<Response, NextRouteHandler,
                 }
 
                 const id = params?.id;
-                const response = await this.requestExecutor
+                return await this.requestExecutor
                     .forHandler({ handler, ctx, id })
-                    .runMaterializedResponse(request.method, options.transaction);
-
-                return new Response(response.body, {
-                    headers: response.headers,
-                    status: response.status,
-                    statusText: response.statusText,
-                });
+                    .runWebResponse(request.method, options.transaction);
             } catch (error) {
                 return this.internalServerError(error);
             }
