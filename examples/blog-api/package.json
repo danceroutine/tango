@@ -8,7 +8,7 @@
         "dev": "tsx watch src/index.ts",
         "prestart": "sh -c 'if [ \"$TANGO_SKIP_SETUP_SCHEMA\" = \"true\" ]; then exit 0; fi; pnpm run setup:schema'",
         "build": "tsdown",
-        "start": "node dist/index.js",
+        "start": "node dist/index.mjs",
         "typecheck": "tsc --noEmit",
         "setup:schema": "pnpm exec tango migrate --config ./tango.config.ts",
         "make:migrations": "tango make:migrations --config ./tango.config.ts --models ./src/models/index.ts",
