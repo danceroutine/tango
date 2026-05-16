@@ -3,20 +3,20 @@
     "version": "1.10.3",
     "description": "Core types and utilities for Tango adapters",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./adapter": {
-            "types": "./dist/adapter/index.d.ts",
-            "import": "./dist/adapter/index.js"
+            "types": "./dist/adapter/index.d.mts",
+            "import": "./dist/adapter/index.mjs"
         },
         "./domain": {
-            "types": "./dist/domain/index.d.ts",
-            "import": "./dist/domain/index.js"
+            "types": "./dist/domain/index.d.mts",
+            "import": "./dist/domain/index.mjs"
         }
     },
     "files": [

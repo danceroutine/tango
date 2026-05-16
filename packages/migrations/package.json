@@ -3,48 +3,48 @@
     "version": "1.10.3",
     "description": "Auto-migration system with ops DSL for Tango",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./commands": {
-            "types": "./dist/commands/index.d.ts",
-            "import": "./dist/commands/index.js"
+            "types": "./dist/commands/index.d.mts",
+            "import": "./dist/commands/index.mjs"
         },
         "./compilers": {
-            "types": "./dist/compilers/index.d.ts",
-            "import": "./dist/compilers/index.js"
+            "types": "./dist/compilers/index.d.mts",
+            "import": "./dist/compilers/index.mjs"
         },
         "./strategies": {
-            "types": "./dist/strategies/index.d.ts",
-            "import": "./dist/strategies/index.js"
+            "types": "./dist/strategies/index.d.mts",
+            "import": "./dist/strategies/index.mjs"
         },
         "./introspect": {
-            "types": "./dist/introspect/index.d.ts",
-            "import": "./dist/introspect/index.js"
+            "types": "./dist/introspect/index.d.mts",
+            "import": "./dist/introspect/index.mjs"
         },
         "./domain": {
-            "types": "./dist/domain/index.d.ts",
-            "import": "./dist/domain/index.js"
+            "types": "./dist/domain/index.d.mts",
+            "import": "./dist/domain/index.mjs"
         },
         "./builder": {
-            "types": "./dist/builder/index.d.ts",
-            "import": "./dist/builder/index.js"
+            "types": "./dist/builder/index.d.mts",
+            "import": "./dist/builder/index.mjs"
         },
         "./runner": {
-            "types": "./dist/runner/index.d.ts",
-            "import": "./dist/runner/index.js"
+            "types": "./dist/runner/index.d.mts",
+            "import": "./dist/runner/index.mjs"
         },
         "./generator": {
-            "types": "./dist/generator/index.d.ts",
-            "import": "./dist/generator/index.js"
+            "types": "./dist/generator/index.d.mts",
+            "import": "./dist/generator/index.mjs"
         },
         "./diff": {
-            "types": "./dist/diff/index.d.ts",
-            "import": "./dist/diff/index.js"
+            "types": "./dist/diff/index.d.mts",
+            "import": "./dist/diff/index.mjs"
         }
     },
     "files": [

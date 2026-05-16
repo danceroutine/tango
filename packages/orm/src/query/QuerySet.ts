@@ -109,8 +109,7 @@ export abstract class QuerySet<
     TBaseResult extends Record<string, unknown> = TModel,
     TSourceModel = unknown,
     THydrated extends Record<string, unknown> = Record<never, never>,
-> implements AsyncIterable<HydratedQueryResult<TBaseResult, THydrated>>
-{
+> implements AsyncIterable<HydratedQueryResult<TBaseResult, THydrated>> {
     static readonly BRAND = 'tango.orm.query_set' as const;
     readonly __tangoBrand: typeof QuerySet.BRAND = QuerySet.BRAND;
     private evaluationCache?: Promise<QueryResult<HydratedQueryResult<TBaseResult, THydrated>>>;

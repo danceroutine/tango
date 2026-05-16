@@ -3,24 +3,24 @@
     "version": "1.10.3",
     "description": "OpenAPI generation for Tango resources",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./domain": {
-            "types": "./dist/domain/index.d.ts",
-            "import": "./dist/domain/index.js"
+            "types": "./dist/domain/index.d.mts",
+            "import": "./dist/domain/index.mjs"
         },
         "./generators": {
-            "types": "./dist/generators/index.d.ts",
-            "import": "./dist/generators/index.js"
+            "types": "./dist/generators/index.d.mts",
+            "import": "./dist/generators/index.mjs"
         },
         "./mappers": {
-            "types": "./dist/mappers/index.d.ts",
-            "import": "./dist/mappers/index.js"
+            "types": "./dist/mappers/index.d.mts",
+            "import": "./dist/mappers/index.mjs"
         }
     },
     "files": [

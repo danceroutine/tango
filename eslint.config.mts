@@ -28,6 +28,7 @@ export default defineConfig([
             'no-restricted-syntax': 'off',
             '@typescript-eslint/no-empty-object-type': 'off',
             'eslint-plugin-unicorn/explicit-length-check': 'off',
+            'no-underscore-dangle': 'off',
             '@typescript-eslint/member-ordering': [
                 'error',
                 {

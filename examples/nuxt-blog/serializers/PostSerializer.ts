@@ -12,9 +12,7 @@ import {
 } from '~~/lib/models';
 
 function omitUndefined<T extends Record<string, unknown>>(input: T): Partial<T> {
-    return Object.fromEntries(
-        Object.entries(input).filter(([, value]) => value !== undefined)
-    ) as Partial<T>;
+    return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as Partial<T>;
 }
 
 export class PostSerializer extends ModelSerializer<

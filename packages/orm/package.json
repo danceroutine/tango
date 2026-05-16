@@ -3,32 +3,32 @@
     "version": "1.10.3",
     "description": "Model-first querying, runtime-managed database access, and transactions for Tango",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./query": {
-            "types": "./dist/query/index.d.ts",
-            "import": "./dist/query/index.js"
+            "types": "./dist/query/index.d.mts",
+            "import": "./dist/query/index.mjs"
         },
         "./connection": {
-            "types": "./dist/connection/index.d.ts",
-            "import": "./dist/connection/index.js"
+            "types": "./dist/connection/index.d.mts",
+            "import": "./dist/connection/index.mjs"
         },
         "./transaction": {
-            "types": "./dist/transaction/index.d.ts",
-            "import": "./dist/transaction/index.js"
+            "types": "./dist/transaction/index.d.mts",
+            "import": "./dist/transaction/index.mjs"
         },
         "./runtime": {
-            "types": "./dist/runtime/index.d.ts",
-            "import": "./dist/runtime/index.js"
+            "types": "./dist/runtime/index.d.mts",
+            "import": "./dist/runtime/index.mjs"
         },
         "./manager": {
-            "types": "./dist/manager/index.d.ts",
-            "import": "./dist/manager/index.js"
+            "types": "./dist/manager/index.d.mts",
+            "import": "./dist/manager/index.mjs"
         }
     },
     "files": [

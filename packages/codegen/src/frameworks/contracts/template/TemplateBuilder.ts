@@ -60,12 +60,16 @@ export abstract class TemplateBuilder implements BoundTemplate {
                     ? `npm run ${scriptName} -- ${serializedArgs}`
                     : `npm run ${scriptName}`;
             case PACKAGE_MANAGER.YARN:
-                return serializedArgs.length > 0 ? `yarn run ${scriptName} ${serializedArgs}` : `yarn run ${scriptName}`;
+                return serializedArgs.length > 0
+                    ? `yarn run ${scriptName} ${serializedArgs}`
+                    : `yarn run ${scriptName}`;
             case PACKAGE_MANAGER.BUN:
                 return serializedArgs.length > 0 ? `bun run ${scriptName} ${serializedArgs}` : `bun run ${scriptName}`;
             case PACKAGE_MANAGER.PNPM:
             default:
-                return serializedArgs.length > 0 ? `pnpm run ${scriptName} ${serializedArgs}` : `pnpm run ${scriptName}`;
+                return serializedArgs.length > 0
+                    ? `pnpm run ${scriptName} ${serializedArgs}`
+                    : `pnpm run ${scriptName}`;
         }
     }
 

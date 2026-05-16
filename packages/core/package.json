@@ -3,36 +3,36 @@
     "version": "1.10.3",
     "description": "Core types, errors, and result utilities for Tango",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./errors": {
-            "types": "./dist/errors/index.d.ts",
-            "import": "./dist/errors/index.js"
+            "types": "./dist/errors/index.d.mts",
+            "import": "./dist/errors/index.mjs"
         },
         "./http": {
-            "types": "./dist/http/index.d.ts",
-            "import": "./dist/http/index.js"
+            "types": "./dist/http/index.d.mts",
+            "import": "./dist/http/index.mjs"
         },
         "./result": {
-            "types": "./dist/result/index.d.ts",
-            "import": "./dist/result/index.js"
+            "types": "./dist/result/index.d.mts",
+            "import": "./dist/result/index.mjs"
         },
         "./logging": {
-            "types": "./dist/logging/index.d.ts",
-            "import": "./dist/logging/index.js"
+            "types": "./dist/logging/index.d.mts",
+            "import": "./dist/logging/index.mjs"
         },
         "./sql": {
-            "types": "./dist/sql/index.d.ts",
-            "import": "./dist/sql/index.js"
+            "types": "./dist/sql/index.d.mts",
+            "import": "./dist/sql/index.mjs"
         },
         "./runtime": {
-            "types": "./dist/runtime/index.d.ts",
-            "import": "./dist/runtime/index.js"
+            "types": "./dist/runtime/index.d.mts",
+            "import": "./dist/runtime/index.mjs"
         }
     },
     "files": [

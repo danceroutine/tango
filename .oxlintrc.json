@@ -38,6 +38,7 @@
         "prefer-string-replace-all": "off",
         // We're not targeting toSorted() yet
         "no-array-sort": "off",
+        "no-underscore-dangle": "off",
         "no-explicit-any": "error"
     }
 }
