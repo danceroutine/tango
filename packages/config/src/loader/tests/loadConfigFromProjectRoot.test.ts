@@ -127,4 +127,38 @@ describe(loadConfigFromProjectRoot, () => {
             process.chdir(cwdBefore);
         }
     });
+
+    it('loads CommonJS configs when the default export key is undefined', () => {
+        const dir = aTempProject();
+
+        writeFileSync(
+            join(dir, 'tango.config.cjs'),
+            `module.exports = {
+    default: undefined,
+    current: 'test',
+    environments: {
+        development: {
+            name: 'development',
+            db: { adapter: 'sqlite', filename: 'dev.sqlite' },
+            migrations: { dir: 'migrations', online: false },
+        },
+        test: {
+            name: 'test',
+            db: { adapter: 'sqlite', filename: 'fallback.sqlite' },
+            migrations: { dir: 'migrations', online: false },
+        },
+        production: {
+            name: 'production',
+            db: { adapter: 'sqlite', filename: 'prod.sqlite' },
+            migrations: { dir: 'migrations', online: false },
+        },
+    },
+};
+`
+        );
+
+        const loaded = loadConfigFromProjectRoot({ projectRoot: dir });
+
+        expect(loaded.current.db.filename).toBe('fallback.sqlite');
+    });
 });

@@ -123,8 +123,8 @@ importers:
         specifier: ^5.2.1
         version: 5.2.1
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/express':
         specifier: ^5.0.0
@@ -175,8 +175,8 @@ importers:
         specifier: ^19.0.0
         version: 19.2.4(react@19.2.4)
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@tailwindcss/typography':
         specifier: ^0.5.16
@@ -242,8 +242,8 @@ importers:
         specifier: ^3.5.31
         version: 3.5.31(typescript@5.9.3)
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -435,8 +435,8 @@ importers:
         specifier: ^4.0.6
         version: 4.0.6(@types/node@22.19.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.20.6)(yaml@2.8.3)
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/config:
     dependencies:
@@ -447,8 +447,8 @@ importers:
         specifier: ^2.6.1
         version: 2.6.1
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -478,8 +478,8 @@ importers:
         specifier: ^4.0.6
         version: 4.0.6(@types/node@22.19.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.20.6)(yaml@2.8.3)
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/migrations:
     dependencies:
@@ -539,8 +539,8 @@ importers:
         specifier: ^4.0.6
         version: 4.0.6(@types/node@22.19.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.20.6)(yaml@2.8.3)
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/openapi:
     dependencies:
@@ -548,8 +548,8 @@ importers:
         specifier: workspace:*
         version: link:../resources
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@danceroutine/tango-core':
         specifier: workspace:*
@@ -582,8 +582,8 @@ importers:
         specifier: workspace:*
         version: link:../schema
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@danceroutine/tango-migrations':
         specifier: workspace:*
@@ -625,8 +625,8 @@ importers:
         specifier: workspace:*
         version: link:../orm
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@danceroutine/tango-schema':
         specifier: workspace:*
@@ -653,8 +653,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -703,8 +703,8 @@ importers:
         specifier: ^4.0.6
         version: 4.0.6(@types/node@22.19.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.20.6)(yaml@2.8.3)
       zod:
-        specifier: ^4.0.0
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
 
 packages:
 
@@ -7163,8 +7163,8 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -14248,6 +14248,6 @@ snapshots:
 
   zod@3.25.76: {}
 
-  zod@4.3.6: {}
+  zod@4.4.3: {}
 
   zwitch@2.0.4: {}
