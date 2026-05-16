@@ -1,4 +1,5 @@
 import type { RequestContext, BaseUser } from '@danceroutine/tango-resources';
+import type { FrameworkTransactionPolicy } from './internal/InternalFrameworkTransactionPolicy';
 /**
  * Adapter interface for integrating Tango with a given framework.
  * @template TResponse - The response type.
@@ -19,6 +20,7 @@ export const FRAMEWORK_ADAPTER_BRAND = 'tango.adapter.framework' as const;
  */
 export interface FrameworkAdapterOptions<TRequest = unknown> {
     getUser?: (request: TRequest) => Promise<BaseUser | null> | BaseUser | null;
+    transaction?: FrameworkTransactionPolicy;
 }
 
 type FrameworkAdapterShape = {

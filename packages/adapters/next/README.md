@@ -43,6 +43,16 @@ For detail requests, the adapter resolves the identifier, passes it as the secon
 
 `NextAdapter` also exposes `toQueryParams(searchParams)` for route modules and server components that want the same normalized query contract resources use internally. That helper returns `TangoQueryParams` from `@danceroutine/tango-core`.
 
+If one resource should treat each write request as a single database unit of work, pass the adapter's writes-only transaction mode when you adapt the viewset:
+
+```ts
+export const { GET, POST, PATCH, PUT, DELETE } = adapter.adaptViewSet(viewset, {
+    transaction: 'writes',
+});
+```
+
+That option wraps `POST`, `PUT`, `PATCH`, and `DELETE` requests in one `transaction.atomic(...)` boundary. `GET`, `HEAD`, and `OPTIONS` stay outside the wrapper. The current adapter transaction mode uses the Tango runtime your application installs as its default runtime.
+
 ## Public API
 
 The root export includes:

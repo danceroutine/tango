@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 import { TangoQueryParams, TangoRequest, TangoResponse } from '@danceroutine/tango-core';
 import { isFrameworkAdapter } from '@danceroutine/tango-adapters-core';
+import { BoundFrameworkAdapterRequestExecutor } from '@danceroutine/tango-adapters-core/adapter';
 import { NextAdapter } from '..';
 
 function jsonResponse(data: unknown, status: number = 200): TangoResponse {
@@ -12,7 +13,28 @@ function emptyResponse(status: number): TangoResponse {
     return new TangoResponse({ status });
 }
 
+type BoundRequestExecutorRunner = {
+    runWebResponse: (
+        method: string | undefined,
+        transaction: 'writes' | undefined,
+    ) => Promise<Response>;
+};
+
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+    const encoded = new TextEncoder().encode(text);
+    return new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(encoded);
+            controller.close();
+        },
+    });
+}
+
 describe(NextAdapter, () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('satisfies the shared framework adapter typeguard', () => {
         expect(isFrameworkAdapter(new NextAdapter())).toBe(true);
     });
@@ -129,6 +151,58 @@ describe(NextAdapter, () => {
         expect(body).toEqual({ error: 'boom', details: null });
         expect(consoleSpy).toHaveBeenCalled();
         consoleSpy.mockRestore();
+    });
+
+    it('forwards the POST request method and policy to request execution support', async () => {
+        const runWebResponseSpy = vi
+            .spyOn(
+                BoundFrameworkAdapterRequestExecutor.prototype as unknown as BoundRequestExecutorRunner,
+                'runWebResponse'
+            )
+            .mockImplementation(async () => Response.json({ ok: true }, { status: 201 }));
+        const adapter = new NextAdapter();
+        const routeHandler = adapter.adapt(async () => jsonResponse({ ok: true }, 201), { transaction: 'writes' });
+
+        const req = { method: 'POST', url: 'http://localhost/users' } as unknown as NextRequest;
+        const response = await routeHandler(req, { params: Promise.resolve({}) });
+
+        expect(response.status).toBe(201);
+        expect(runWebResponseSpy).toHaveBeenCalledWith('POST', 'writes');
+        runWebResponseSpy.mockRestore();
+    });
+
+    it('forwards the GET request method and policy to request execution support', async () => {
+        const runWebResponseSpy = vi
+            .spyOn(
+                BoundFrameworkAdapterRequestExecutor.prototype as unknown as BoundRequestExecutorRunner,
+                'runWebResponse'
+            )
+            .mockImplementation(async () => Response.json({ ok: true }, { status: 200 }));
+        const adapter = new NextAdapter();
+        const routeHandler = adapter.adapt(async () => jsonResponse({ ok: true }, 200), { transaction: 'writes' });
+
+        const req = { method: 'GET', url: 'http://localhost/users' } as unknown as NextRequest;
+        const response = await routeHandler(req, { params: Promise.resolve({}) });
+
+        expect(response.status).toBe(200);
+        expect(runWebResponseSpy).toHaveBeenCalledWith('GET', 'writes');
+        runWebResponseSpy.mockRestore();
+    });
+
+    it('preserves streaming responses without buffering them in the adapter', async () => {
+        const adapter = new NextAdapter();
+        const routeHandler = adapter.adapt(async () =>
+            TangoResponse.stream(streamFromText('next-stream'), {
+                status: 206,
+                headers: { 'content-type': 'text/plain' },
+            })
+        );
+
+        const req = { method: 'GET', url: 'http://localhost/users' } as unknown as NextRequest;
+        const response = await routeHandler(req, { params: Promise.resolve({}) });
+
+        expect(response.status).toBe(206);
+        expect(await response.text()).toBe('next-stream');
     });
 
     it('adapts full CRUD handlers for catch-all routes', async () => {

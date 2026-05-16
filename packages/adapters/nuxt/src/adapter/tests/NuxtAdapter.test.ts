@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { H3Event } from 'h3';
 import { TangoQueryParams, TangoRequest, TangoResponse } from '@danceroutine/tango-core';
 import { isFrameworkAdapter } from '@danceroutine/tango-adapters-core';
+import { BoundFrameworkAdapterRequestExecutor } from '@danceroutine/tango-adapters-core/adapter';
 import { NuxtAdapter, toNuxtQueryParams } from '..';
 
 function jsonResponse(data: unknown, status: number = 200): TangoResponse {
@@ -72,7 +73,28 @@ function createEvent(
     } as unknown as H3Event;
 }
 
+type BoundRequestExecutorRunner = {
+    runWebResponse: (
+        method: string | undefined,
+        transaction: 'writes' | undefined,
+    ) => Promise<Response>;
+};
+
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+    const encoded = new TextEncoder().encode(text);
+    return new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(encoded);
+            controller.close();
+        },
+    });
+}
+
 describe(NuxtAdapter, () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('satisfies the shared framework adapter typeguard', () => {
         expect(isFrameworkAdapter(new NuxtAdapter())).toBe(true);
     });
@@ -230,6 +252,55 @@ describe(NuxtAdapter, () => {
         expect(body).toEqual({ error: 'boom', details: null });
         expect(consoleSpy).toHaveBeenCalled();
         consoleSpy.mockRestore();
+    });
+
+    it('forwards the POST request method and policy to request execution support', async () => {
+        const runWebResponseSpy = vi
+            .spyOn(
+                BoundFrameworkAdapterRequestExecutor.prototype as unknown as BoundRequestExecutorRunner,
+                'runWebResponse'
+            )
+            .mockImplementation(async () => Response.json({ ok: true }, { status: 201 }));
+        const adapter = new NuxtAdapter();
+        const handler = adapter.adapt(async () => jsonResponse({ ok: true }, 201), { transaction: 'writes' });
+
+        const response = await handler(createEvent({ method: 'POST' }));
+
+        expect(response.status).toBe(201);
+        expect(runWebResponseSpy).toHaveBeenCalledWith('POST', 'writes');
+        runWebResponseSpy.mockRestore();
+    });
+
+    it('forwards the GET request method and policy to request execution support', async () => {
+        const runWebResponseSpy = vi
+            .spyOn(
+                BoundFrameworkAdapterRequestExecutor.prototype as unknown as BoundRequestExecutorRunner,
+                'runWebResponse'
+            )
+            .mockImplementation(async () => Response.json({ ok: true }, { status: 200 }));
+        const adapter = new NuxtAdapter();
+        const handler = adapter.adapt(async () => jsonResponse({ ok: true }, 200), { transaction: 'writes' });
+
+        const response = await handler(createEvent({ method: 'GET' }));
+
+        expect(response.status).toBe(200);
+        expect(runWebResponseSpy).toHaveBeenCalledWith('GET', 'writes');
+        runWebResponseSpy.mockRestore();
+    });
+
+    it('preserves streaming responses without buffering them in the adapter', async () => {
+        const adapter = new NuxtAdapter();
+        const handler = adapter.adapt(async () =>
+            TangoResponse.stream(streamFromText('nuxt-stream'), {
+                status: 206,
+                headers: { 'content-type': 'text/plain' },
+            })
+        );
+
+        const response = await handler(createEvent({ method: 'GET', url: 'http://localhost/users' }));
+
+        expect(response.status).toBe(206);
+        expect(await response.text()).toBe('nuxt-stream');
     });
 
     it('adapts full CRUD handlers for catch-all routes', async () => {
