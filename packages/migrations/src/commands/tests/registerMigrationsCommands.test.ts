@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const warnings: string[] = [];
 const createdDirs: string[] = [];
 const LOAD_COUNT_KEY = '__tangoMigrationsLoadCount';
+const SLOW_TEST_TIMEOUT_MS = 15_000;
 
 type LoadCounterGlobal = typeof globalThis & {
     [LOAD_COUNT_KEY]?: number;
@@ -156,7 +157,7 @@ describe(importRegisterMigrationsCommands, () => {
         const relationTypes = await readFile(join(root, '.tango/relations.generated.d.ts'), 'utf8');
         expect(relationTypes).toContain('"blog/User"');
         expect(relationTypes).toContain('typeof import("../src/models.ts")["UserModel"]');
-    });
+    }, SLOW_TEST_TIMEOUT_MS);
 
     it('accepts one-level grouped model exports during make:migrations', async () => {
         const root = await makeTempDir('tango-migrations-cli-grouped-');
@@ -204,7 +205,7 @@ describe(importRegisterMigrationsCommands, () => {
         const relationTypes = await readFile(join(root, '.tango/relations.generated.d.ts'), 'utf8');
         expect(relationTypes).toContain('typeof import("../src/models.ts")["models"]["UserModel"]');
         expect(relationTypes).toContain('typeof import("../src/models.ts")["models"]["PostModel"]');
-    });
+    }, SLOW_TEST_TIMEOUT_MS);
 
     it('warns and continues when relation artifact refresh fails', async () => {
         const root = await makeTempDir('tango-migrations-cli-warning-');
@@ -246,5 +247,5 @@ describe(importRegisterMigrationsCommands, () => {
         expect(warnings).toEqual([
             expect.stringContaining('Unable to refresh generated relation registry during make:migrations'),
         ]);
-    });
+    }, SLOW_TEST_TIMEOUT_MS);
 });

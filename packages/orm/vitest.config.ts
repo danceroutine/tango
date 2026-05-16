@@ -3,35 +3,96 @@ import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
     resolve: {
-        alias: {
-            '@danceroutine/tango-config': fileURLToPath(new URL('../config/src/index.ts', import.meta.url)),
-            '@danceroutine/tango-config/': fileURLToPath(new URL('../config/src/', import.meta.url)),
-            '@danceroutine/tango-core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
-            '@danceroutine/tango-core/sql': fileURLToPath(new URL('../core/src/sql/index.ts', import.meta.url)),
-            '@danceroutine/tango-core/': fileURLToPath(new URL('../core/src/', import.meta.url)),
-            '@danceroutine/tango-orm/connection': fileURLToPath(new URL('./src/connection/index.ts', import.meta.url)),
-            '@danceroutine/tango-orm/query': fileURLToPath(new URL('./src/query/index.ts', import.meta.url)),
-            '@danceroutine/tango-orm': fileURLToPath(new URL('./src/index.ts', import.meta.url)),
-            '@danceroutine/tango-orm/': fileURLToPath(new URL('./src/', import.meta.url)),
-            '@danceroutine/tango-testing/integration': fileURLToPath(
-                new URL('../testing/src/integration/index.ts', import.meta.url)
-            ),
-            '@danceroutine/tango-testing': fileURLToPath(new URL('../testing/src/index.ts', import.meta.url)),
-            '@danceroutine/tango-testing/': fileURLToPath(new URL('../testing/src/', import.meta.url)),
-            '@danceroutine/tango-migrations': fileURLToPath(new URL('../migrations/src/index.ts', import.meta.url)),
-            '@danceroutine/tango-migrations/': fileURLToPath(new URL('../migrations/src/', import.meta.url)),
-            '@danceroutine/tango-resources/context': fileURLToPath(
-                new URL('../resources/src/context/index.ts', import.meta.url)
-            ),
-            '@danceroutine/tango-resources': fileURLToPath(new URL('../resources/src/index.ts', import.meta.url)),
-            '@danceroutine/tango-resources/': fileURLToPath(new URL('../resources/src/', import.meta.url)),
-            '@danceroutine/tango-schema': fileURLToPath(new URL('../schema/src/index.ts', import.meta.url)),
-            '@danceroutine/tango-schema/domain': fileURLToPath(
-                new URL('../schema/src/domain/index.ts', import.meta.url)
-            ),
-            '@danceroutine/tango-schema/model': fileURLToPath(new URL('../schema/src/model/index.ts', import.meta.url)),
-            '@danceroutine/tango-schema/': fileURLToPath(new URL('../schema/src/', import.meta.url)),
-        },
+        alias: [
+            {
+                find: '@danceroutine/tango-config/',
+                replacement: fileURLToPath(new URL('../config/src/', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-config',
+                replacement: fileURLToPath(new URL('../config/src/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-core/sql',
+                replacement: fileURLToPath(new URL('../core/src/sql/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-core/',
+                replacement: fileURLToPath(new URL('../core/src/', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-core',
+                replacement: fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-orm/connection',
+                replacement: fileURLToPath(new URL('./src/connection/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-orm/query',
+                replacement: fileURLToPath(new URL('./src/query/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-orm/',
+                replacement: fileURLToPath(new URL('./src/', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-orm',
+                replacement: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-testing/integration',
+                replacement: fileURLToPath(new URL('../testing/src/integration/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-testing/',
+                replacement: fileURLToPath(new URL('../testing/src/', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-testing',
+                replacement: fileURLToPath(new URL('../testing/src/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-migrations/diff',
+                replacement: fileURLToPath(new URL('../migrations/src/diff/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-migrations/',
+                replacement: fileURLToPath(new URL('../migrations/src/', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-migrations',
+                replacement: fileURLToPath(new URL('../migrations/src/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-resources/context',
+                replacement: fileURLToPath(new URL('../resources/src/context/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-resources/',
+                replacement: fileURLToPath(new URL('../resources/src/', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-resources',
+                replacement: fileURLToPath(new URL('../resources/src/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-schema/domain',
+                replacement: fileURLToPath(new URL('../schema/src/domain/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-schema/model',
+                replacement: fileURLToPath(new URL('../schema/src/model/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-schema/',
+                replacement: fileURLToPath(new URL('../schema/src/', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-schema',
+                replacement: fileURLToPath(new URL('../schema/src/index.ts', import.meta.url)),
+            },
+        ],
     },
     test: {
         globals: true,

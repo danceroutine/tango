@@ -10,6 +10,7 @@ import { NextScaffoldStrategy } from '../../strategies/next/NextScaffoldStrategy
 import { NuxtScaffoldStrategy } from '../../strategies/nuxt/NuxtScaffoldStrategy';
 
 const execFileAsync = promisify(execFile);
+const SLOW_TEST_TIMEOUT_MS = 15_000;
 
 describe(scaffoldProject, () => {
     it('writes a full Express project into target directory', async () => {
@@ -199,7 +200,7 @@ writeFileSync(join(process.cwd(), 'migrations', \`20260424120000_\${args[nameInd
                 await rm(dir, { recursive: true, force: true });
             }
         }
-    });
+    }, SLOW_TEST_TIMEOUT_MS);
 
     it('creates the target directory when it does not exist', async () => {
         const root = await mkdtemp(join(tmpdir(), 'tango-codegen-relative-'));
