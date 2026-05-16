@@ -3,20 +3,20 @@
     "version": "1.10.3",
     "description": "Model factory, Zod helpers, and metadata utilities for Tango",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./domain": {
-            "types": "./dist/domain/index.d.ts",
-            "import": "./dist/domain/index.js"
+            "types": "./dist/domain/index.d.mts",
+            "import": "./dist/domain/index.mjs"
         },
         "./model": {
-            "types": "./dist/model/index.d.ts",
-            "import": "./dist/model/index.js"
+            "types": "./dist/model/index.d.mts",
+            "import": "./dist/model/index.mjs"
         }
     },
     "files": [
@@ -50,7 +50,7 @@
     },
     "devDependencies": {
         "@types/node": "^22.9.0",
-        "tsdown": "^0.4.0",
+        "tsdown": "^0.22.0",
         "typescript": "^5.6.3",
         "vitest": "^4.0.6"
     }

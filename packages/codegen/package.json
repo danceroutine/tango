@@ -3,28 +3,28 @@
     "version": "1.10.3",
     "description": "CLI for generating repositories, types, migrations, and OpenAPI specs for Tango",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./domain": {
-            "types": "./dist/domain/index.d.ts",
-            "import": "./dist/domain/index.js"
+            "types": "./dist/domain/index.d.mts",
+            "import": "./dist/domain/index.mjs"
         },
         "./generators": {
-            "types": "./dist/generators/index.d.ts",
-            "import": "./dist/generators/index.js"
+            "types": "./dist/generators/index.d.mts",
+            "import": "./dist/generators/index.mjs"
         },
         "./frameworks": {
-            "types": "./dist/frameworks/index.d.ts",
-            "import": "./dist/frameworks/index.js"
+            "types": "./dist/frameworks/index.d.mts",
+            "import": "./dist/frameworks/index.mjs"
         },
         "./commands": {
-            "types": "./dist/commands/index.d.ts",
-            "import": "./dist/commands/index.js"
+            "types": "./dist/commands/index.d.mts",
+            "import": "./dist/commands/index.mjs"
         }
     },
     "files": [
@@ -62,7 +62,7 @@
         "@danceroutine/tango-testing": "workspace:*",
         "@types/yargs": "^17.0.33",
         "@types/node": "^22.9.0",
-        "tsdown": "^0.4.0",
+        "tsdown": "^0.22.0",
         "typescript": "^5.6.3",
         "vitest": "^4.0.6",
         "zod": "^4.0.0"

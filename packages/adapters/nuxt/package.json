@@ -3,16 +3,16 @@
     "version": "1.10.3",
     "description": "Nuxt Nitro adapter for Tango viewsets",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./adapter": {
-            "types": "./dist/adapter/index.d.ts",
-            "import": "./dist/adapter/index.js"
+            "types": "./dist/adapter/index.d.mts",
+            "import": "./dist/adapter/index.mjs"
         }
     },
     "files": [
@@ -51,7 +51,7 @@
     "devDependencies": {
         "@types/node": "^22.9.0",
         "nuxt": "^4.4.2",
-        "tsdown": "^0.4.0",
+        "tsdown": "^0.22.0",
         "typescript": "^5.6.3",
         "vitest": "^4.0.6",
         "vue": "^3.5.31"

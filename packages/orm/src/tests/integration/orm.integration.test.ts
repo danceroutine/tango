@@ -223,14 +223,14 @@ describe.each(selectedDialects())('ORM integration (%s)', (dialect) => {
             expect(postKey).toBeDefined();
             expect(tagKey).toBeDefined();
 
-            await harness.dbClient.query(`INSERT INTO ${q('tags')} (${q('id')}, ${q('slug')}) VALUES (${p(1)}, ${p(2)})`, [
-                1,
-                'tango',
-            ]);
-            await harness.dbClient.query(`INSERT INTO ${q('posts')} (${q('id')}, ${q('title')}) VALUES (${p(1)}, ${p(2)})`, [
-                1,
-                'Hello',
-            ]);
+            await harness.dbClient.query(
+                `INSERT INTO ${q('tags')} (${q('id')}, ${q('slug')}) VALUES (${p(1)}, ${p(2)})`,
+                [1, 'tango']
+            );
+            await harness.dbClient.query(
+                `INSERT INTO ${q('posts')} (${q('id')}, ${q('title')}) VALUES (${p(1)}, ${p(2)})`,
+                [1, 'Hello']
+            );
             await harness.dbClient.query(
                 `INSERT INTO ${q(joinTable!)} (${q('id')}, ${q(postKey!)}, ${q(tagKey!)}) VALUES (${p(1)}, ${p(2)}, ${p(3)})`,
                 [1, 1, 1]

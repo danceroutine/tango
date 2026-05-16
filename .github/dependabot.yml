@@ -5,36 +5,36 @@
 version: 2
 
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    groups:
-      eslint:
-        patterns:
-          - "eslint"
-          - "@eslint/*"
-          - "typescript-eslint"
-          - "eslint-*"
-      vitest:
-        patterns:
-          - "vitest"
-          - "@vitest/*"
-      typescript:
-        patterns:
-          - "typescript"
-          - "@types/*"
-      build-tools:
-        patterns:
-          - "tsdown"
-          - "tsx"
-          - "prettier"
-          - "oxlint*"
-          - "@changesets/*"
+    - package-ecosystem: 'npm'
+      directory: '/'
+      schedule:
+          interval: 'weekly'
+      open-pull-requests-limit: 10
+      groups:
+          eslint:
+              patterns:
+                  - 'eslint'
+                  - '@eslint/*'
+                  - 'typescript-eslint'
+                  - 'eslint-*'
+          vitest:
+              patterns:
+                  - 'vitest'
+                  - '@vitest/*'
+          typescript:
+              patterns:
+                  - 'typescript'
+                  - '@types/*'
+          build-tools:
+              patterns:
+                  - 'tsdown'
+                  - 'tsx'
+                  - 'prettier'
+                  - 'oxlint*'
+                  - '@changesets/*'
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+    - package-ecosystem: 'github-actions'
+      directory: '/'
+      schedule:
+          interval: 'weekly'
+      open-pull-requests-limit: 5

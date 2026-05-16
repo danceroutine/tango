@@ -3,40 +3,40 @@
     "version": "1.10.3",
     "description": "ModelViewSet, serializers, filters, and pagination for Tango",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./context": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./filters": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./pagination": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./paginators": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./serializer": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./viewset": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./view": {
-            "types": "./dist/view/index.d.ts",
-            "import": "./dist/view/index.js"
+            "types": "./dist/view/index.d.mts",
+            "import": "./dist/view/index.mjs"
         }
     },
     "files": [
@@ -73,7 +73,7 @@
         "@danceroutine/tango-schema": "workspace:*",
         "@danceroutine/tango-testing": "workspace:*",
         "@types/node": "^22.9.0",
-        "tsdown": "^0.4.0",
+        "tsdown": "^0.22.0",
         "typescript": "^5.6.3",
         "vitest": "^4.0.6",
         "zod": "^4.0.0"

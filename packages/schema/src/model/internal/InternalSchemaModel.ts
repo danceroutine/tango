@@ -29,9 +29,10 @@ type InternalSchemaModelCarrier = object & {
     [EXPLICIT_RELATIONS_KEY]?: Readonly<Record<string, RelationDef>>;
 };
 
-export class InternalSchemaModel<TSchema extends z.ZodObject<z.ZodRawShape>, TKey extends string = string>
-    implements Model<TSchema, TKey>
-{
+export class InternalSchemaModel<
+    TSchema extends z.ZodObject<z.ZodRawShape>,
+    TKey extends string = string,
+> implements Model<TSchema, TKey> {
     static readonly BRAND = 'tango.schema.internal_schema_model' as const;
 
     readonly __tangoBrand: typeof InternalSchemaModel.BRAND = InternalSchemaModel.BRAND;

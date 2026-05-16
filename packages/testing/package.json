@@ -3,36 +3,36 @@
     "version": "1.10.3",
     "description": "Testing utilities for Tango",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
         },
         "./integration": {
-            "types": "./dist/integration/index.d.ts",
-            "import": "./dist/integration/index.js"
+            "types": "./dist/integration/index.d.mts",
+            "import": "./dist/integration/index.mjs"
         },
         "./vitest": {
-            "types": "./dist/vitest/index.d.ts",
-            "import": "./dist/vitest/index.js"
+            "types": "./dist/vitest/index.d.mts",
+            "import": "./dist/vitest/index.mjs"
         },
         "./mocks": {
-            "types": "./dist/mocks/index.d.ts",
-            "import": "./dist/mocks/index.js"
+            "types": "./dist/mocks/index.d.mts",
+            "import": "./dist/mocks/index.mjs"
         },
         "./factories": {
-            "types": "./dist/factories/index.d.ts",
-            "import": "./dist/factories/index.js"
+            "types": "./dist/factories/index.d.mts",
+            "import": "./dist/factories/index.mjs"
         },
         "./assertions": {
-            "types": "./dist/assertions/index.d.ts",
-            "import": "./dist/assertions/index.js"
+            "types": "./dist/assertions/index.d.mts",
+            "import": "./dist/assertions/index.mjs"
         },
         "./express": {
-            "types": "./dist/express/index.d.ts",
-            "import": "./dist/express/index.js"
+            "types": "./dist/express/index.d.mts",
+            "import": "./dist/express/index.mjs"
         }
     },
     "files": [
@@ -81,7 +81,7 @@
     "devDependencies": {
         "@types/express": "^5.0.0",
         "@types/node": "^22.9.0",
-        "tsdown": "^0.4.0",
+        "tsdown": "^0.22.0",
         "typescript": "^5.6.3",
         "vitest": "^4.0.6",
         "zod": "^4.0.0"
