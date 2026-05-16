@@ -61,9 +61,9 @@
     "devDependencies": {
         "@danceroutine/tango-testing": "workspace:*",
         "@types/yargs": "^17.0.33",
-        "@types/node": "^22.9.0",
+        "@types/node": "^25.8.0",
         "tsdown": "^0.4.0",
-        "typescript": "^5.6.3",
+        "typescript": "^6.0.3",
         "vitest": "^4.0.6",
         "zod": "^4.0.0"
     }
