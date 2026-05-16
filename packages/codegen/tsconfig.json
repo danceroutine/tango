@@ -3,6 +3,7 @@
     "compilerOptions": {
         "baseUrl": ".",
         "composite": false,
+        "rootDir": "..",
         "outDir": "./dist",
         "paths": {
             "@danceroutine/tango-core": ["../core/src/index.ts"],

@@ -2,6 +2,7 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
         "composite": false,
+        "rootDir": "../..",
         "lib": ["dom", "dom.iterable", "esnext"],
         "jsx": "preserve",
         "incremental": true,
@@ -38,6 +39,6 @@
         "esModuleInterop": true,
         "resolveJsonModule": true
     },
-    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "tango.config.ts", ".tango/**/*.d.ts"],
+    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.d.ts", ".next/types/**/*.ts", "tango.config.ts", ".tango/**/*.d.ts"],
     "exclude": ["node_modules"]
 }

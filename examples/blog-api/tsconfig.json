@@ -2,6 +2,7 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
         "composite": false,
+        "rootDir": "../..",
         "outDir": "./dist",
         "paths": {
             "@danceroutine/tango-adapters-core": ["../../packages/adapters/core/src/index.ts"],
