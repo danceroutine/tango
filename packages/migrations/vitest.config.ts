@@ -69,6 +69,18 @@ export default defineConfig({
                 replacement: fileURLToPath(new URL('../orm/src/query/index.ts', import.meta.url)),
             },
             {
+                find: '@danceroutine/tango-orm/transaction',
+                replacement: fileURLToPath(new URL('../orm/src/transaction/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-orm/runtime',
+                replacement: fileURLToPath(new URL('../orm/src/runtime/index.ts', import.meta.url)),
+            },
+            {
+                find: '@danceroutine/tango-orm/manager',
+                replacement: fileURLToPath(new URL('../orm/src/manager/index.ts', import.meta.url)),
+            },
+            {
                 find: '@danceroutine/tango-orm/',
                 replacement: fileURLToPath(new URL('../orm/src/', import.meta.url)),
             },
