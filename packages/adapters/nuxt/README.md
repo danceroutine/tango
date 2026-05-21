@@ -50,6 +50,16 @@ That gives the adapter one handler for the collection route at `/api/todos` and 
 
 Use `adaptViewSet(...)` when you already have a ready viewset instance in hand. Use `adaptViewSetFactory(...)` when constructing the viewset requires asynchronous setup. The factory result is memoized inside the adapter, and initialization failures clear that memoized promise so a later request can retry cleanly.
 
+If one resource should treat each write request as a single database unit of work, pass the adapter's writes-only transaction mode when you adapt the viewset:
+
+```ts
+export default adapter.adaptViewSet(new TodoViewSet(), {
+    transaction: 'writes',
+});
+```
+
+That option wraps `POST`, `PUT`, `PATCH`, and `DELETE` requests in one `transaction.atomic(...)` boundary. `GET`, `HEAD`, and `OPTIONS` stay outside the wrapper. The current adapter transaction mode uses the Tango runtime your application installs as its default runtime.
+
 ## Public API
 
 The root export includes:

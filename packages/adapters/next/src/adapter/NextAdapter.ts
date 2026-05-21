@@ -10,6 +10,7 @@ import {
 } from '@danceroutine/tango-core';
 import {
     FRAMEWORK_ADAPTER_BRAND,
+    FrameworkAdapterRequestExecutor,
     type FrameworkAdapter,
     type FrameworkAdapterOptions,
 } from '@danceroutine/tango-adapters-core/adapter';
@@ -94,6 +95,7 @@ type ActionMatch =
 export class NextAdapter implements FrameworkAdapter<Response, NextRouteHandler, NextRequest> {
     readonly __tangoBrand: typeof FRAMEWORK_ADAPTER_BRAND = FRAMEWORK_ADAPTER_BRAND;
     private readonly logger = getLogger('tango.adapter.next');
+    private readonly requestExecutor = new FrameworkAdapterRequestExecutor();
     /**
      * Normalize Next.js-style route search params into Tango query params.
      */
@@ -348,11 +350,9 @@ export class NextAdapter implements FrameworkAdapter<Response, NextRouteHandler,
                 }
 
                 const id = params?.id;
-                if (id && handler.length > 1) {
-                    return (await handler(ctx, id)).toWebResponse();
-                }
-
-                return (await handler(ctx)).toWebResponse();
+                return await this.requestExecutor
+                    .forHandler({ handler, ctx, id })
+                    .runWebResponse(request.method, options.transaction);
             } catch (error) {
                 return this.internalServerError(error);
             }

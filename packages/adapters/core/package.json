@@ -44,9 +44,12 @@
         "directory": "packages/adapters/core"
     },
     "dependencies": {
+        "@danceroutine/tango-core": "workspace:*",
+        "@danceroutine/tango-orm": "workspace:*",
         "@danceroutine/tango-resources": "workspace:*"
     },
     "devDependencies": {
+        "@danceroutine/tango-testing": "workspace:*",
         "@types/node": "^22.9.0",
         "tsdown": "^0.4.0",
         "typescript": "^5.6.3",

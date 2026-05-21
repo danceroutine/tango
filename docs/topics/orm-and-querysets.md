@@ -410,6 +410,12 @@ await transaction.atomic(async (tx) => {
 
 Nested `atomic()` blocks keep their own callback frame. If a nested savepoint rolls back, only that nested frame's callbacks are discarded. A successful nested block merges its callbacks into the parent in registration order.
 
+If you enable request-scoped write transactions in a host adapter, keep one extra boundary in mind:
+
+::: warning
+A non-robust `tx.onCommit(...)` callback can still throw after the database commit succeeds. If that happens inside a request-scoped adapter transaction wrapper, the request may return an error even though the write is already durable.
+:::
+
 ## Why Tango uses `tx.onCommit(...)` instead of a global helper
 
 Django exposes `transaction.on_commit(...)` as a package-level helper because ambient transaction state is a natural fit in Python code. Tango keeps reads and writes ambient inside `atomic(...)`, but it does not make post-commit registration ambient.

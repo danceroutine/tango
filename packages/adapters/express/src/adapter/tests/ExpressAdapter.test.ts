@@ -1,8 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
+import { PassThrough } from 'node:stream';
 import { TangoQueryParams, TangoResponse } from '@danceroutine/tango-core';
 import { isFrameworkAdapter } from '@danceroutine/tango-adapters-core';
-import { anExpressRequest, anExpressResponse } from '@danceroutine/tango-testing';
+import { aDBClient, aTangoConfig, anExpressRequest, anExpressResponse } from '@danceroutine/tango-testing';
+import { getTangoRuntime, initializeTangoRuntime, resetTangoRuntime } from '@danceroutine/tango-orm/runtime';
+import { atomic } from '@danceroutine/tango-orm/transaction';
 import { ExpressAdapter } from '..';
 
 type RouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
@@ -17,6 +20,16 @@ function textResponse(text: string, status: number = 200, headers?: HeadersInit)
 
 function bodyResponse(body: BodyInit | null, status: number = 200, headers?: HeadersInit): TangoResponse {
     return new TangoResponse({ body, status, headers });
+}
+
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+    const encoded = new TextEncoder().encode(text);
+    return new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(encoded);
+            controller.close();
+        },
+    });
 }
 
 function emptyResponse(status: number): TangoResponse {
@@ -39,7 +52,31 @@ function findRegisteredHandler(methodMock: ReturnType<typeof vi.fn>, path: strin
     return call[1] as RouteHandler;
 }
 
+function setupTransactionalRuntime() {
+    const runtime = initializeTangoRuntime(() => aTangoConfig());
+    const client = aDBClient();
+    const release = vi.fn(async () => {});
+
+    vi.spyOn(runtime, 'leaseTransactionClient').mockResolvedValue({ client, release });
+    const runtimeQuery = vi.spyOn(runtime, 'query').mockResolvedValue({ rows: [] });
+
+    return {
+        runtime,
+        client,
+        release,
+        runtimeQuery,
+    };
+}
+
 describe(ExpressAdapter, () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    afterEach(async () => {
+        await resetTangoRuntime();
+    });
+
     it('satisfies the shared framework adapter typeguard', () => {
         expect(isFrameworkAdapter(new ExpressAdapter())).toBe(true);
     });
@@ -171,6 +208,35 @@ describe(ExpressAdapter, () => {
         expect(res.send).not.toHaveBeenCalled();
     });
 
+    it('streams readable responses to Express without buffering them first', async () => {
+        const adapter = new ExpressAdapter();
+        const routeHandler = adapter.adapt(async () =>
+            TangoResponse.stream(streamFromText('streamed body'), {
+                status: 206,
+                headers: { 'content-type': 'text/plain' },
+            })
+        );
+
+        const req = anExpressRequest({ method: 'GET', originalUrl: '/stream', url: '/stream' });
+        const res = new PassThrough() as PassThrough & Response;
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        res.status = vi.fn().mockReturnValue(res);
+        res.setHeader = vi.fn().mockReturnValue(res);
+        res.send = vi.fn().mockReturnValue(res);
+        const next = vi.fn() as unknown as NextFunction;
+
+        await routeHandler(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(206);
+        expect(res.setHeader).toHaveBeenCalledWith('content-type', 'text/plain');
+        expect(res.send).not.toHaveBeenCalled();
+        expect(Buffer.concat(chunks).toString()).toBe('streamed body');
+        expect(next).not.toHaveBeenCalled();
+    });
+
     it('passes handler failures to the next middleware', async () => {
         const adapter = new ExpressAdapter();
         const expected = new Error('boom');
@@ -185,6 +251,114 @@ describe(ExpressAdapter, () => {
         await routeHandler(req, res, next);
 
         expect(next).toHaveBeenCalledWith(expected);
+    });
+
+    it('wraps POST handlers in one request-scoped transaction when writes mode is enabled', async () => {
+        const { client, release, runtimeQuery } = setupTransactionalRuntime();
+        const adapter = new ExpressAdapter();
+        const routeHandler = adapter.adapt(
+            async () => {
+                const runtimeClient = await getTangoRuntime().getClient();
+                await runtimeClient.query('INSERT INTO todos VALUES ($1)', [1]);
+                return jsonResponse({ ok: true }, 201);
+            },
+            { transaction: 'writes' }
+        );
+
+        const req = anExpressRequest({ method: 'POST', originalUrl: '/todos', url: '/todos' });
+        const res = anExpressResponse();
+        const next = vi.fn() as unknown as NextFunction;
+
+        await routeHandler(req, res, next);
+
+        expect(client.begin).toHaveBeenCalledOnce();
+        expect(client.query).toHaveBeenCalledWith('INSERT INTO todos VALUES ($1)', [1]);
+        expect(client.commit).toHaveBeenCalledOnce();
+        expect(client.rollback).not.toHaveBeenCalled();
+        expect(runtimeQuery).not.toHaveBeenCalled();
+        expect(release).toHaveBeenCalledOnce();
+        expect(res.status).toHaveBeenCalledWith(201);
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    it('does not wrap GET handlers in a request transaction when writes mode is enabled', async () => {
+        const { client, runtimeQuery } = setupTransactionalRuntime();
+        const adapter = new ExpressAdapter();
+        const routeHandler = adapter.adapt(
+            async () => {
+                const runtimeClient = await getTangoRuntime().getClient();
+                await runtimeClient.query('SELECT 1');
+                return jsonResponse({ ok: true }, 200);
+            },
+            { transaction: 'writes' }
+        );
+
+        const req = anExpressRequest({ method: 'GET', originalUrl: '/todos', url: '/todos' });
+        const res = anExpressResponse();
+        const next = vi.fn() as unknown as NextFunction;
+
+        await routeHandler(req, res, next);
+
+        expect(client.begin).not.toHaveBeenCalled();
+        expect(client.commit).not.toHaveBeenCalled();
+        expect(client.rollback).not.toHaveBeenCalled();
+        expect(runtimeQuery).toHaveBeenCalledWith('SELECT 1', undefined);
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    it('rolls back request-scoped write transactions before forwarding handler errors', async () => {
+        const { client, release, runtimeQuery } = setupTransactionalRuntime();
+        const adapter = new ExpressAdapter();
+        const expected = new Error('boom');
+        const routeHandler = adapter.adapt(
+            async () => {
+                const runtimeClient = await getTangoRuntime().getClient();
+                await runtimeClient.query('INSERT INTO todos VALUES ($1)', [1]);
+                throw expected;
+            },
+            { transaction: 'writes' }
+        );
+
+        const req = anExpressRequest({ method: 'POST', originalUrl: '/todos', url: '/todos' });
+        const res = anExpressResponse();
+        const next = vi.fn() as unknown as NextFunction;
+
+        await routeHandler(req, res, next);
+
+        expect(client.begin).toHaveBeenCalledOnce();
+        expect(client.query).toHaveBeenCalledWith('INSERT INTO todos VALUES ($1)', [1]);
+        expect(client.rollback).toHaveBeenCalledOnce();
+        expect(client.commit).not.toHaveBeenCalled();
+        expect(runtimeQuery).not.toHaveBeenCalled();
+        expect(release).toHaveBeenCalledOnce();
+        expect(next).toHaveBeenCalledWith(expected);
+    });
+
+    it('keeps nested atomic work valid inside a wrapped write request', async () => {
+        const { client } = setupTransactionalRuntime();
+        const adapter = new ExpressAdapter();
+        const routeHandler = adapter.adapt(
+            async () => {
+                await atomic(async () => {
+                    const runtimeClient = await getTangoRuntime().getClient();
+                    await runtimeClient.query('INSERT INTO todos VALUES ($1)', [1]);
+                });
+                return jsonResponse({ ok: true }, 201);
+            },
+            { transaction: 'writes' }
+        );
+
+        const req = anExpressRequest({ method: 'POST', originalUrl: '/todos', url: '/todos' });
+        const res = anExpressResponse();
+        const next = vi.fn() as unknown as NextFunction;
+
+        await routeHandler(req, res, next);
+
+        expect(client.begin).toHaveBeenCalledOnce();
+        expect(client.createSavepoint).toHaveBeenCalledWith('tango_sp_0');
+        expect(client.releaseSavepoint).toHaveBeenCalledWith('tango_sp_0');
+        expect(client.commit).toHaveBeenCalledOnce();
+        expect(next).not.toHaveBeenCalled();
     });
 
     it('sets JSON content-type for JSON-like bodies when absent', async () => {

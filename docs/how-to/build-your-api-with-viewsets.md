@@ -78,6 +78,43 @@ export const { GET, POST, PATCH, PUT, DELETE } = adapter.adaptViewSet(new PostVi
 
 The `[[...tango]]` catch-all segment lets the adapter handle both `/api/posts` and `/api/posts/123` through the same viewset instance.
 
+### Opt into request-scoped write transactions
+
+If one resource should treat each write request as a single database unit of work, enable the adapter's writes-only transaction mode when you hand the viewset to the adapter.
+
+In Express:
+
+```ts
+const adapter = new ExpressAdapter();
+adapter.registerViewSet(app, '/api/posts', new PostViewSet(), {
+    transaction: 'writes',
+});
+```
+
+In Next.js:
+
+```ts
+const adapter = new NextAdapter();
+
+export const { GET, POST, PATCH, PUT, DELETE } = adapter.adaptViewSet(new PostViewSet(), {
+    transaction: 'writes',
+});
+```
+
+In Nuxt:
+
+```ts
+const adapter = new NuxtAdapter();
+
+export default adapter.adaptViewSet(new PostViewSet(), {
+    transaction: 'writes',
+});
+```
+
+That option wraps `POST`, `PUT`, `PATCH`, and `DELETE` requests in one `transaction.atomic(...)` boundary. `GET`, `HEAD`, and `OPTIONS` stay outside the wrapper. The current adapter transaction mode uses the Tango runtime your application installs as its default runtime.
+
+Use this when one request's database writes should commit or roll back as one unit. Keep using explicit `transaction.atomic(...)` blocks inside application code when the workflow needs a narrower boundary or when a non-standard mutating route should opt in manually.
+
 ## Add filtering to the list endpoint
 
 Once the CRUD surface is in place, the next question is usually which query parameters the posts list should accept. Filtering decides which records are eligible to appear in the list response. Pagination answers a different question, namely how a client moves through that result set. It is usually easier to define the filtering contract first, test that the eligible rows are correct, and then add pagination once the list semantics are stable.
