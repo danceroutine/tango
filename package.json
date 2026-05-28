@@ -51,7 +51,7 @@
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-oxlint": "^1.64.0",
         "eslint-plugin-prettier": "^5.5.5",
-        "globals": "^16.5.0",
+        "globals": "^17.6.0",
         "oxlint": "^1.51.0",
         "oxlint-plugin-eslint": "^1.57.0",
         "oxlint-tsgolint": "^0.15.0",
