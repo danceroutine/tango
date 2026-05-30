@@ -12,8 +12,8 @@ Use this skill only when the user explicitly requests an adversarial review. Do 
 1. Announce `Executing adversarial-review.`
 2. State to yourself that disagreement is useful and you are allowed to disagree when the plan is weak, incomplete, or likely to create future problems.
 3. Before finalizing your own critique, spawn exactly two subagents if the tool is available.
-    - If a CODEX/IDE plan exists, copy it verbatim into a temporary markdown file that the subagents can access.
-    - Pass both the current proposal or plan to the subagents, and when a CODEX plan exists, include the temporary markdown file path in both prompts.
+    - If a plan exists in `~/.cursor/plans`, use that drafted plan file directly rather than copying it into a temporary file. Identify the relevant `*.plan.md` for the current work. Otherwise copy it verbatim into a temporary markdown file that the subagents can access.
+    - Pass the current proposal to the subagents, and when a Cursor plan exists, include the absolute path to that plan file in `~/.cursor/plans` in both prompts.
     - Instruct both subagents to critique the actual plan from that file rather than a paraphrase or summary.
     - Instruct both to review it in detail with an adversarial eye.
     - Instruct both to aggressively raise concerns about:
@@ -41,7 +41,7 @@ Use this skill only when the user explicitly requests an adversarial review. Do 
     - Do not silently absorb or discard a concern.
 7. After the adversarial review loop is complete and you no longer need the spawned subagents, close the old agent threads.
     - Close both adversarial review subagents after their output has been incorporated or explicitly set aside.
-    - Remove any temporary markdown file that was created to share the CODEX plan once it is no longer needed.
+    - Do not delete the plan file in `~/.cursor/plans`; it is the canonical drafted plan, not a temporary artifact. If you instead copied the contents to a temporary markdown file, delete the markdown file.
 8. The user may push back further. You are allowed to continue disagreeing if the objection remains unconvincing.
     - If the user sends `<disagree_and_commit>`, stop arguing, accept the user's decision as final, and proceed on that basis.
     - If the user changes their mind, update the plan accordingly.
@@ -52,8 +52,8 @@ Use this skill only when the user explicitly requests an adversarial review. Do 
 - Do not manufacture balance for its own sake. If the plan is strong, say so after serious scrutiny.
 - Do not soften real concerns just to keep the discussion agreeable.
 - Do not treat subagent output as authoritative. Use it as adversarial input, then apply your own judgment.
-- When a CODEX plan exists, make the subagents review the temporary markdown copy of that plan so they critique the real plan text.
-- Clean up adversarial review artifacts after use by closing the spawned agent threads and removing any temporary plan file.
+- When a Cursor plan exists in `~/.cursor/plans`, point the subagents at that drafted plan file so they critique the real plan text. Otherwise, have them review the temporary markdown copy of the plan so they critique the real plan text.
+- Clean up adversarial review artifacts after use by closing the spawned agent threads, but leave the `~/.cursor/plans` plan file in place. You may remove the temporary copy if you did not leverage cursor plans.
 - Keep critiques concrete. Prefer specific failure modes and tradeoffs over vague discomfort.
 - Do not allow wording-only critique. Exclude feedback that merely tightens language, adjusts tone, or changes emphasis unless it is tied to a substantive flaw or risk in the plan.
 - If a subagent tool is unavailable, perform the two-perspective adversarial pass yourself and say that you are doing the fallback locally.
