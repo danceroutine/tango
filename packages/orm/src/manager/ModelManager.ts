@@ -421,6 +421,14 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
         });
     }
 
+    /**
+     * Insert multiple rows in a single multi-row INSERT statement.
+     *
+     * All rows must share the same field set after hook processing. Rows with
+     * extra or missing fields relative to the first row will cause an error.
+     * If you need to insert rows with different field sets, use individual
+     * {@link create} calls instead.
+     */
     async bulkCreate(inputs: Partial<TModelRow>[]): Promise<TModelRow[]> {
         if (inputs.length === 0) {
             return [];
@@ -438,6 +446,7 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
         if (preparedKeys.length === 0) {
             throw new Error(`Cannot create ${this.model.metadata.name} without any values.`);
         }
+        this.assertUniformRowShape(batchPrepared, new Set(preparedKeys));
 
         const validatedPlan = sqlSafetyAdapter.validate({
             kind: SqlPlanKind.INSERT,
@@ -600,5 +609,40 @@ export class ModelManager<TModelRow extends Record<string, unknown>, TSourceMode
 
     private getHookTransaction() {
         return TransactionEngine.forRuntime(this.runtime).getActiveTransaction();
+    }
+
+    private assertUniformRowShape(batch: Partial<TModelRow>[], referenceKeys: Set<string>): void {
+        const divergentRows = batch
+            .slice(1)
+            .map((row, i) => {
+                const rowKeys = new Set(Object.keys(row));
+                const missing = [...referenceKeys].filter((k) => !rowKeys.has(k)).sort();
+                const extra = [...rowKeys].filter((k) => !referenceKeys.has(k)).sort();
+                return { index: i + 1, missing, extra };
+            })
+            .filter((r) => r.missing.length > 0 || r.extra.length > 0);
+
+        if (divergentRows.length === 0) {
+            return;
+        }
+
+        const sortedReferenceKeys = [...referenceKeys].sort();
+        const indices = divergentRows.map((r) => r.index);
+        const details = divergentRows
+            .map((r) => {
+                const parts: string[] = [];
+                if (r.missing.length > 0) {
+                    parts.push(`missing [${r.missing.join(', ')}]`);
+                }
+                if (r.extra.length > 0) {
+                    parts.push(`extra [${r.extra.join(', ')}]`);
+                }
+                return `Row at index ${r.index}: ${parts.join(', ')}.`;
+            })
+            .join('\n');
+
+        throw new Error(
+            `bulkCreate failed after hook processing: rows at indices [${indices.join(', ')}] have mismatched fields.\n${details}\nExpected fields (from row at index 0): [${sortedReferenceKeys.join(', ')}].`
+        );
     }
 }
