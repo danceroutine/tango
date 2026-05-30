@@ -4,6 +4,12 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.1 - 2026-05-30
+
+Fix `bulkCreate(...)` so batches with mismatched row shapes fail clearly after hook processing instead of silently dropping extra keys or inserting `undefined` values.
+
+---
+
 ## 1.11.0 - 2026-05-21
 
 Add opt-in request-scoped write transactions to the Express, Next.js, and Nuxt adapters.
