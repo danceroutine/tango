@@ -708,6 +708,102 @@ describe(ModelManager, () => {
         );
     });
 
+    it('rejects bulkCreate when a later row has extra keys', async () => {
+        const manager = new ModelManager(UserModel, getTangoRuntime());
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        await expect(
+            manager.bulkCreate([
+                { id: 1, email: 'first@example.com' },
+                { id: 2, email: 'second@example.com', active: true },
+            ])
+        ).rejects.toThrow(/rows at indices \[1\] have mismatched fields.*extra \[active\]/s);
+    });
+
+    it('rejects bulkCreate when a later row has missing keys', async () => {
+        const manager = new ModelManager(UserModel, getTangoRuntime());
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        await expect(
+            manager.bulkCreate([
+                { id: 1, email: 'first@example.com', active: true },
+                { id: 2, active: false },
+            ])
+        ).rejects.toThrow(/rows at indices \[1\] have mismatched fields.*missing \[email\]/s);
+    });
+
+    it('reports all divergent rows in a single bulkCreate error', async () => {
+        const manager = new ModelManager(UserModel, getTangoRuntime());
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        await expect(
+            manager.bulkCreate([
+                { id: 1, email: 'first@example.com', active: true },
+                { id: 2, active: false },
+                { id: 3, email: 'third@example.com', active: true },
+                { id: 4 },
+            ])
+        ).rejects.toThrow(/rows at indices \[1, 3\] have mismatched fields/);
+    });
+
+    it('rejects bulkCreate when beforeCreate hook produces divergent row shapes', async () => {
+        const manager = new ModelManager(
+            {
+                ...UserModel,
+                hooks: {
+                    beforeCreate: vi.fn(async ({ data }) => {
+                        if (data.id === 2) {
+                            return { ...data, extraField: 'injected' };
+                        }
+                        return data;
+                    }),
+                },
+            },
+            getTangoRuntime()
+        );
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        await expect(
+            manager.bulkCreate([
+                { id: 1, email: 'first@example.com', active: true },
+                { id: 2, email: 'second@example.com', active: true },
+            ])
+        ).rejects.toThrow(/rows at indices \[1\] have mismatched fields.*extra \[extraField\]/s);
+    });
+
+    it('rejects bulkCreate when beforeBulkCreate hook returns divergent row shapes', async () => {
+        const manager = new ModelManager(
+            {
+                ...UserModel,
+                hooks: {
+                    beforeBulkCreate: vi.fn(async ({ rows }) => {
+                        return rows.map((row: Partial<UserRecord>, index: number) => {
+                            if (index === 1) {
+                                const { email: _email, ...rest } = row;
+                                return rest;
+                            }
+                            return row;
+                        });
+                    }),
+                },
+            },
+            getTangoRuntime()
+        );
+        const client = await getTangoRuntime().getClient();
+        await client.query('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER)');
+
+        await expect(
+            manager.bulkCreate([
+                { id: 1, email: 'first@example.com', active: true },
+                { id: 2, email: 'second@example.com', active: true },
+            ])
+        ).rejects.toThrow(/rows at indices \[1\] have mismatched fields.*missing \[email\]/s);
+    });
+
     it('passes the active transaction handle into hooks only while running inside atomic(...)', async () => {
         const tempDir = await mkdtemp(join(tmpdir(), 'tango-orm-hooks-'));
 
