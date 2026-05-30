@@ -55,7 +55,7 @@
     "dependencies": {
         "@danceroutine/tango-core": "workspace:*",
         "@danceroutine/tango-schema": "workspace:*",
-        "jiti": "^2.6.1",
+        "jiti": "^2.7.0",
         "yargs": "^18.0.0"
     },
     "devDependencies": {
