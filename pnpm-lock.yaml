@@ -58,7 +58,7 @@ importers:
         version: 1.0.1
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       tsx:
         specifier: ^4.22.3
         version: 4.22.3
@@ -68,6 +68,9 @@ importers:
       typescript-eslint:
         specifier: ^8.60.0
         version: 8.60.0(eslint@10.4.1(jiti@2.7.0))(typescript@5.9.3)
+      unrun:
+        specifier: ^0.3.0
+        version: 0.3.0(synckit@0.11.13)
       vitest:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@22.19.0)(@vitest/coverage-v8@4.1.7)(vite@7.3.1(@types/node@22.19.0)(jiti@2.7.0)(terser@5.46.1)(tsx@4.22.3)(yaml@2.8.3))
@@ -278,7 +281,7 @@ importers:
         version: 22.19.0
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -315,7 +318,7 @@ importers:
         version: 5.2.1
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -343,7 +346,7 @@ importers:
         version: 15.5.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -374,7 +377,7 @@ importers:
         version: 4.4.2(@babel/core@7.29.0)(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@parcel/watcher@2.5.6)(@types/node@22.19.0)(@vue/compiler-sfc@3.5.31)(better-sqlite3@12.10.0)(cac@6.7.14)(db0@0.3.4(better-sqlite3@12.10.0))(eslint@10.4.1(jiti@2.7.0))(ioredis@5.10.1)(magicast@0.5.3)(optionator@0.9.4)(oxlint@1.67.0(oxlint-tsgolint@0.23.0))(rolldown@1.0.3)(rollup-plugin-visualizer@7.0.1(rolldown@1.0.3)(rollup@4.60.1))(rollup@4.60.1)(terser@5.46.1)(tsx@4.22.3)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.0)(jiti@2.7.0)(terser@5.46.1)(tsx@4.22.3)(yaml@2.8.3))(vue-tsc@3.2.7(typescript@5.9.3))(yaml@2.8.3)
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -405,7 +408,7 @@ importers:
         version: 17.0.35
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -439,7 +442,7 @@ importers:
         version: 17.0.35
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -467,7 +470,7 @@ importers:
         version: 22.19.0
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -482,7 +485,7 @@ importers:
         version: 22.19.0
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -543,7 +546,7 @@ importers:
         version: 8.20.0
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -574,7 +577,7 @@ importers:
         version: 22.19.0
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -620,7 +623,7 @@ importers:
         version: 8.20.0
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -651,7 +654,7 @@ importers:
         version: 22.19.0
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -673,7 +676,7 @@ importers:
         version: 22.19.0
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -707,7 +710,7 @@ importers:
         version: 22.19.0
       tsdown:
         specifier: ^0.22.1
-        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3))
+        version: 0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -6720,6 +6723,16 @@ packages:
 
   unrouting@0.1.7:
     resolution: {integrity: sha512-+0hfD+CVWtD636rc5Fn9VEjjTEDhdqgMpbwAuVoUmydSHDaMNiFW93SJG4LV++RoGSEAyvQN5uABAscYpDphpQ==}
+
+  unrun@0.3.0:
+    resolution: {integrity: sha512-5xw2AIVS2WR9Lqhz76qDIQLxipKRidf7Nq+Iz5SZ8shk1OmRlxnc6FyI/1Q2m99WLj6cbqaKFdESfWE99KPzlA==}
+    engines: {node: ^22.13.0 || >=24.0.0}
+    hasBin: true
+    peerDependencies:
+      synckit: ^0.11.11
+    peerDependenciesMeta:
+      synckit:
+        optional: true
 
   unstorage@1.17.5:
     resolution: {integrity: sha512-0i3iqvRfx29hkNntHyQvJTpf5W9dQ9ZadSoRU8+xVlhVtT7jAX57fazYO9EHvcRCfBCyi5YRya7XCDOsbTgkPg==}
@@ -13316,7 +13329,7 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  tsdown@0.22.1(tsx@4.22.3)(typescript@5.9.3)(vue-tsc@3.2.7(typescript@5.9.3)):
+  tsdown@0.22.1(tsx@4.22.3)(typescript@5.9.3)(unrun@0.3.0(synckit@0.11.13))(vue-tsc@3.2.7(typescript@5.9.3)):
     dependencies:
       ansis: 4.3.0
       cac: 7.0.0
@@ -13336,6 +13349,7 @@ snapshots:
     optionalDependencies:
       tsx: 4.22.3
       typescript: 5.9.3
+      unrun: 0.3.0(synckit@0.11.13)
     transitivePeerDependencies:
       - '@ts-macro/tsc'
       - '@typescript/native-preview'
@@ -13490,6 +13504,12 @@ snapshots:
     dependencies:
       escape-string-regexp: 5.0.0
       ufo: 1.6.3
+
+  unrun@0.3.0(synckit@0.11.13):
+    dependencies:
+      rolldown: 1.0.3
+    optionalDependencies:
+      synckit: 0.11.13
 
   unstorage@1.17.5(db0@0.3.4(better-sqlite3@12.10.0))(ioredis@5.10.1):
     dependencies:

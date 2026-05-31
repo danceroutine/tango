@@ -11,28 +11,32 @@
             "import": "./dist/index.js"
         },
         "./context": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/context/index.d.ts",
+            "import": "./dist/context/index.js"
         },
         "./filters": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/filters/index.d.ts",
+            "import": "./dist/filters/index.js"
         },
         "./pagination": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/pagination/index.d.ts",
+            "import": "./dist/pagination/index.js"
         },
         "./paginators": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/paginators/index.d.ts",
+            "import": "./dist/paginators/index.js"
+        },
+        "./resource": {
+            "types": "./dist/resource/index.d.ts",
+            "import": "./dist/resource/index.js"
         },
         "./serializer": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/serializer/index.d.ts",
+            "import": "./dist/serializer/index.js"
         },
         "./viewset": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/viewset/index.d.ts",
+            "import": "./dist/viewset/index.js"
         },
         "./view": {
             "types": "./dist/view/index.d.ts",
