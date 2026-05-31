@@ -44,7 +44,7 @@
         "directory": "packages/config"
     },
     "dependencies": {
-        "dotenv": "^16.4.7",
+        "dotenv": "^17.4.2",
         "jiti": "^2.7.0",
         "zod": "^4.0.0"
     },
