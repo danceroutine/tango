@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.5 - 2026-05-31
+
+Update the Nuxt adapter peer dependency range to Nuxt 4.4.6.
+
 ## 1.11.4 - 2026-05-31
 
 - `FilterSet` now passes raw `icontains` values to the ORM so SQL wildcard wrapping happens once in the query compiler.
