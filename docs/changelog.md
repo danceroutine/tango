@@ -4,6 +4,12 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.7 - 2026-05-31
+
+Update dotenv to 17.4.2 for configuration loading.
+
+Bump h3 to 1.15.11.
+
 ## 1.11.6 - 2026-05-31
 
 Validate stored migration checksums before treating applied migrations as unchanged.
