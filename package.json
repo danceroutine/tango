@@ -41,7 +41,7 @@
         "typecheck:examples": "pnpm -r --filter '@danceroutine/tango-example-*' --if-present run typecheck"
     },
     "devDependencies": {
-        "@changesets/cli": "^2.27.10",
+        "@changesets/cli": "^2.31.0",
         "@danceroutine/tango-config": "workspace:*",
         "@eslint/js": "^10.0.1",
         "@types/eslint": "^9.6.1",
@@ -52,13 +52,13 @@
         "eslint-plugin-oxlint": "^1.67.0",
         "eslint-plugin-prettier": "^5.5.6",
         "globals": "^17.6.0",
-        "oxlint": "^1.51.0",
-        "oxlint-plugin-eslint": "^1.57.0",
-        "oxlint-tsgolint": "^0.15.0",
-        "prettier": "^3.6.2",
+        "oxlint": "^1.67.0",
+        "oxlint-plugin-eslint": "^1.67.0",
+        "oxlint-tsgolint": "^0.23.0",
+        "prettier": "^3.8.3",
         "prettier-linter-helpers": "^1.0.1",
-        "tsdown": "^0.4.0",
-        "tsx": "^4.20.6",
+        "tsdown": "^0.22.1",
+        "tsx": "^4.22.3",
         "typescript": "^5.6.3",
         "typescript-eslint": "^8.60.0",
         "vitest": "^4.1.7"
