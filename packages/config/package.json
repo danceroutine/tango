@@ -45,7 +45,7 @@
     },
     "dependencies": {
         "dotenv": "^16.4.7",
-        "jiti": "^2.6.1",
+        "jiti": "^2.7.0",
         "zod": "^4.0.0"
     },
     "devDependencies": {
