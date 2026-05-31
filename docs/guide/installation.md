@@ -308,9 +308,11 @@ export const TodoModel = Model({
 Finally, generate and apply the first migration:
 
 ```bash
-tango make:migrations --config ./tango.config.ts --models ./src/models/index.ts --name initial
-tango migrate --config ./tango.config.ts
+pnpm exec tango make:migrations --config ./tango.config.ts --models ./src/models/index.ts --name initial
+pnpm exec tango migrate --config ./tango.config.ts
 ```
+
+A local install puts the `tango` binary in the project's `node_modules/.bin`, so run it through your package manager: `pnpm exec tango`, `npx tango`, `yarn exec tango`, or `bunx tango`.
 
 ::: tip pnpm 10 and native builds
 On pnpm 10 and newer, a dependency's build scripts wait for your approval, and `better-sqlite3` compiles its native binding during that step. If a migration command reports a missing `better-sqlite3` binding, run `pnpm approve-builds`, select `better-sqlite3` (and `esbuild`), and reinstall. pnpm 9 builds the binding during install with no extra action.
