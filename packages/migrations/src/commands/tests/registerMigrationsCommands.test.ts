@@ -156,8 +156,8 @@ describe(importRegisterMigrationsCommands, () => {
                 join(root, 'migrations', generatedMigrationName as string),
                 'utf8'
             );
-            expect(generatedMigration).toContain("op.table('posts').create");
-            expect(generatedMigration).toContain("op.table('users').create");
+            expect(generatedMigration).toContain('op.table("posts").create');
+            expect(generatedMigration).toContain('op.table("users").create');
 
             const relationTypes = await readFile(join(root, '.tango/relations.generated.d.ts'), 'utf8');
             expect(relationTypes).toContain('"blog/User"');
@@ -211,8 +211,8 @@ describe(importRegisterMigrationsCommands, () => {
                 join(root, 'migrations', generatedMigrationName as string),
                 'utf8'
             );
-            expect(generatedMigration).toContain("op.table('posts').create");
-            expect(generatedMigration).toContain("op.table('users').create");
+            expect(generatedMigration).toContain('op.table("posts").create');
+            expect(generatedMigration).toContain('op.table("users").create');
 
             const relationTypes = await readFile(join(root, '.tango/relations.generated.d.ts'), 'utf8');
             expect(relationTypes).toContain('typeof import("../src/models.ts")["models"]["UserModel"]');
