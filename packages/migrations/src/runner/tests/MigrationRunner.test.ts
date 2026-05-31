@@ -5,6 +5,7 @@ import { aDBClient } from '@danceroutine/tango-testing';
 import { MigrationRunner } from '../MigrationRunner';
 import { InternalDialect } from '../../domain/internal/InternalDialect';
 import type { CompilerStrategy } from '../../strategies/CompilerStrategy';
+import { webcrypto } from 'node:crypto';
 
 const DOMAIN_IMPORT = '../src/domain/index.ts';
 
@@ -20,7 +21,7 @@ function makeClient(queryImpl?: (sql: string, params?: readonly unknown[]) => Pr
             if (queryImpl) {
                 return queryImpl(sql, params);
             }
-            if (sql.includes('SELECT id FROM')) {
+            if (sql.includes('SELECT id, checksum FROM')) {
                 return { rows: [] };
             }
             return { rows: [] };
@@ -34,6 +35,22 @@ function strategyReturning(sql: string): CompilerStrategy {
         prepareOperations: vi.fn((_dialect, operations) => operations),
         compile: vi.fn(() => [{ sql, params: [] }]),
     } as unknown as CompilerStrategy;
+}
+
+async function checksumForPayload(payload: unknown): Promise<string> {
+    const digest = await webcrypto.subtle.digest('SHA-256', Buffer.from(JSON.stringify(payload), 'utf8'));
+    return Buffer.from(digest).toString('hex');
+}
+
+function tableDropChecksum(table: string): Promise<string> {
+    return checksumForPayload([{ kind: 'table.drop', table }]);
+}
+
+function tableDropMigrationChecksum(table: string, dataFns: string[] = []): Promise<string> {
+    return checksumForPayload({
+        operations: [{ kind: 'table.drop', table }],
+        dataFns,
+    });
 }
 
 describe(MigrationRunner, () => {
@@ -52,7 +69,7 @@ describe(MigrationRunner, () => {
         tempDirs.push(dir);
 
         const client = makeClient(async (sql) => {
-            if (sql.includes('SELECT id FROM')) return { rows: [] };
+            if (sql.includes('SELECT id, checksum FROM')) return { rows: [] };
             return { rows: [] };
         });
         const runner = new MigrationRunner(
@@ -83,7 +100,7 @@ describe(MigrationRunner, () => {
         tempDirs.push(dir);
 
         const client = makeClient(async (sql) => {
-            if (sql.includes('SELECT id FROM')) return { rows: [] };
+            if (sql.includes('SELECT id, checksum FROM')) return { rows: [] };
             if (sql === 'SELECT FAIL') throw new Error('boom');
             return { rows: [] };
         });
@@ -101,7 +118,7 @@ describe(MigrationRunner, () => {
         tempDirs.push(dir);
 
         const client = makeClient(async (sql) => {
-            if (sql.includes('SELECT id FROM')) return { rows: [] };
+            if (sql.includes('SELECT id, checksum FROM')) return { rows: [] };
             if (sql === 'SELECT FAIL SQLITE') throw new Error('sqlite-fail');
             return { rows: [] };
         });
@@ -125,7 +142,9 @@ describe(MigrationRunner, () => {
         tempDirs.push(dir);
 
         const client = makeClient(async (sql) => {
-            if (sql.includes('SELECT id FROM')) return { rows: [{ id: '001_one' }] };
+            if (sql.includes('SELECT id, checksum FROM')) {
+                return { rows: [{ id: '001_one', checksum: await tableDropChecksum('a') }] };
+            }
             return { rows: [] };
         });
         const runner = new MigrationRunner(client, InternalDialect.SQLITE, dir, strategyReturning('SELECT 1'));
@@ -136,13 +155,62 @@ describe(MigrationRunner, () => {
         expect(inserts).toHaveLength(0);
     });
 
+    it('detects a changed applied migration before skipping it', async () => {
+        const dir = await createTempMigrations({
+            '001_changed.ts': `import { Migration } from '${DOMAIN_IMPORT}';\nexport default class MChanged extends Migration { id='001_changed'; up(m){ m.run({ kind: 'table.drop', table: 'accounts' }); } down(){} }`,
+        });
+        tempDirs.push(dir);
+
+        const client = makeClient(async (sql) => {
+            if (sql.includes('SELECT id, checksum FROM')) {
+                return { rows: [{ id: '001_changed', checksum: await tableDropChecksum('users') }] };
+            }
+            return { rows: [] };
+        });
+        const runner = new MigrationRunner(client, InternalDialect.SQLITE, dir, strategyReturning('SELECT 1'));
+
+        await expect(runner.apply()).rejects.toThrow("Applied migration '001_changed' checksum mismatch");
+        const sqlCalls = vi.mocked(client.query).mock.calls as Array<[string, ...unknown[]]>;
+        const inserts = sqlCalls.filter((call) => String(call[0]).includes('INSERT INTO _tango_migrations'));
+        expect(inserts).toHaveLength(0);
+    });
+
+    it('detects a changed applied migration data step before skipping it', async () => {
+        const dir = await createTempMigrations({
+            '001_changed_data.ts': `import { Migration } from '${DOMAIN_IMPORT}';\nexport default class MChangedData extends Migration { id='001_changed_data'; up(m){ m.run({ kind: 'table.drop', table: 'users' }); m.data(async (ctx)=>{ await ctx.query('SELECT changed'); }); } down(){} }`,
+        });
+        tempDirs.push(dir);
+
+        const client = makeClient(async (sql) => {
+            if (sql.includes('SELECT id, checksum FROM')) {
+                return {
+                    rows: [
+                        {
+                            id: '001_changed_data',
+                            checksum: await tableDropMigrationChecksum('users', [
+                                "async (ctx) => { await ctx.query('SELECT original'); }",
+                            ]),
+                        },
+                    ],
+                };
+            }
+            return { rows: [] };
+        });
+        const runner = new MigrationRunner(client, InternalDialect.SQLITE, dir, strategyReturning('SELECT 1'));
+
+        await expect(runner.apply()).rejects.toThrow("Applied migration '001_changed_data' checksum mismatch");
+    });
+
     it('generates plans, statuses, and validates invalid migration modules', async () => {
         const validDir = await createTempMigrations({
             '001_plan.ts': `import { Migration } from '${DOMAIN_IMPORT}';\nexport default class MPlan extends Migration { id='001_plan'; up(m){ m.run({ kind: 'table.drop', table: 'users' }); m.data(async()=>{}); } down(){} }`,
+            '002_pending.ts': `import { Migration } from '${DOMAIN_IMPORT}';\nexport default class MPending extends Migration { id='002_pending'; up(m){ m.run({ kind: 'table.drop', table: 'posts' }); } down(){} }`,
         });
         tempDirs.push(validDir);
         const client = makeClient(async (sql) => {
-            if (sql.includes('SELECT id FROM')) return { rows: [{ id: '001_plan' }] };
+            if (sql.includes('SELECT id, checksum FROM')) {
+                return { rows: [{ id: '001_plan', checksum: await tableDropChecksum('users') }] };
+            }
             return { rows: [] };
         });
         const runner = new MigrationRunner(
@@ -152,7 +220,10 @@ describe(MigrationRunner, () => {
             strategyReturning('DROP TABLE users')
         );
         await expect(runner.plan()).resolves.toContain('-- (data step present)');
-        await expect(runner.status()).resolves.toEqual([{ id: '001_plan', applied: true }]);
+        await expect(runner.status()).resolves.toEqual([
+            { id: '001_plan', applied: true },
+            { id: '002_pending', applied: false },
+        ]);
 
         const invalidDir = await createTempMigrations({ '001_invalid.js': 'export default { nope: true };' });
         tempDirs.push(invalidDir);
@@ -165,6 +236,23 @@ describe(MigrationRunner, () => {
         await expect(invalidRunner.plan()).rejects.toThrow('Invalid migration module');
     });
 
+    it('detects a changed applied migration while reporting status', async () => {
+        const dir = await createTempMigrations({
+            '001_changed.ts': `import { Migration } from '${DOMAIN_IMPORT}';\nexport default class MChanged extends Migration { id='001_changed'; up(m){ m.run({ kind: 'table.drop', table: 'accounts' }); } down(){} }`,
+        });
+        tempDirs.push(dir);
+
+        const client = makeClient(async (sql) => {
+            if (sql.includes('SELECT id, checksum FROM')) {
+                return { rows: [{ id: '001_changed', checksum: await tableDropChecksum('users') }] };
+            }
+            return { rows: [] };
+        });
+        const runner = new MigrationRunner(client, InternalDialect.SQLITE, dir, strategyReturning('SELECT 1'));
+
+        await expect(runner.status()).rejects.toThrow("Applied migration '001_changed' checksum mismatch");
+    });
+
     it('loads typescript migration modules directly', async () => {
         const dir = await createTempMigrations({
             '001_ts.ts': `import { Migration } from '${DOMAIN_IMPORT}'; export default class MTs extends Migration { id='001_ts'; up(m){ m.run({ kind: 'table.drop', table: 'users' }); } down(){} }`,
@@ -172,7 +260,7 @@ describe(MigrationRunner, () => {
         tempDirs.push(dir);
 
         const client = makeClient(async (sql) => {
-            if (sql.includes('SELECT id FROM')) return { rows: [] };
+            if (sql.includes('SELECT id, checksum FROM')) return { rows: [] };
             return { rows: [] };
         });
         const runner = new MigrationRunner(client, InternalDialect.SQLITE, dir, strategyReturning('SELECT 1'));
@@ -187,7 +275,7 @@ describe(MigrationRunner, () => {
         tempDirs.push(dir);
 
         const client = makeClient(async (sql) => {
-            if (sql.includes('SELECT id FROM')) return { rows: [] };
+            if (sql.includes('SELECT id, checksum FROM')) return { rows: [] };
             return { rows: [] };
         });
         const runner = new MigrationRunner(client, InternalDialect.SQLITE, dir, strategyReturning('SELECT 1'));
@@ -202,7 +290,7 @@ describe(MigrationRunner, () => {
         tempDirs.push(dir);
 
         const client = makeClient(async (sql) => {
-            if (sql.includes('SELECT id FROM')) return { rows: [] };
+            if (sql.includes('SELECT id, checksum FROM')) return { rows: [] };
             return { rows: [] };
         });
         const runner = new MigrationRunner(client, InternalDialect.SQLITE, dir, strategyReturning('SELECT 1'));

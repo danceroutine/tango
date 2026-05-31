@@ -10,6 +10,7 @@ import { isError } from '@danceroutine/tango-core';
 import { readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadDefaultExport } from '../runtime/loadModule';
+import { webcrypto } from 'node:crypto';
 
 const JOURNAL = '_tango_migrations';
 
@@ -19,6 +20,16 @@ interface DBClient {
     query<T = unknown>(sql: string, params?: readonly unknown[]): Promise<{ rows: T[] }>;
     /** Release underlying database resources. */
     close(): Promise<void>;
+}
+
+interface AppliedMigrationRecord {
+    id: string;
+    checksum: string;
+}
+
+interface MigrationChecksums {
+    current: string;
+    legacyOperations: string;
 }
 
 /**
@@ -84,7 +95,9 @@ export class MigrationRunner {
             if (toId && migration.id > toId) {
                 break;
             }
-            if (applied.has(migration.id)) {
+            const storedChecksum = applied.get(migration.id);
+            if (storedChecksum !== undefined) {
+                await this.assertAppliedChecksum(migration, storedChecksum);
                 continue;
             }
 
@@ -126,10 +139,21 @@ export class MigrationRunner {
         const applied = await this.listApplied();
         const migrations = await this.loadMigrations();
 
-        return migrations.map((m) => ({
-            id: m.id,
-            applied: applied.has(m.id),
-        }));
+        const statuses: { id: string; applied: boolean }[] = [];
+
+        for (const migration of migrations) {
+            const storedChecksum = applied.get(migration.id);
+            if (storedChecksum !== undefined) {
+                await this.assertAppliedChecksum(migration, storedChecksum);
+            }
+
+            statuses.push({
+                id: migration.id,
+                applied: storedChecksum !== undefined,
+            });
+        }
+
+        return statuses;
     }
 
     private async ensureJournal(): Promise<void> {
@@ -149,10 +173,10 @@ export class MigrationRunner {
         await this.client.query(sql);
     }
 
-    private async listApplied(): Promise<Set<string>> {
+    private async listApplied(): Promise<Map<string, string>> {
         const table = this.dialect === InternalDialect.POSTGRES ? `"${JOURNAL}"` : JOURNAL;
-        const { rows } = await this.client.query<{ id: string }>(`SELECT id FROM ${table}`);
-        return new Set(rows.map((r) => r.id));
+        const { rows } = await this.client.query<AppliedMigrationRecord>(`SELECT id, checksum FROM ${table}`);
+        return new Map(rows.map((record) => [record.id, record.checksum]));
     }
 
     private async loadMigrations(): Promise<Migration[]> {
@@ -194,7 +218,7 @@ export class MigrationRunner {
 
         const preparedOps = this.compilerStrategy.prepareOperations(this.dialect, builder.ops);
         const sqls = preparedOps.flatMap((op) => this.compileOperation(op));
-        const checksum = String(this.hashJSON(builder.ops));
+        const checksum = await this.calculateBuilderChecksum(builder);
 
         const isOnline = (migration.mode ?? builder.getMode()) === 'online';
 
@@ -229,23 +253,47 @@ export class MigrationRunner {
         }
     }
 
+    private async assertAppliedChecksum(migration: Migration, storedChecksum: string): Promise<void> {
+        const checksums = await this.calculateChecksums(migration);
+
+        // Older Tango versions stored operation-only checksums. Keep those
+        // journals readable while writing data-aware checksums for new rows.
+        if (checksums.current !== storedChecksum && checksums.legacyOperations !== storedChecksum) {
+            throw new Error(
+                `Applied migration '${migration.id}' checksum mismatch. The migration file may have been modified after it was applied.`
+            );
+        }
+    }
+
+    private async calculateChecksums(migration: Migration): Promise<MigrationChecksums> {
+        const builder = new CollectingBuilder();
+        await migration.up(builder);
+
+        return {
+            current: await this.calculateBuilderChecksum(builder),
+            legacyOperations: await this.calculateLegacyOperationsChecksum(builder),
+        };
+    }
+
+    private async calculateBuilderChecksum(builder: CollectingBuilder): Promise<string> {
+        return this.hashPayload({
+            operations: builder.ops,
+            dataFns: builder.dataFns.map((fn) => fn.toString()),
+        });
+    }
+
+    private async calculateLegacyOperationsChecksum(builder: CollectingBuilder): Promise<string> {
+        return this.hashPayload(builder.ops);
+    }
+
     /**
-     * Compute a simple hash of the migration's operation list.
+     * Compute a SHA-256 digest of a migration checksum payload.
      * Stored alongside each applied migration in the journal table to detect
      * if a migration file has been modified after it was already applied.
-     * Uses a djb2-like hash over the JSON-serialized operations.
      */
-    private hashJSON(x: unknown): number {
-        const s = JSON.stringify(x);
-        let h = 0;
-        for (let i = 0; i < s.length; i++) {
-            // oxlint-disable-next-line prefer-code-point
-            h = Math.imul(31, h) + s.charCodeAt(i);
-            // oxlint-disable-next-line prefer-math-trunc
-            h = h | 0;
-        }
-        // oxlint-disable-next-line unicorn/prefer-math-trunc
-        return h >>> 0;
+    private async hashPayload(payload: unknown): Promise<string> {
+        const digest = await webcrypto.subtle.digest('SHA-256', Buffer.from(JSON.stringify(payload), 'utf8'));
+        return Buffer.from(digest).toString('hex');
     }
 
     private compileOperation(op: MigrationOperation): SQL[] {
