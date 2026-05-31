@@ -44,7 +44,7 @@ export class PackageJsonTemplateBuilder extends TemplateBuilder {
                     'vue-tsc': '^3.1.2',
                 },
                 pnpm: {
-                    onlyBuiltDependencies: ['better-sqlite3'],
+                    onlyBuiltDependencies: ['better-sqlite3', 'esbuild'],
                 },
             },
             null,

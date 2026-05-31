@@ -15,4 +15,4 @@
 "@danceroutine/tango-testing": patch
 ---
 
-Preserve package build outputs and source compatibility with the updated build toolchain.
+Preserve package build outputs and source compatibility with the updated build toolchain, and allow generated projects to build native dependencies required by `better-sqlite3` and `tsx`.

@@ -44,7 +44,7 @@ export class PackageJsonTemplateBuilder extends TemplateBuilder {
                     typescript: '^5.6.3',
                 },
                 pnpm: {
-                    onlyBuiltDependencies: ['better-sqlite3'],
+                    onlyBuiltDependencies: ['better-sqlite3', 'esbuild'],
                 },
             },
             null,
