@@ -44,9 +44,10 @@ type ModelLike<TModelRow extends Record<string, unknown>> = {
 /**
  * Model-backed data access API exposed as `Model.objects`.
  */
-export class ModelManager<TModelRow extends Record<string, unknown>, TSourceModel = unknown>
-    implements ManagerLike<TModelRow, TSourceModel>
-{
+export class ModelManager<TModelRow extends Record<string, unknown>, TSourceModel = unknown> implements ManagerLike<
+    TModelRow,
+    TSourceModel
+> {
     static readonly BRAND = 'tango.orm.model_manager' as const;
     readonly __tangoBrand: typeof ModelManager.BRAND = ModelManager.BRAND;
     private readonly queryExecutor: QueryExecutor<TModelRow>;

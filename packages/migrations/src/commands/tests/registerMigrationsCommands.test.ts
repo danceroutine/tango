@@ -107,12 +107,14 @@ afterEach(async () => {
 });
 
 describe(importRegisterMigrationsCommands, () => {
-    it('loads the models module once while refreshing relation artifacts', async () => {
-        const root = await makeTempDir('tango-migrations-cli-');
-        await writeConfigFile(root);
-        await writeModelsFile(
-            root,
-            `
+    it(
+        'loads the models module once while refreshing relation artifacts',
+        async () => {
+            const root = await makeTempDir('tango-migrations-cli-');
+            await writeConfigFile(root);
+            await writeModelsFile(
+                root,
+                `
             import { Model, t } from '@danceroutine/tango-schema';
             import { z } from 'zod';
 
@@ -141,30 +143,37 @@ describe(importRegisterMigrationsCommands, () => {
                 }),
             });
             `
-        );
+            );
 
-        await runMakeMigrations(root);
+            await runMakeMigrations(root);
 
-        expect((globalThis as LoadCounterGlobal)[LOAD_COUNT_KEY]).toBe(1);
+            expect((globalThis as LoadCounterGlobal)[LOAD_COUNT_KEY]).toBe(1);
 
-        const generatedMigrationName = (await readdir(join(root, 'migrations'))).at(0);
-        expect(generatedMigrationName).toBeDefined();
+            const generatedMigrationName = (await readdir(join(root, 'migrations'))).at(0);
+            expect(generatedMigrationName).toBeDefined();
 
-        const generatedMigration = await readFile(join(root, 'migrations', generatedMigrationName as string), 'utf8');
-        expect(generatedMigration).toContain("op.table('posts').create");
-        expect(generatedMigration).toContain("op.table('users').create");
+            const generatedMigration = await readFile(
+                join(root, 'migrations', generatedMigrationName as string),
+                'utf8'
+            );
+            expect(generatedMigration).toContain("op.table('posts').create");
+            expect(generatedMigration).toContain("op.table('users').create");
 
-        const relationTypes = await readFile(join(root, '.tango/relations.generated.d.ts'), 'utf8');
-        expect(relationTypes).toContain('"blog/User"');
-        expect(relationTypes).toContain('typeof import("../src/models.ts")["UserModel"]');
-    }, SLOW_TEST_TIMEOUT_MS);
+            const relationTypes = await readFile(join(root, '.tango/relations.generated.d.ts'), 'utf8');
+            expect(relationTypes).toContain('"blog/User"');
+            expect(relationTypes).toContain('typeof import("../src/models.ts")["UserModel"]');
+        },
+        SLOW_TEST_TIMEOUT_MS
+    );
 
-    it('accepts one-level grouped model exports during make:migrations', async () => {
-        const root = await makeTempDir('tango-migrations-cli-grouped-');
-        await writeConfigFile(root);
-        await writeModelsFile(
-            root,
-            `
+    it(
+        'accepts one-level grouped model exports during make:migrations',
+        async () => {
+            const root = await makeTempDir('tango-migrations-cli-grouped-');
+            await writeConfigFile(root);
+            await writeModelsFile(
+                root,
+                `
             import { Model, t } from '@danceroutine/tango-schema';
             import { z } from 'zod';
 
@@ -191,28 +200,35 @@ describe(importRegisterMigrationsCommands, () => {
                 }),
             };
             `
-        );
+            );
 
-        await runMakeMigrations(root);
+            await runMakeMigrations(root);
 
-        const generatedMigrationName = (await readdir(join(root, 'migrations'))).at(0);
-        expect(generatedMigrationName).toBeDefined();
+            const generatedMigrationName = (await readdir(join(root, 'migrations'))).at(0);
+            expect(generatedMigrationName).toBeDefined();
 
-        const generatedMigration = await readFile(join(root, 'migrations', generatedMigrationName as string), 'utf8');
-        expect(generatedMigration).toContain("op.table('posts').create");
-        expect(generatedMigration).toContain("op.table('users').create");
+            const generatedMigration = await readFile(
+                join(root, 'migrations', generatedMigrationName as string),
+                'utf8'
+            );
+            expect(generatedMigration).toContain("op.table('posts').create");
+            expect(generatedMigration).toContain("op.table('users').create");
 
-        const relationTypes = await readFile(join(root, '.tango/relations.generated.d.ts'), 'utf8');
-        expect(relationTypes).toContain('typeof import("../src/models.ts")["models"]["UserModel"]');
-        expect(relationTypes).toContain('typeof import("../src/models.ts")["models"]["PostModel"]');
-    }, SLOW_TEST_TIMEOUT_MS);
+            const relationTypes = await readFile(join(root, '.tango/relations.generated.d.ts'), 'utf8');
+            expect(relationTypes).toContain('typeof import("../src/models.ts")["models"]["UserModel"]');
+            expect(relationTypes).toContain('typeof import("../src/models.ts")["models"]["PostModel"]');
+        },
+        SLOW_TEST_TIMEOUT_MS
+    );
 
-    it('warns and continues when relation artifact refresh fails', async () => {
-        const root = await makeTempDir('tango-migrations-cli-warning-');
-        await writeConfigFile(root);
-        await writeModelsFile(
-            root,
-            `
+    it(
+        'warns and continues when relation artifact refresh fails',
+        async () => {
+            const root = await makeTempDir('tango-migrations-cli-warning-');
+            await writeConfigFile(root);
+            await writeModelsFile(
+                root,
+                `
             import { Model, t } from '@danceroutine/tango-schema';
             import { z } from 'zod';
 
@@ -238,14 +254,16 @@ describe(importRegisterMigrationsCommands, () => {
                 }),
             });
             `
-        );
+            );
 
-        await runMakeMigrations(root);
+            await runMakeMigrations(root);
 
-        const generatedMigrationName = (await readdir(join(root, 'migrations'))).at(0);
-        expect(generatedMigrationName).toBeDefined();
-        expect(warnings).toEqual([
-            expect.stringContaining('Unable to refresh generated relation registry during make:migrations'),
-        ]);
-    }, SLOW_TEST_TIMEOUT_MS);
+            const generatedMigrationName = (await readdir(join(root, 'migrations'))).at(0);
+            expect(generatedMigrationName).toBeDefined();
+            expect(warnings).toEqual([
+                expect.stringContaining('Unable to refresh generated relation registry during make:migrations'),
+            ]);
+        },
+        SLOW_TEST_TIMEOUT_MS
+    );
 });

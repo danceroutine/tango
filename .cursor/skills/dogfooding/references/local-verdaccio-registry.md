@@ -65,7 +65,7 @@ Record the Verdaccio PID so you can kill it during teardown.
 
 ## 4. Publish the Tango packages
 
-Verdaccio requires *some* auth token to publish, even anonymously. Use a fake one in an
+Verdaccio requires _some_ auth token to publish, even anonymously. Use a fake one in an
 `.npmrc`, and point pnpm at it via the `npm_config_userconfig` ENV VAR.
 
 > Gotcha: `pnpm publish --userconfig ...` fails with "Unknown option: 'userconfig'".
@@ -143,6 +143,7 @@ pkill -f "tsx watch src/index.ts"
 ```
 
 Verified behavior:
+
 - `pnpm dlx @danceroutine/tango-cli new ...` DOES resolve the `tango` bin even though the
   package suffix is `tango-cli` (pnpm runs the sole bin). The `--package` workaround is not needed.
 - `pnpm install` pulls `@danceroutine/*` from Verdaccio and express/pg/better-sqlite3/tsx from

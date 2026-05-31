@@ -53,6 +53,7 @@ describe(NextScaffoldStrategy, () => {
             const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
 
             expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"esbuild"');
             expect(packageJson).toContain('"pg"');
             expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(packageJson).toContain('"codegen:relations"');
@@ -96,6 +97,7 @@ describe(NextScaffoldStrategy, () => {
 
             expect(packageJson).toContain('"pg"');
             expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"esbuild"');
             expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(config).toContain("adapter: 'postgres'");
         });

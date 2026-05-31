@@ -14,10 +14,7 @@ function emptyResponse(status: number): TangoResponse {
 }
 
 type BoundRequestExecutorRunner = {
-    runWebResponse: (
-        method: string | undefined,
-        transaction: 'writes' | undefined,
-    ) => Promise<Response>;
+    runWebResponse: (method: string | undefined, transaction: 'writes' | undefined) => Promise<Response>;
 };
 
 function streamFromText(text: string): ReadableStream<Uint8Array> {

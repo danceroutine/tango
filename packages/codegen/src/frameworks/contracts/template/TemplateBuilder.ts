@@ -60,12 +60,16 @@ export abstract class TemplateBuilder implements BoundTemplate {
                     ? `npm run ${scriptName} -- ${serializedArgs}`
                     : `npm run ${scriptName}`;
             case PACKAGE_MANAGER.YARN:
-                return serializedArgs.length > 0 ? `yarn run ${scriptName} ${serializedArgs}` : `yarn run ${scriptName}`;
+                return serializedArgs.length > 0
+                    ? `yarn run ${scriptName} ${serializedArgs}`
+                    : `yarn run ${scriptName}`;
             case PACKAGE_MANAGER.BUN:
                 return serializedArgs.length > 0 ? `bun run ${scriptName} ${serializedArgs}` : `bun run ${scriptName}`;
             case PACKAGE_MANAGER.PNPM:
             default:
-                return serializedArgs.length > 0 ? `pnpm run ${scriptName} ${serializedArgs}` : `pnpm run ${scriptName}`;
+                return serializedArgs.length > 0
+                    ? `pnpm run ${scriptName} ${serializedArgs}`
+                    : `pnpm run ${scriptName}`;
         }
     }
 
@@ -107,8 +111,8 @@ export abstract class TemplateBuilder implements BoundTemplate {
                   ? { '@danceroutine/tango-adapters-next': v }
                   : { '@danceroutine/tango-adapters-nuxt': v };
         const dialectDeps: Record<string, string> = {
-            'better-sqlite3': '^11.10.0',
-            pg: '^8.16.3',
+            'better-sqlite3': '^12.10.0',
+            pg: '^8.20.0',
         };
         return { ...core, ...adapter, ...dialectDeps };
     }

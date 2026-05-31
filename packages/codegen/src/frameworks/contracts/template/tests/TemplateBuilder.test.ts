@@ -32,8 +32,8 @@ describe(TemplateBuilder, () => {
         expect(oneLiner).toContain('npm install ');
         expect(oneLiner).toContain('npm install -D ');
         expect(oneLiner).toContain('@danceroutine/tango-adapters-express@');
-        expect(oneLiner).toContain('better-sqlite3@^11.10.0');
-        expect(oneLiner).toContain('pg@^8.16.3');
+        expect(oneLiner).toContain('better-sqlite3@^12.10.0');
+        expect(oneLiner).toContain('pg@^8.20.0');
         expect(oneLiner).toContain('@types/better-sqlite3@^7.6.12');
     });
 
@@ -41,8 +41,8 @@ describe(TemplateBuilder, () => {
         const oneLiner = TemplateBuilder.getTangoInstallOneLiner('pnpm', 'sqlite', 'nuxt');
 
         expect(oneLiner).toContain('@danceroutine/tango-adapters-nuxt@');
-        expect(oneLiner).toContain('better-sqlite3@^11.10.0');
-        expect(oneLiner).toContain('pg@^8.16.3');
+        expect(oneLiner).toContain('better-sqlite3@^12.10.0');
+        expect(oneLiner).toContain('pg@^8.20.0');
         expect(oneLiner).toContain('@types/better-sqlite3@^7.6.12');
     });
 

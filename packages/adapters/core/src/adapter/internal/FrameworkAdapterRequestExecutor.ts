@@ -26,7 +26,9 @@ type FrameworkHandlerInvocation<TContext> = {
  * request should run inside a transaction.
  */
 export class FrameworkAdapterRequestExecutor {
-    forHandler<TContext>(invocation: FrameworkHandlerInvocation<TContext>): BoundFrameworkAdapterRequestExecutor<TContext> {
+    forHandler<TContext>(
+        invocation: FrameworkHandlerInvocation<TContext>
+    ): BoundFrameworkAdapterRequestExecutor<TContext> {
         return new BoundFrameworkAdapterRequestExecutor(this, invocation);
     }
 
@@ -69,7 +71,10 @@ export class BoundFrameworkAdapterRequestExecutor<TContext> {
         return this.requestExecutor.runRequestTransaction(method, transaction, async () => this.invokeHandler());
     }
 
-    async runWebResponse(method: string | undefined, transaction: FrameworkTransactionPolicy | undefined): Promise<Response> {
+    async runWebResponse(
+        method: string | undefined,
+        transaction: FrameworkTransactionPolicy | undefined
+    ): Promise<Response> {
         const response = await this.runResponse(method, transaction);
         return this.requestExecutor.toWebResponse(response);
     }

@@ -56,6 +56,7 @@ describe(NuxtScaffoldStrategy, () => {
 
             expect(packageJson).toContain('"nuxt"');
             expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"esbuild"');
             expect(packageJson).toContain('"pg"');
             expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(packageJson).toContain('"codegen:relations"');
@@ -101,6 +102,7 @@ describe(NuxtScaffoldStrategy, () => {
 
             expect(packageJson).toContain('"pg"');
             expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"esbuild"');
             expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(config).toContain("adapter: 'postgres'");
         });

@@ -137,46 +137,48 @@ describe(scaffoldProject, () => {
         }
     });
 
-    it('forwards named migration args cleanly through the scaffolded package script', async () => {
-        const scenarios = [
-            {
-                framework: 'express' as const,
-                strategy: new ExpressScaffoldStrategy(),
-                projectName: 'express-script-app',
-            },
-            {
-                framework: 'next' as const,
-                strategy: new NextScaffoldStrategy(),
-                projectName: 'next-script-app',
-            },
-            {
-                framework: 'nuxt' as const,
-                strategy: new NuxtScaffoldStrategy(),
-                projectName: 'nuxt-script-app',
-            },
-        ];
+    it(
+        'forwards named migration args cleanly through the scaffolded package script',
+        async () => {
+            const scenarios = [
+                {
+                    framework: 'express' as const,
+                    strategy: new ExpressScaffoldStrategy(),
+                    projectName: 'express-script-app',
+                },
+                {
+                    framework: 'next' as const,
+                    strategy: new NextScaffoldStrategy(),
+                    projectName: 'next-script-app',
+                },
+                {
+                    framework: 'nuxt' as const,
+                    strategy: new NuxtScaffoldStrategy(),
+                    projectName: 'nuxt-script-app',
+                },
+            ];
 
-        for (const scenario of scenarios) {
-            const dir = await mkdtemp(join(tmpdir(), `tango-codegen-${scenario.framework}-script-`));
-            try {
-                await scaffoldProject(
-                    {
-                        projectName: scenario.projectName,
-                        targetDir: dir,
-                        framework: scenario.framework,
-                        packageManager: 'pnpm',
-                        dialect: 'sqlite',
-                        includeSeed: false,
-                    },
-                    scenario.strategy
-                );
+            for (const scenario of scenarios) {
+                const dir = await mkdtemp(join(tmpdir(), `tango-codegen-${scenario.framework}-script-`));
+                try {
+                    await scaffoldProject(
+                        {
+                            projectName: scenario.projectName,
+                            targetDir: dir,
+                            framework: scenario.framework,
+                            packageManager: 'pnpm',
+                            dialect: 'sqlite',
+                            includeSeed: false,
+                        },
+                        scenario.strategy
+                    );
 
-                const tangoBinDir = join(dir, 'node_modules', '.bin');
-                await mkdir(tangoBinDir, { recursive: true });
-                const tangoStub = join(tangoBinDir, 'tango');
-                await writeFile(
-                    tangoStub,
-                    `#!/usr/bin/env node
+                    const tangoBinDir = join(dir, 'node_modules', '.bin');
+                    await mkdir(tangoBinDir, { recursive: true });
+                    const tangoStub = join(tangoBinDir, 'tango');
+                    await writeFile(
+                        tangoStub,
+                        `#!/usr/bin/env node
 const { mkdirSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');
 const args = process.argv.slice(2);
@@ -188,19 +190,21 @@ if (nameIndex === -1 || !args[nameIndex + 1]) {
 mkdirSync(join(process.cwd(), 'migrations'), { recursive: true });
 writeFileSync(join(process.cwd(), 'migrations', \`20260424120000_\${args[nameIndex + 1]}.ts\`), args.join(' '), 'utf8');
 `,
-                    'utf8'
-                );
-                await chmod(tangoStub, 0o755);
+                        'utf8'
+                    );
+                    await chmod(tangoStub, 0o755);
 
-                await execFileAsync('pnpm', ['run', 'make:migrations', '--name', 'initial'], { cwd: dir });
+                    await execFileAsync('pnpm', ['run', 'make:migrations', '--name', 'initial'], { cwd: dir });
 
-                const filenames = await readdir(join(dir, 'migrations'));
-                expect(filenames).toContain('20260424120000_initial.ts');
-            } finally {
-                await rm(dir, { recursive: true, force: true });
+                    const filenames = await readdir(join(dir, 'migrations'));
+                    expect(filenames).toContain('20260424120000_initial.ts');
+                } finally {
+                    await rm(dir, { recursive: true, force: true });
+                }
             }
-        }
-    }, SLOW_TEST_TIMEOUT_MS);
+        },
+        SLOW_TEST_TIMEOUT_MS
+    );
 
     it('creates the target directory when it does not exist', async () => {
         const root = await mkdtemp(join(tmpdir(), 'tango-codegen-relative-'));

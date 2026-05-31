@@ -43,6 +43,7 @@ describe(ExpressScaffoldStrategy, () => {
             const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
 
             expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"esbuild"');
             expect(packageJson).toContain('"pg"');
             expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(packageJson).toContain('"@danceroutine/tango-openapi"');
@@ -87,6 +88,7 @@ describe(ExpressScaffoldStrategy, () => {
 
             expect(packageJson).toContain('"pg"');
             expect(packageJson).toContain('"better-sqlite3"');
+            expect(packageJson).toContain('"esbuild"');
             expect(packageJson).toContain('"@types/better-sqlite3"');
             expect(config).toContain("adapter: 'postgres'");
             expect(config).toContain('TANGO_DATABASE_URL');
