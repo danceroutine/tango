@@ -34,8 +34,8 @@ describe(MigrationGenerator, () => {
             expect(source).toContain(
                 "import { Migration, op, trustedSql, type Builder } from '@danceroutine/tango-migrations'"
             );
-            expect(source).toContain("id = '001_create_users'");
-            expect(source).toContain("op.table('users').create");
+            expect(source).toContain('id = "001_create_users"');
+            expect(source).toContain('op.table("users").create');
             expect(source).toContain('.serial()');
             expect(source).toContain('.primaryKey()');
             expect(source).toContain('.notNull()');
@@ -43,7 +43,7 @@ describe(MigrationGenerator, () => {
             expect(source).toContain('.unique()');
             expect(source).toContain('.timestamptz()');
             expect(source).toContain('.defaultNow()');
-            expect(source).toContain("op.table('users').drop()");
+            expect(source).toContain('op.table("users").drop()');
         });
 
         it('renders a TABLE_DROP operation', () => {
@@ -53,13 +53,13 @@ describe(MigrationGenerator, () => {
 
             const source = generator.render('002_drop_old', operations);
 
-            expect(source).toContain("op.table('old_table').drop({ cascade: true })");
+            expect(source).toContain('op.table("old_table").drop({ cascade: true })');
         });
 
         it('renders a TABLE_DROP operation without cascade', () => {
             const operations: MigrationOperation[] = [{ kind: InternalOperationKind.TABLE_DROP, table: 'old_table' }];
             const source = generator.render('002b_drop_old', operations);
-            expect(source).toContain("op.table('old_table').drop()");
+            expect(source).toContain('op.table("old_table").drop()');
         });
 
         it('renders a COLUMN_ADD operation', () => {
@@ -73,8 +73,8 @@ describe(MigrationGenerator, () => {
 
             const source = generator.render('003_add_bio', operations);
 
-            expect(source).toContain("op.table('users').addColumn('bio', (b) => b.text())");
-            expect(source).toContain("op.table('users').dropColumn('bio')");
+            expect(source).toContain('op.table("users").addColumn("bio", (b) => b.text())');
+            expect(source).toContain('op.table("users").dropColumn("bio")');
         });
 
         it('renders a COLUMN_DROP operation', () => {
@@ -84,7 +84,7 @@ describe(MigrationGenerator, () => {
 
             const source = generator.render('004_drop_legacy', operations);
 
-            expect(source).toContain("op.table('users').dropColumn('legacy_field')");
+            expect(source).toContain('op.table("users").dropColumn("legacy_field")');
         });
 
         it('renders a COLUMN_RENAME operation', () => {
@@ -94,8 +94,8 @@ describe(MigrationGenerator, () => {
 
             const source = generator.render('005_rename_name', operations);
 
-            expect(source).toContain("op.table('users').renameColumn('name', 'full_name')");
-            expect(source).toContain("op.table('users').renameColumn('full_name', 'name')");
+            expect(source).toContain('op.table("users").renameColumn("name", "full_name")');
+            expect(source).toContain('op.table("users").renameColumn("full_name", "name")');
         });
 
         it('renders an INDEX_CREATE operation', () => {
@@ -114,9 +114,9 @@ describe(MigrationGenerator, () => {
             const source = generator.render('006_add_index', operations);
 
             expect(source).toContain(
-                `op.index.create({ name: 'users_email_idx', table: 'users', on: ['email'], unique: true, where: trustedSql(${JSON.stringify('deleted_at IS NULL')}), concurrently: true })`
+                `op.index.create({ name: "users_email_idx", table: "users", on: ["email"], unique: true, where: trustedSql(${JSON.stringify('deleted_at IS NULL')}), concurrently: true })`
             );
-            expect(source).toContain("op.index.drop({ name: 'users_email_idx', table: 'users' })");
+            expect(source).toContain('op.index.drop({ name: "users_email_idx", table: "users" })');
         });
 
         it('renders a FK_CREATE operation', () => {
@@ -136,12 +136,12 @@ describe(MigrationGenerator, () => {
             const source = generator.render('007_add_fk', operations);
 
             expect(source).toContain('op.foreignKey(');
-            expect(source).toContain("table: 'posts'");
-            expect(source).toContain("columns: ['author_id']");
-            expect(source).toContain("references: { table: 'users', columns: ['id'] }");
-            expect(source).toContain("name: 'posts_author_id_fkey'");
-            expect(source).toContain("onDelete: 'CASCADE'");
-            expect(source).toContain("onUpdate: 'CASCADE'");
+            expect(source).toContain('table: "posts"');
+            expect(source).toContain('columns: ["author_id"]');
+            expect(source).toContain('references: { table: "users", columns: ["id"] }');
+            expect(source).toContain('name: "posts_author_id_fkey"');
+            expect(source).toContain('onDelete: "CASCADE"');
+            expect(source).toContain('onUpdate: "CASCADE"');
         });
 
         it('renders column with references', () => {
@@ -163,7 +163,7 @@ describe(MigrationGenerator, () => {
 
             const source = generator.render('008_posts', operations);
 
-            expect(source).toContain(".references('users', 'id', { onDelete: 'CASCADE' })");
+            expect(source).toContain('.references("users", "id", { onDelete: "CASCADE" })');
         });
 
         it('renders multiple operations', () => {
@@ -187,10 +187,10 @@ describe(MigrationGenerator, () => {
 
             const source = generator.render('009_tags', operations);
 
-            expect(source).toContain("op.table('tags').create");
+            expect(source).toContain('op.table("tags").create');
             expect(source).toContain('op.index.create');
             expect(source).toContain('op.index.drop');
-            expect(source).toContain("op.table('tags').drop()");
+            expect(source).toContain('op.table("tags").drop()');
         });
 
         it('renders a COLUMN_ALTER operation', () => {
@@ -205,7 +205,7 @@ describe(MigrationGenerator, () => {
 
             const source = generator.render('010_alter_email', operations);
 
-            expect(source).toContain("op.table('users').alterColumn('email', { notNull: true })");
+            expect(source).toContain('op.table("users").alterColumn("email", { notNull: true })');
         });
 
         it('generates valid TypeScript module structure', () => {
@@ -237,9 +237,9 @@ describe(MigrationGenerator, () => {
 
             const source = generator.render('011_misc', operations);
             expect(source).toContain('op.foreignKeyValidate');
-            expect(source).toContain("op.foreignKeyDrop({ table: 'posts', name: 'posts_author_fkey' })");
-            expect(source).toContain("op.index.drop({ name: 'posts_idx', table: 'posts' })");
-            expect(source).toContain("custom operation 'seed.users'");
+            expect(source).toContain('op.foreignKeyDrop({ table: "posts", name: "posts_author_fkey" })');
+            expect(source).toContain('op.index.drop({ name: "posts_idx", table: "posts" })');
+            expect(source).toContain('custom operation "seed.users"');
             expect(source).toContain('unsupported operation');
             expect(source).toContain('manual reverse required');
             expect(source).toContain('no reverse needed for FK_VALIDATE');
@@ -294,14 +294,14 @@ describe(MigrationGenerator, () => {
 
             const source = generator.render('012_alter_defaults', operations);
             expect(source).toContain(
-                "alterColumn('created_at', { type: 'timestamptz', notNull: false, default: null })"
+                'alterColumn("created_at", { type: "timestamptz", notNull: false, default: null })'
             );
-            expect(source).toContain(`alterColumn('status', { default: trustedSql(${JSON.stringify('active')}) })`);
-            expect(source).toContain("alterColumn('updated_at', { default: { now: true } })");
-            expect(source).toContain("alterColumn('metadata', {  })");
-            expect(source).toContain(".references('users', 'id', { onDelete: 'CASCADE', onUpdate: 'CASCADE' })");
+            expect(source).toContain(`alterColumn("status", { default: trustedSql(${JSON.stringify('active')}) })`);
+            expect(source).toContain('alterColumn("updated_at", { default: { now: true } })');
+            expect(source).toContain('alterColumn("metadata", {  })');
+            expect(source).toContain('.references("users", "id", { onDelete: "CASCADE", onUpdate: "CASCADE" })');
             expect(source).toContain('notValid: true');
-            expect(source).toContain("op.foreignKeyDrop({ table: 'events', name: 'events_user_id_fkey' })");
+            expect(source).toContain('op.foreignKeyDrop({ table: "events", name: "events_user_id_fkey" })');
         });
 
         it('renders column chains for string and null defaults', () => {
@@ -333,9 +333,9 @@ describe(MigrationGenerator, () => {
                 },
             ]);
 
-            expect(source).toContain("cols.add('untyped', (b) => b);");
-            expect(source).toContain("cols.add('opaque_default', (b) => b.text());");
-            expect(source).toContain(".references('users', 'id')");
+            expect(source).toContain('cols.add("untyped", (b) => b);');
+            expect(source).toContain('cols.add("opaque_default", (b) => b.text());');
+            expect(source).toContain('.references("users", "id")');
         });
 
         it('renders index create without unique/where/concurrently flags', () => {
@@ -347,7 +347,91 @@ describe(MigrationGenerator, () => {
                     on: ['username'],
                 },
             ]);
-            expect(source).toContain("op.index.create({ name: 'users_plain_idx', table: 'users', on: ['username'] })");
+            expect(source).toContain('op.index.create({ name: "users_plain_idx", table: "users", on: ["username"] })');
+        });
+
+        it('renders source safely for names that contain source delimiters', () => {
+            const table = `users');\nthrow new Error("bad");/*`;
+            const column = `bio"'\n`;
+            const indexName = `users*/idx'`;
+            const fkName = `posts"author'\n`;
+            const refTable = `authors'`;
+            const refColumn = `id"`;
+            const customName = 'seed*/users';
+            const source = generator.render(`016_name'\n_escape`, [
+                {
+                    kind: InternalOperationKind.TABLE_CREATE,
+                    table,
+                    columns: [
+                        {
+                            name: column,
+                            type: 'int',
+                            references: { table: refTable, column: refColumn, onDelete: 'CASCADE' },
+                        },
+                    ],
+                },
+                {
+                    kind: InternalOperationKind.INDEX_CREATE,
+                    table,
+                    name: indexName,
+                    on: [column],
+                },
+                {
+                    kind: InternalOperationKind.FK_CREATE,
+                    table,
+                    name: fkName,
+                    columns: [column],
+                    refTable,
+                    refColumns: [refColumn],
+                    onUpdate: 'CASCADE',
+                },
+                {
+                    kind: InternalOperationKind.FK_VALIDATE,
+                    table,
+                    name: fkName,
+                },
+                {
+                    kind: 'custom',
+                    name: customName,
+                    args: {},
+                },
+            ]);
+
+            expect(source).toContain(`id = ${JSON.stringify(`016_name'\n_escape`)}`);
+            expect(source).toContain(`op.table(${JSON.stringify(table)}).create`);
+            expect(source).toContain(`cols.add(${JSON.stringify(column)}, (b) => b.int()`);
+            expect(source).toContain(
+                `.references(${JSON.stringify(refTable)}, ${JSON.stringify(refColumn)}, { onDelete: ${JSON.stringify('CASCADE')} })`
+            );
+            expect(source).toContain(
+                `op.index.create({ name: ${JSON.stringify(indexName)}, table: ${JSON.stringify(table)}, on: [${JSON.stringify(column)}] })`
+            );
+            expect(source).toContain(
+                `op.foreignKey({ table: ${JSON.stringify(table)}, columns: [${JSON.stringify(column)}], references: { table: ${JSON.stringify(refTable)}, columns: [${JSON.stringify(refColumn)}] }, name: ${JSON.stringify(fkName)}, onUpdate: ${JSON.stringify('CASCADE')} })`
+            );
+            expect(source).toContain(
+                `op.foreignKeyValidate({ table: ${JSON.stringify(table)}, name: ${JSON.stringify(fkName)} })`
+            );
+            expect(source).toContain(
+                `custom operation ${JSON.stringify(customName).replaceAll('*/', '*\\/')} cannot be code-generated`
+            );
+        });
+
+        it('rejects unsupported column types while rendering source', () => {
+            expect(() =>
+                generator.render('017_invalid_type', [
+                    {
+                        kind: InternalOperationKind.TABLE_CREATE,
+                        table: 'users',
+                        columns: [
+                            {
+                                name: 'id',
+                                type: 'text(); throw new Error("bad"); b.text' as 'text',
+                            },
+                        ],
+                    },
+                ])
+            ).toThrow('Unsupported column type in migration source generation');
         });
     });
 
@@ -379,7 +463,7 @@ describe(MigrationGenerator, () => {
                 const source = await readFile(path, 'utf8');
                 expect(path.startsWith(dir)).toBe(true);
                 expect(source).toContain('extends Migration');
-                expect(source).toContain("op.table('users').create");
+                expect(source).toContain('op.table("users").create');
             } finally {
                 await rm(dir, { recursive: true, force: true });
             }
