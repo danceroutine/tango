@@ -82,7 +82,7 @@ describe(ManyToManyRelatedManager, () => {
                     selectTargetIdsForOwner: async () => [],
                 } as unknown as ConstructorParameters<typeof ManyToManyRelatedManager>[0]['throughTableManager'],
                 targetExecutorProvider: () => null,
-                createTarget: async () => ({ id: 1 } as { id: number }),
+                createTarget: async () => ({ id: 1 }) as { id: number },
                 runAtomic: async (work) => work(),
             });
             await expect(manager.add(true as unknown as { id: number })).rejects.toThrow(
@@ -216,7 +216,7 @@ describe(ManyToManyRelatedManager, () => {
         it('throws when the created target record does not expose the configured primary key', async () => {
             const { manager, insertLink } = aManyToManyRelatedManager<{ id: number }>({
                 targetPrimaryKeyField: 'id',
-                createTarget: async () => ({ slug: 'missing-id' } as unknown as { id: number }),
+                createTarget: async () => ({ slug: 'missing-id' }) as unknown as { id: number },
             });
 
             await expect(manager.create({})).rejects.toThrow(

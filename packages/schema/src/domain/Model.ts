@@ -43,9 +43,8 @@ export type PersistedModelOutput<TSchema extends z.ZodObject<z.ZodRawShape>> =
 export interface ModelAugmentations<
     TSchema extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>,
     TKey extends string = string,
-> extends ModelAugmentationCarrier<TSchema>,
-        ModelKeyCarrier<TKey>,
-        TangoSchemaModelAugmentations<TSchema, TKey> {}
+>
+    extends ModelAugmentationCarrier<TSchema>, ModelKeyCarrier<TKey>, TangoSchemaModelAugmentations<TSchema, TKey> {}
 
 export interface Model<
     TSchema extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>,

@@ -248,10 +248,9 @@ export class ExpressAdapter implements FrameworkAdapter<Response, RequestHandler
 
                 const rawId = req.params.id;
                 const id = Array.isArray(rawId) ? rawId[0] : rawId;
-                const tangoResponse = await this.requestExecutor.forHandler({ handler, ctx, id }).runResponse(
-                    req.method,
-                    options.transaction
-                );
+                const tangoResponse = await this.requestExecutor
+                    .forHandler({ handler, ctx, id })
+                    .runResponse(req.method, options.transaction);
                 const response = tangoResponse.toWebResponse();
 
                 res.status(response.status);

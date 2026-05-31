@@ -34,6 +34,7 @@
         "max-classes-per-file": "off",
         "no-array-callback-reference": "off",
         "no-negated-condition": "off",
+        "no-underscore-dangle": "off",
         "consistent-function-scoping": "off",
         "prefer-string-replace-all": "off",
         // We're not targeting toSorted() yet

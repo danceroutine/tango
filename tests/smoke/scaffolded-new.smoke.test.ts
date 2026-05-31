@@ -237,7 +237,9 @@ smokeDescribe('fresh tango new scaffold smoke tests', () => {
             runCommand('scaffold build', 'pnpm', ['run', 'build'], result.dir, {
                 TANGO_SQLITE_FILENAME: result.sqliteFile,
             });
-            await expect(readFile(join(result.dir, 'app/pages/index.server.vue'), 'utf8')).resolves.toContain('Tango + Nuxt');
+            await expect(readFile(join(result.dir, 'app/pages/index.server.vue'), 'utf8')).resolves.toContain(
+                'Tango + Nuxt'
+            );
         }, 240_000);
     }
 });

@@ -13,24 +13,24 @@ Dogfooding validates instructions and first-run experience. Subagents follow mat
 
 Before spawning subagents, collect or infer these inputs. Ask once for anything still missing:
 
-| Input | Purpose |
-|-------|---------|
-| **Verification goal** | What success means (e.g. scaffold and run an app from Getting Started) |
-| **Materials** | Docs, plan files, or other instructions subagents must follow |
-| **Environment** | How packages and tools are made available. For Tango docs that use `pnpm dlx @danceroutine/...`, follow [local-verdaccio-registry.md](references/local-verdaccio-registry.md). |
-| **Personas** | Default is three (below); override if the user specifies fewer or different roles |
-| **Stop condition** | When each subagent stops (default: verification goal met or blocked) |
+| Input                 | Purpose                                                                                                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Verification goal** | What success means (e.g. scaffold and run an app from Getting Started)                                                                                                         |
+| **Materials**         | Docs, plan files, or other instructions subagents must follow                                                                                                                  |
+| **Environment**       | How packages and tools are made available. For Tango docs that use `pnpm dlx @danceroutine/...`, follow [local-verdaccio-registry.md](references/local-verdaccio-registry.md). |
+| **Personas**          | Default is three (below); override if the user specifies fewer or different roles                                                                                              |
+| **Stop condition**    | When each subagent stops (default: verification goal met or blocked)                                                                                                           |
 
 ## Workflow
 
 1. Announce `Executing dogfooding.`
 2. Restate the verification goal and materials back to yourself before setup.
 3. Prepare environments **before** launching subagents. You run setup; subagents never do.
-   - For Tango docs dogfooding (`pnpm dlx @danceroutine/...`, `pnpm add @danceroutine/...`), follow [local-verdaccio-registry.md](references/local-verdaccio-registry.md): build packages, start Verdaccio, publish `@danceroutine/*`, pre-flight the documented flow once, then provision per-subagent dirs.
-   - Otherwise, provision a fully functional environment so documented commands can succeed (local registry, tarball install, workspace clone, or equivalent).
-   - One working directory under `/tmp` per subagent; no shared paths or state. Each Tango subagent also gets an isolated pnpm `store-dir` (see reference).
-   - Verify the environment is consumable before handing it to a subagent.
-   - Include materials exactly as a real user would see them — edited files on disk, plan draft copy, or rendered paths. Do not paraphrase into prompts.
+    - For Tango docs dogfooding (`pnpm dlx @danceroutine/...`, `pnpm add @danceroutine/...`), follow [local-verdaccio-registry.md](references/local-verdaccio-registry.md): build packages, start Verdaccio, publish `@danceroutine/*`, pre-flight the documented flow once, then provision per-subagent dirs.
+    - Otherwise, provision a fully functional environment so documented commands can succeed (local registry, tarball install, workspace clone, or equivalent).
+    - One working directory under `/tmp` per subagent; no shared paths or state. Each Tango subagent also gets an isolated pnpm `store-dir` (see reference).
+    - Verify the environment is consumable before handing it to a subagent.
+    - Include materials exactly as a real user would see them — edited files on disk, plan draft copy, or rendered paths. Do not paraphrase into prompts.
 4. Spawn one subagent per persona (default three). Pass absolute paths to materials and each isolated working directory.
 5. Wait for all subagent reports.
 6. Synthesize findings and present them to the user (see Synthesis).
@@ -74,6 +74,7 @@ Each subagent prompt must include:
 # Dogfooding report — [persona name]
 
 ## Outcome
+
 [running | blocked]
 
 ## What went well
@@ -81,12 +82,15 @@ Each subagent prompt must include:
 ## What went wrong
 
 ## Friction
+
 [Was the material straightforward to follow? Where did momentum stop?]
 
 ## Continue with product?
+
 [Would this persona continue using the product based on this experience? Why or why not?]
 
 ## Blocker details
+
 [If blocked: exact step, command output or error, and what was unclear]
 ```
 
@@ -98,10 +102,10 @@ After all subagents report:
 2. Preserve persona-specific differences.
 3. Order by severity: blockers first, then confusion, then minor friction.
 4. Present to the user:
-   - **Blockers** — steps that prevent completion
-   - **Friction** — completable but painful or unclear
-   - **Positives** — what worked across personas
-   - **Recommended fixes** — concrete next changes tied to specific steps or materials
+    - **Blockers** — steps that prevent completion
+    - **Friction** — completable but painful or unclear
+    - **Positives** — what worked across personas
+    - **Recommended fixes** — concrete next changes tied to specific steps or materials
 
 Do not silently fix the product during dogfooding unless the user explicitly asks for fixes after synthesis.
 

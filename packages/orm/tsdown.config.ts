@@ -16,5 +16,6 @@ export default defineConfig({
     platform: 'node',
     target: 'node22',
     shims: false,
+    fixedExtension: false,
     external: ['pg', 'better-sqlite3', '@danceroutine/tango-config'],
 });
