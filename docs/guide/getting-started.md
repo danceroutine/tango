@@ -1,194 +1,170 @@
 # Getting started
 
-Tango gives TypeScript applications a Django-inspired developer workflow for managing database schemas and persistence, managing application configuration, building APIs, and testing the result. It works alongside a host framework such as Express, Next.js, or Nuxt, so you keep the runtime you already know while adding a more structured application layer on top of it.
+Tango gives a TypeScript application a Django-inspired workflow for database schema, persistence, configuration, APIs, and testing. It runs alongside a host framework such as Express, Next.js, or Nuxt, so you keep the runtime you already use and add a structured application layer above it.
 
-There are two good ways to begin:
+The quickest way to understand that workflow is to scaffold a project, run it, and watch one change move through the model, a migration, and the API. The quickstart below does that with Express and SQLite in a few minutes.
 
-- If you want to see Tango in a working project before installing anything into your own application, run one of the example apps in this repository.
-- If you already know you want Tango in your own project, continue with [Installation](/guide/installation).
+## Prerequisites
 
-## What Tango adds to your stack
+The quickstart needs Node.js 22 or newer and a package manager. The commands below use pnpm, which Corepack can activate:
 
-Most Tango applications are built from the same set of concerns.
+```bash
+corepack enable
+corepack prepare pnpm@9.13.2 --activate
+```
 
-- `tango.config.ts` gives the application and the CLI one shared source of truth for database and migration settings. You can also leverage it to provide a one stop configuration module for your business logic.
-- Models built from the `@danceroutine/tango-schema` API define your business logic data shape, provide lifecycle hooks for persistence, and define relevant database metadata.
-- `@danceroutine/tango-orm` provides you the same QuerySet based ORM contract you're used to from Django, backed by an extensible adapter system to enable onboarding new database management systems.
-- `@danceroutine/tango-migrations` provides the same onion-skin automatic migration process for deterministically evolving your database schema as you change your models.
-- `@danceroutine/tango-resources` exposes familiar DRF-style capabilities such as APIViews, Viewsets, and Serializers to integrate your application business logic to your API layer with minimal boilerplate.
-- An adapter package responsible for connecting your resources to the host framework you are using.
+npm, Yarn, and Bun also work. Pass your choice to `tango new` with `--package-manager`.
 
-## Start with a working Tango application
+## Scaffold a Tango project
 
-The example projects in this repository give you an end-to-end view of Tango in a working application before you decide how much of the stack you want to adopt.
+`tango new` generates a complete starter project for the host framework you choose. Create an Express project on SQLite and install its dependencies in one step:
 
-To run the examples, you need:
+```bash
+pnpm dlx @danceroutine/tango-cli new my-app --framework express --dialect sqlite --install
+cd my-app
+```
 
-- Git
-- Node.js 22 or newer
-- pnpm 9 or newer
-- a local clone of the Tango repository
+The scaffold includes `tango.config.ts`, a `Todo` model with its serializer and viewset, the Express adapter wiring, and an OpenAPI endpoint. `--install` runs the package manager for you; omit it to install the dependencies yourself.
 
-On macOS, Linux, or WSL, the following sequence gives you a clean local setup.
+::: tip pnpm 10 and native builds
+pnpm 10 and newer wait for your approval before a dependency runs its build scripts. `better-sqlite3` compiles a native binding during that step, so on pnpm 10 approve it once and reinstall before generating migrations:
 
-Install Git from [git-scm.com](https://git-scm.com/downloads) when you need it.
+```bash
+pnpm approve-builds
+pnpm install
+```
 
-Install `nvm` using the official install script:
+Select `better-sqlite3` (and `esbuild`) when prompted. pnpm remembers the choice, so this is a one-time step. On pnpm 9 the binding builds during install with no extra action.
+:::
+
+## Generate the first migration and run the app
+
+The generated model needs an initial migration before the database has a table to read and write. Generate it, then start the development server:
+
+```bash
+pnpm run make:migrations --name initial
+pnpm run dev
+```
+
+`make:migrations` reads the `Todo` model and writes a migration file under `migrations/`. `pnpm run dev` applies pending migrations and then starts Express on port 3000.
+
+## See the API
+
+`pnpm run dev` keeps running in the foreground, so leave it running and open a second terminal for the requests below. The scaffolded routes are live:
+
+- `http://localhost:3000/health` confirms the server booted.
+- `http://localhost:3000/api/openapi.json` returns the generated OpenAPI document.
+- `http://localhost:3000/api/todos` returns the todo collection, which starts empty.
+
+Create a todo, then read it back:
+
+```bash
+curl -X POST http://localhost:3000/api/todos \
+  -H 'content-type: application/json' \
+  -d '{"title": "Write my first Tango model"}'
+
+curl http://localhost:3000/api/todos
+```
+
+The list response now includes the todo you created.
+
+## Make one change end to end
+
+Changing a single field exercises the full workflow end to end. Add a `priority` field to the todo and watch it travel from the model to a migration to the API.
+
+Open `src/models/TodoModel.ts` and add `priority` to the read schema and the create schema:
+
+```ts
+export const TodoReadSchema = z.object({
+    id: z.number(),
+    title: z.string().min(1),
+    priority: z.number().int().min(1).max(5).nullish(),
+    completed: z.coerce.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+});
+
+export const TodoCreateSchema = z.object({
+    title: z.string().min(1),
+    priority: z.number().int().min(1).max(5).optional(),
+    completed: z.boolean().optional().default(false),
+});
+```
+
+The read schema marks `priority` with `.nullish()` so it accepts `null`. The todo you created earlier predates the new column, so the database stores its `priority` as `null`, and the list endpoint validates every row it returns against the read schema. The create schema keeps `priority` optional, since a new todo either sets the field or omits it.
+
+`TodoModel` builds its stored schema from `TodoReadSchema`, so adding `priority` there also adds it to the model's stored shape. Generate the migration. If the development server is still running, stop it with Ctrl-C and start it again so the new migration is applied before the server restarts:
+
+```bash
+pnpm run make:migrations --name add_todo_priority
+pnpm run dev
+```
+
+Create a todo that sets the new field, and read it back:
+
+```bash
+curl -X POST http://localhost:3000/api/todos \
+  -H 'content-type: application/json' \
+  -d '{"title": "Ship the priority field", "priority": 1}'
+
+curl http://localhost:3000/api/todos
+```
+
+The list now returns both todos: the earlier one with `priority` as `null` and the new one with `priority` set to `1`. The regenerated OpenAPI document at `/api/openapi.json` describes the field as well. That loop, from model to migration to API, is the same one you repeat for real schema work.
+
+## Explore the example applications
+
+For fuller, multi-model applications, the Tango repository ships runnable Express, Next.js, and Nuxt examples. They show the same layers in larger blog APIs with users, posts, comments, and relations.
+
+Set up the workspace once:
+
+```bash
+git clone https://github.com/danceroutine/tango.git
+cd tango
+pnpm install
+```
+
+If you still need Node 22 or pnpm, install Node through nvm and activate pnpm with Corepack first:
 
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
-```
-
-`zsh` users may need to create `~/.zshrc` first with `touch ~/.zshrc`. After the install script finishes, open a new terminal or load your shell profile so the `nvm` command is available.
-
-Then install Node 22, enable Corepack, activate the workspace pnpm version, and clone Tango:
-
-```bash
 nvm install 22
 nvm use 22
 corepack enable
 corepack prepare pnpm@9.13.2 --activate
-git clone https://github.com/danceroutine/tango.git
-cd tango
-pnpm install
 ```
 
-Machines that already have Git, Node 22, and pnpm can start from the clone step:
-
-```bash
-git clone https://github.com/danceroutine/tango.git
-cd tango
-pnpm install
-```
-
-## Run the Express example
-
-Begin with the Express blog example for a straightforward introduction to Tango. It is a conventional REST API, so the framework integration stays easy to read while still exposing the full Tango workflow: configuration, models, ORM access, migrations, serializers, viewsets, filtering, pagination, and the Express adapter.
-
-From the root of the Tango repository, prepare the example data first:
+Each example seeds sample data and starts its own development server:
 
 ```bash
 pnpm --filter @danceroutine/tango-example-express-blog-api bootstrap
-```
-
-The bootstrap step seeds the example database with users, posts, and comments. The development server also applies migrations automatically to the configured database (configured in the example's `tango.config.ts`), so once the app starts you can focus on the API behavior with the schema already in place.
-
-Then start the development server:
-
-```bash
 pnpm --filter @danceroutine/tango-example-express-blog-api dev
 ```
 
-When the server is running, open these URLs:
+The Express example serves on port 3000, the Next.js example on 3001, and the Nuxt example on 3002. Swap the filter to `@danceroutine/tango-example-nextjs-blog` or `@danceroutine/tango-example-nuxt-blog` to run the others. The [tutorials](/tutorials/) walk through these applications in detail.
 
-- `http://localhost:3000/health`
-- `http://localhost:3000/api/posts?limit=20&offset=0`
-- `http://localhost:3000/api/posts?published=true&ordering=-createdAt`
+## What to look for in every Tango app
 
-The health endpoint confirms that the application booted successfully. The posts endpoints show pagination, filtering, and ordering against real seeded data, which makes it easier to see how Tango resources expose a predictable query surface.
-
-After you have clicked through the endpoints, we recommend checking out the code in this order: the post model, the serializer, the viewset, and the Express bootstrap code. That path shows how Tango's persistence and API layers connect to a conventional JSON API server.
-
-The Express example is also the best place to inspect Tango's nested relation hydration story. Its blog models form a small relation graph with `Post.author`, `User.posts`, `Post.comments`, and `Comment.author`, so the example's model module is suitable both for runtime relation planning and for generated relation typing.
-
-## Run the Next.js example
-
-Move to the Next.js example when you want to see the same Tango primitives inside App Router route handlers. It is a good fit for readers whose application already depends on React and Next.js and who want Tango to supply the persistence and API layers inside that environment.
-
-Prepare the seeded content first:
-
-```bash
-pnpm --filter @danceroutine/tango-example-nextjs-blog bootstrap
-```
-
-The bootstrap script fills the example database with many posts so pagination and listing behavior are visible immediately.
-
-Then start the development server:
-
-```bash
-pnpm --filter @danceroutine/tango-example-nextjs-blog dev
-```
-
-When the app is running, open:
-
-- `http://localhost:3001/`
-- `http://localhost:3001/api/posts?limit=20&offset=0`
-
-The home page shows the application in its normal rendered form. The API route lets you see the same model-backed data through Tango's resource layer inside Next.js route handling.
-
-After that, inspect the model definitions, the serializer, the post viewset, and the route handlers. That sequence gives a clear picture of how Tango integrates with Next.js while Next continues to own the application shell and routing model.
-
-## Run the Nuxt example
-
-The Nuxt example shows the same overall pattern in a Vue and Nitro application. It is a good fit when you want to see Tango in a host framework that combines SSR pages, Nitro server handlers, and a Nuxt-managed application shell.
-
-Prepare the example data first:
-
-```bash
-pnpm --filter @danceroutine/tango-example-nuxt-blog bootstrap
-```
-
-This script seeds the database with enough posts to make list endpoints, pagination, and the OpenAPI document worth inspecting.
-
-Then start the development server:
-
-```bash
-pnpm --filter @danceroutine/tango-example-nuxt-blog dev
-```
-
-When the app is running, open:
-
-- `http://localhost:3002/`
-- `http://localhost:3002/api/posts?limit=20&offset=0`
-- `http://localhost:3002/api/openapi`
-
-The root page shows the Nuxt application as a user sees it, powered by the same ORM layer. If you're interested in the Nitro API side, check out the posts endpoint to learn about Tango's API behavior in Nuxt. Additionally, the OpenAPI endpoint shows how Tango's API layer can also drive machine-readable self-documenting API output in the same application.
-
-After that, inspect `nuxt.config.ts`, the Tango server handlers, the post serializer, the post viewset, and the Nuxt pages. That path shows how Tango can power the data and API layer while Nuxt continues to shape the user-facing application.
-
-## What to look for in every example
-
-As you move through any of the examples, keep this sequence in mind:
+Whether you scaffold a project or read an example, the same sequence appears:
 
 1. `tango.config.ts` selects the database and migration settings.
-2. A model definition describes data shape and schema metadata, and works in conjunction with the migration API to keep the database schema aligned with the model metadata.
-3. The exported model module is also the input for generated relation typing. `tango make:migrations` refreshes that generated registry during normal schema work, and `tango codegen relations` handles relation-only changes when no migration file is needed.
-4. Models expose their ORM query entry via the `<Model>.objects` interface, same as Django, but with the added type-safety that TypeScript enables.
-5. Serializers give you an opportunity to define arbitrary or model-driven validation and two-way serialization to and from arbitrary JSON data and Tango models.
-6. Viewsets or APIViews define the HTTP-facing contract.
-7. Last of all, an adapter connects those Tango abstractions to the host framework.
+2. A model describes the data shape and the schema metadata that migrations keep aligned with the database.
+3. `Model.objects` exposes the ORM query entry point, with TypeScript-native typing.
+4. Serializers define validation and two-way serialization between JSON and Tango models.
+5. Viewsets or API views define the HTTP contract.
+6. An adapter connects those Tango abstractions to the host framework.
 
-Once that sequence feels familiar, the rest of the documentation becomes much easier to place because the same workflow shows up across the framework.
-
-## A practical first exercise
-
-One small change across the whole stack is a useful way to build intuition.
-
-Use the Express example and do this:
-
-1. Add a field to `PostModel`.
-2. Generate a migration for the example.
-3. Notice that the same `make:migrations` step also refreshes the generated relation registry for that example's model module.
-4. Apply the migration with `tango migrate`.
-5. Update the serializer or resource code if the new field belongs in the API contract.
-6. Confirm that the field appears in the API response.
-
-That exercise touches the same boundaries you will use in a real Tango project: schema metadata, migrations, runtime persistence, and API exposure.
+Once that sequence feels familiar, the rest of the documentation is easier to place.
 
 ## Continue from here
 
-Once you have seen a working Tango application, the usual next steps are:
+- [Installation](/guide/installation) to add Tango to an existing application
+- A tutorial for your host framework: [Express](/tutorials/express-blog-api), [Next.js](/tutorials/nextjs-blog), or [Nuxt](/tutorials/nuxt-blog)
+- The [topic guides](/topics/) for the layers you use most
+- The [how-to guides](/how-to/) for self-contained tasks
+- [Supported and unsupported features](/guide/supported-and-unsupported) for the current boundary
 
-1. [Installation](/guide/installation) if you are adding Tango to your own application
-2. [Overview](/guide/overview) if you want to understand how the documentation is organized
-3. A tutorial for your use case:
-   [Express blog API](/tutorials/express-blog-api),
-   [Next.js blog](/tutorials/nextjs-blog),
-   or [Nuxt blog](/tutorials/nuxt-blog)
-4. the topic guides to learn more about the capabilities you plan to use most heavily
-5. the how-to guides to dig into a self-contained functionality or workflow you plan to layer into your application development.
-
-If you want to work on Tango itself, continue with the [Contributor documentation](/contributors/). Those pages cover setup, contribution workflow, and release operations.
+To work on Tango itself, continue with the [contributor documentation](/contributors/). Those pages cover setup, contribution workflow, and release operations.
 
 ## Related pages
 

@@ -232,19 +232,93 @@ bun add @danceroutine/tango-openapi
 
 Install the OpenAPI package when you want the application to publish a machine-readable API document for Swagger UI, client generation, or external tooling.
 
-## Verify the installation
+## Create a minimal application
 
-After the packages are installed, the next step is usually to create `tango.config.ts`, define a model, and wire the chosen adapter into your host framework.
+The fastest way to a working setup is to let `tango new` scaffold the files for you:
 
-At this point, the most useful verification is practical:
+```bash
+pnpm dlx @danceroutine/tango-cli new my-app --framework express --dialect sqlite --install
+```
 
-1. create `tango.config.ts`
-2. define one model
-3. generate or write the first migration
-4. run the migration
-5. expose the model through one view or viewset
+See [Getting started](/guide/getting-started) for the full scaffold-and-run walkthrough.
 
-If you want a working reference before you do that in your own application, go back to [Getting started](/guide/getting-started) and run one of the example apps.
+You can also assemble the pieces by hand. Three things form the smallest complete Tango application: one config file, one model, and the first migration.
+
+First, `tango.config.ts` points the runtime and the CLI at one SQLite database:
+
+```ts
+import { defineConfig } from '@danceroutine/tango-config';
+
+export default defineConfig({
+    current: 'development',
+    environments: {
+        development: {
+            name: 'development',
+            db: { adapter: 'sqlite', filename: './.data/app.sqlite', maxConnections: 1 },
+            migrations: { dir: './migrations', online: false },
+        },
+        test: {
+            name: 'test',
+            db: { adapter: 'sqlite', filename: ':memory:', maxConnections: 1 },
+            migrations: { dir: './migrations', online: false },
+        },
+        production: {
+            name: 'production',
+            db: { adapter: 'sqlite', filename: './.data/app.sqlite', maxConnections: 1 },
+            migrations: { dir: './migrations', online: false },
+        },
+    },
+});
+```
+
+Next, `src/models/index.ts` defines one model and registers its manager:
+
+```ts
+import { z } from 'zod';
+import { registerModelObjects } from '@danceroutine/tango-orm/runtime';
+import { Model, t } from '@danceroutine/tango-schema';
+
+registerModelObjects();
+
+export const TodoReadSchema = z.object({
+    id: z.number(),
+    title: z.string().min(1),
+    completed: z.coerce.boolean(),
+});
+
+export const TodoCreateSchema = z.object({
+    title: z.string().min(1),
+    completed: z.boolean().optional().default(false),
+});
+
+export const TodoUpdateSchema = TodoCreateSchema.partial();
+
+export type Todo = z.output<typeof TodoReadSchema>;
+
+export const TodoModel = Model({
+    namespace: 'app',
+    name: 'Todo',
+    schema: TodoReadSchema.extend({
+        id: t.primaryKey(z.number().int()),
+        completed: t.field(z.coerce.boolean()).defaultValue('false').build(),
+    }),
+});
+```
+
+Finally, generate and apply the first migration:
+
+```bash
+pnpm exec tango make:migrations --config ./tango.config.ts --models ./src/models/index.ts --name initial
+pnpm exec tango migrate --config ./tango.config.ts
+```
+
+A local install puts the `tango` binary in the project's `node_modules/.bin`, so run it through your package manager: `pnpm exec tango`, `npx tango`, `yarn exec tango`, or `bunx tango`.
+
+::: tip pnpm 10 and native builds
+On pnpm 10 and newer, a dependency's build scripts wait for your approval, and `better-sqlite3` compiles its native binding during that step. If a migration command reports a missing `better-sqlite3` binding, run `pnpm approve-builds`, select `better-sqlite3` (and `esbuild`), and reinstall. pnpm 9 builds the binding during install with no extra action.
+:::
+
+At that point the database has a `Todo` table that matches the model. Exposing it through the API takes one serializer and one viewset wired into the host framework, which follow the shapes in [Work with serializers](/how-to/working-with-serializers) and [Build your API with viewsets](/how-to/build-your-api-with-viewsets). For a fully wired starting point, scaffold a project with `tango new` or read the [Express tutorial](/tutorials/express-blog-api).
 
 ## What to read next
 

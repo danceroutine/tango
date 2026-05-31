@@ -91,35 +91,11 @@ Then open `examples/blog-api/src/openapi.ts`. That file generates an OpenAPI doc
 
 That relationship matters for the feature you are about to add. Once the post schemas and resource contract change, the generated OpenAPI document will reflect the new field as well.
 
-## 2. Add the feature from a fresh machine
+## 2. Add the feature
 
-The steps below assume a fresh machine and a fresh clone of the Tango repository. If your machine already has Git, Node 22, and pnpm 9 available, you can start at the clone step.
+The blog API example lives in the Tango repository, so the steps below run inside a clone of that workspace. If you still need to set it up, follow [Explore the example applications](/guide/getting-started#explore-the-example-applications) in Getting started to install Node, activate pnpm, clone Tango, and run `pnpm install`.
 
-### Install the workspace prerequisites
-
-Install Git from [git-scm.com](https://git-scm.com/downloads) if it is not already available on your machine.
-
-Install `nvm` using the official install script:
-
-```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
-```
-
-If you use `zsh` and do not already have a `~/.zshrc`, create it first with `touch ~/.zshrc`. After the install script finishes, open a new terminal or reload your shell profile so `nvm` is available.
-
-Then install Node 22, enable Corepack, activate the workspace pnpm version, and clone Tango:
-
-```bash
-nvm install 22
-nvm use 22
-corepack enable
-corepack prepare pnpm@9.13.2 --activate
-git clone https://github.com/danceroutine/tango.git
-cd tango
-pnpm install
-```
-
-All remaining commands in this tutorial should be run from the repository root.
+Run all remaining commands from the repository root.
 
 ### Add `summary` to the post schemas
 
