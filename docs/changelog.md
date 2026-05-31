@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.3 - 2026-05-31
+
+Release updated runtime dependency support for `jiti`.
+
 ## 1.11.2 - 2026-05-31
 
 Preserve package build outputs and source compatibility with the updated build toolchain, and allow generated projects to build native dependencies required by `better-sqlite3` and `tsx`.
