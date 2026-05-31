@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.2 - 2026-05-31
+
+Preserve package build outputs and source compatibility with the updated build toolchain, and allow generated projects to build native dependencies required by `better-sqlite3` and `tsx`.
+
 ## 1.11.1 - 2026-05-30
 
 Fix `bulkCreate(...)` so batches with mismatched row shapes fail clearly after hook processing instead of silently dropping extra keys or inserting `undefined` values.
