@@ -270,7 +270,7 @@ export class FilterSet<T extends Record<string, unknown>> {
 
         if (lookup === 'icontains') {
             const lookupKey = `${String(field)}__icontains` as FilterKey<T>;
-            return { [lookupKey]: `%${FilterSet.toScalarString(value)}%` } as FilterInput<T>;
+            return { [lookupKey]: FilterSet.toScalarString(value) } as FilterInput<T>;
         }
 
         const lookupKey = `${String(field)}__${lookup}` as FilterKey<T>;
@@ -389,7 +389,7 @@ export class FilterSet<T extends Record<string, unknown>> {
                 return { [resolver.column]: value } as FilterInput<T>;
 
             case InternalFilterType.ILIKE: {
-                const pattern = `%${FilterSet.toScalarString(value)}%`;
+                const pattern = FilterSet.toScalarString(value);
                 const filter: Partial<Record<FilterKey<T>, FilterValue>> = {};
                 resolver.columns.forEach((col) => {
                     filter[`${String(col)}__icontains` as FilterKey<T>] = pattern;
