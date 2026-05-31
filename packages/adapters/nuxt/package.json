@@ -43,7 +43,7 @@
         "@danceroutine/tango-core": "workspace:*",
         "@danceroutine/tango-resources": "workspace:*",
         "@danceroutine/tango-adapters-core": "workspace:*",
-        "h3": "^1.15.6"
+        "h3": "^1.15.11"
     },
     "peerDependencies": {
         "nuxt": "^4.4.6"
