@@ -2,6 +2,7 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
         "composite": false,
+        "rootDir": "../..",
         "lib": ["dom", "dom.iterable", "esnext"],
         "jsx": "preserve",
         "incremental": true,
