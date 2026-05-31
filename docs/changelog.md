@@ -4,6 +4,14 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.4 - 2026-05-31
+
+- `FilterSet` now passes raw `icontains` values to the ORM so SQL wildcard wrapping happens once in the query compiler.
+
+Align resource subpath exports with their built entrypoints so domain imports resolve to concrete `dist` files.
+
+Escape string values when rendering generated migration source.
+
 ## 1.11.3 - 2026-05-31
 
 Release updated runtime dependency support for `jiti`.
