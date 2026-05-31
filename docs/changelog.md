@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.8 - 2026-05-31
+
+Update scaffolded app manifests for TypeScript 6 and pnpm 10 compatibility.
+
 ## 1.11.7 - 2026-05-31
 
 Update dotenv to 17.4.2 for configuration loading.
