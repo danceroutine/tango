@@ -30,7 +30,7 @@
         "@danceroutine/tango-schema": "workspace:*",
         "better-sqlite3": "^12.10.0",
         "nuxt": "^4.4.2",
-        "vue": "^3.5.31",
+        "vue": "^3.5.35",
         "zod": "^4.0.0"
     },
     "devDependencies": {

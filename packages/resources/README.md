@@ -143,10 +143,10 @@ The package supports both root imports and domain-style imports:
 
 ```ts
 import { APIView, FilterSet, ModelSerializer, ModelViewSet, OffsetPaginator } from '@danceroutine/tango-resources';
-import { context, filters, pagination, serializer, view, viewset } from '@danceroutine/tango-resources';
+import { context, filters, pagination, resource, serializer, view, viewset } from '@danceroutine/tango-resources';
 ```
 
-Available subpaths include `context`, `filters`, `pagination`, `paginators`, `serializer`, `viewset`, `view`, and `domain`.
+Available subpaths include `context`, `filters`, `pagination`, `paginators`, `resource`, `serializer`, `view`, and `viewset`.
 
 ## Developer workflow
 

@@ -37,8 +37,7 @@ describe(FilterSet, () => {
         const result = filters.apply(params);
 
         expect(result).toHaveLength(1);
-        expect(result[0]).toHaveProperty('name__icontains');
-        expect(result[0]).toHaveProperty('email__icontains');
+        expect(result[0]).toEqual({ name__icontains: 'john', email__icontains: 'john' });
     });
 
     it('applies range filter', () => {
@@ -134,7 +133,7 @@ describe(FilterSet, () => {
         });
 
         const result = filters.apply(query('tags__slug=tango&author__email__icontains=example.com'));
-        expect(result).toEqual([{ tags__slug: 'tango' }, { author__email__icontains: '%example.com%' }]);
+        expect(result).toEqual([{ tags__slug: 'tango' }, { author__email__icontains: 'example.com' }]);
     });
 
     it('ignores malformed all-field lookup params that resolve to an empty relation path', () => {
@@ -238,7 +237,7 @@ describe(FilterSet, () => {
             active: (raw) => raw,
         });
 
-        expect(filters.apply(query('q=pedro'))).toEqual([{ name__icontains: '%pedro%', email__icontains: '%pedro%' }]);
+        expect(filters.apply(query('q=pedro'))).toEqual([{ name__icontains: 'pedro', email__icontains: 'pedro' }]);
     });
 
     it('leaves range and in resolvers unchanged when no matching parser override exists', () => {
@@ -278,7 +277,7 @@ describe(FilterSet, () => {
         });
 
         const result = filters.apply(query('q=pedro'));
-        expect(result).toEqual([{ name__icontains: '%pedro%', email__icontains: '%pedro%' }]);
+        expect(result).toEqual([{ name__icontains: 'pedro', email__icontains: 'pedro' }]);
     });
 
     it('defaults multi-field alias lookups to icontains when lookup is omitted', () => {
@@ -291,7 +290,7 @@ describe(FilterSet, () => {
         });
 
         const result = filters.apply(query('q=pedro'));
-        expect(result).toEqual([{ name__icontains: '%pedro%', email__icontains: '%pedro%' }]);
+        expect(result).toEqual([{ name__icontains: 'pedro', email__icontains: 'pedro' }]);
     });
 
     it('supports __all__ mode when explicitly enabled', () => {
@@ -363,7 +362,7 @@ describe(FilterSet, () => {
             { id__lte: '10' },
             { id__gt: '0' },
             { id__gte: '1' },
-            { name__icontains: '%foo%' },
+            { name__icontains: 'foo' },
             { name__contains: 'foo' },
             { name__startswith: 'fo' },
             { name__istartswith: 'fo' },
@@ -423,7 +422,7 @@ describe(FilterSet, () => {
         expect(internalClass.resolveLookupFilter('id', 'in', '1,2')).toEqual({ id__in: ['1', '2'] });
         expect(internalClass.resolveLookupFilter('id', 'in', [1, 2])).toEqual({ id__in: [1, 2] });
         expect(internalClass.resolveLookupFilter('name', 'icontains', 'foo')).toEqual({
-            name__icontains: '%foo%',
+            name__icontains: 'foo',
         });
 
         expect(internalClass.isFilterResolverDeclaration({ type: 'scalar', column: 'id' })).toBe(true);

@@ -13,6 +13,7 @@ import type {
     ForeignKeyDrop,
 } from '../domain/MigrationOperation';
 import type { ColumnSpec } from '../builder/contracts/ColumnSpec';
+import { InternalColumnType } from '../domain/internal/InternalColumnType';
 import { InternalOperationKind } from '../domain/internal/InternalOperationKind';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -84,7 +85,7 @@ export class MigrationGenerator {
             `import { Migration, op, trustedSql, type Builder } from '@danceroutine/tango-migrations';`,
             ``,
             `export default class ${className} extends Migration {`,
-            `  id = '${id}';`,
+            `  id = ${this.renderStringLiteral(id)};`,
             ``,
             `  up(m: Builder) {`,
             `    m.run(`,
@@ -138,9 +139,9 @@ export class MigrationGenerator {
             case InternalOperationKind.FK_DROP:
                 return this.renderForeignKeyDrop(operation);
             case InternalOperationKind.FK_VALIDATE:
-                return `op.foreignKeyValidate({ table: '${operation.table}', name: '${operation.name}' })`;
+                return `op.foreignKeyValidate({ table: ${this.renderStringLiteral(operation.table)}, name: ${this.renderStringLiteral(operation.name)} })`;
             case 'custom':
-                return `/* custom operation '${operation.name}' cannot be code-generated */`;
+                return `/* custom operation ${this.renderCommentStringLiteral(operation.name)} cannot be code-generated */`;
             default:
                 return `/* unsupported operation */`;
         }
@@ -149,29 +150,29 @@ export class MigrationGenerator {
     private renderReverseOperation(operation: MigrationOperation): string {
         switch (operation.kind) {
             case InternalOperationKind.TABLE_CREATE:
-                return `op.table('${operation.table}').drop()`;
+                return `op.table(${this.renderStringLiteral(operation.table)}).drop()`;
             case InternalOperationKind.TABLE_DROP:
-                return `/* manual reverse required: recreate dropped table '${operation.table}' */`;
+                return `/* manual reverse required: recreate dropped table ${this.renderCommentStringLiteral(operation.table)} */`;
             case InternalOperationKind.COLUMN_ADD:
-                return `op.table('${operation.table}').dropColumn('${operation.column.name}')`;
+                return `op.table(${this.renderStringLiteral(operation.table)}).dropColumn(${this.renderStringLiteral(operation.column.name)})`;
             case InternalOperationKind.COLUMN_DROP:
-                return `/* manual reverse required: restore dropped column '${operation.column}' */`;
+                return `/* manual reverse required: restore dropped column ${this.renderCommentStringLiteral(operation.column)} */`;
             case InternalOperationKind.COLUMN_ALTER:
-                return `/* manual reverse required: revert ALTER COLUMN '${operation.column}' on '${operation.table}' */`;
+                return `/* manual reverse required: revert ALTER COLUMN ${this.renderCommentStringLiteral(operation.column)} on ${this.renderCommentStringLiteral(operation.table)} */`;
             case InternalOperationKind.COLUMN_RENAME:
-                return `op.table('${operation.table}').renameColumn('${operation.to}', '${operation.from}')`;
+                return `op.table(${this.renderStringLiteral(operation.table)}).renameColumn(${this.renderStringLiteral(operation.to)}, ${this.renderStringLiteral(operation.from)})`;
             case InternalOperationKind.INDEX_CREATE:
-                return `op.index.drop({ name: '${operation.name}', table: '${operation.table}' })`;
+                return `op.index.drop({ name: ${this.renderStringLiteral(operation.name)}, table: ${this.renderStringLiteral(operation.table)} })`;
             case InternalOperationKind.INDEX_DROP:
-                return `/* manual reverse required: recreate dropped index '${operation.name}' */`;
+                return `/* manual reverse required: recreate dropped index ${this.renderCommentStringLiteral(operation.name)} */`;
             case InternalOperationKind.FK_CREATE:
-                return `op.foreignKeyDrop({ table: '${operation.table}', name: '${operation.name ?? `${operation.table}_${operation.columns.join('_')}_fkey`}' })`;
+                return `op.foreignKeyDrop({ table: ${this.renderStringLiteral(operation.table)}, name: ${this.renderStringLiteral(operation.name ?? `${operation.table}_${operation.columns.join('_')}_fkey`)} })`;
             case InternalOperationKind.FK_DROP:
-                return `/* manual reverse required: recreate dropped FK '${operation.name}' */`;
+                return `/* manual reverse required: recreate dropped FK ${this.renderCommentStringLiteral(operation.name)} */`;
             case InternalOperationKind.FK_VALIDATE:
                 return `/* no reverse needed for FK_VALIDATE */`;
             case 'custom':
-                return `/* manual reverse required: custom operation '${operation.name}' */`;
+                return `/* manual reverse required: custom operation ${this.renderCommentStringLiteral(operation.name)} */`;
             default:
                 return `/* unsupported reverse operation */`;
         }
@@ -180,32 +181,36 @@ export class MigrationGenerator {
     private renderTableCreate(operation: TableCreate): string {
         const columnLines = operation.columns.map((col) => {
             const chain = this.renderColumnChain(col);
-            return `        cols.add('${col.name}', (b) => b${chain});`;
+            return `        cols.add(${this.renderStringLiteral(col.name)}, (b) => b${chain});`;
         });
 
-        return [`op.table('${operation.table}').create((cols) => {`, ...columnLines, `      })`].join('\n');
+        return [
+            `op.table(${this.renderStringLiteral(operation.table)}).create((cols) => {`,
+            ...columnLines,
+            `      })`,
+        ].join('\n');
     }
 
     private renderTableDrop(operation: TableDrop): string {
         if (operation.cascade) {
-            return `op.table('${operation.table}').drop({ cascade: true })`;
+            return `op.table(${this.renderStringLiteral(operation.table)}).drop({ cascade: true })`;
         }
-        return `op.table('${operation.table}').drop()`;
+        return `op.table(${this.renderStringLiteral(operation.table)}).drop()`;
     }
 
     private renderColumnAdd(operation: ColumnAdd): string {
         const chain = this.renderColumnChain(operation.column);
-        return `op.table('${operation.table}').addColumn('${operation.column.name}', (b) => b${chain})`;
+        return `op.table(${this.renderStringLiteral(operation.table)}).addColumn(${this.renderStringLiteral(operation.column.name)}, (b) => b${chain})`;
     }
 
     private renderColumnDrop(operation: ColumnDrop): string {
-        return `op.table('${operation.table}').dropColumn('${operation.column}')`;
+        return `op.table(${this.renderStringLiteral(operation.table)}).dropColumn(${this.renderStringLiteral(operation.column)})`;
     }
 
     private renderColumnAlter(operation: ColumnAlter): string {
         const parts: string[] = [];
         if (operation.to.type) {
-            parts.push(`type: '${operation.to.type}'`);
+            parts.push(`type: ${this.renderStringLiteral(operation.to.type)}`);
         }
         if (operation.to.notNull !== undefined) {
             parts.push(`notNull: ${operation.to.notNull}`);
@@ -216,27 +221,27 @@ export class MigrationGenerator {
             } else if (this.isNowDefault(operation.to.default)) {
                 parts.push(`default: { now: true }`);
             } else if (isTrustedSqlFragment(operation.to.default)) {
-                parts.push(`default: trustedSql(${JSON.stringify(operation.to.default.sql)})`);
+                parts.push(`default: trustedSql(${this.renderStringLiteral(operation.to.default.sql)})`);
             }
         }
-        return `op.table('${operation.table}').alterColumn('${operation.column}', { ${parts.join(', ')} })`;
+        return `op.table(${this.renderStringLiteral(operation.table)}).alterColumn(${this.renderStringLiteral(operation.column)}, { ${parts.join(', ')} })`;
     }
 
     private renderColumnRename(operation: ColumnRename): string {
-        return `op.table('${operation.table}').renameColumn('${operation.from}', '${operation.to}')`;
+        return `op.table(${this.renderStringLiteral(operation.table)}).renameColumn(${this.renderStringLiteral(operation.from)}, ${this.renderStringLiteral(operation.to)})`;
     }
 
     private renderIndexCreate(operation: IndexCreate): string {
         const parts: string[] = [
-            `name: '${operation.name}'`,
-            `table: '${operation.table}'`,
-            `on: [${operation.on.map((c) => `'${c}'`).join(', ')}]`,
+            `name: ${this.renderStringLiteral(operation.name)}`,
+            `table: ${this.renderStringLiteral(operation.table)}`,
+            `on: ${this.renderStringArrayLiteral(operation.on)}`,
         ];
         if (operation.unique) {
             parts.push(`unique: true`);
         }
         if (operation.where) {
-            parts.push(`where: trustedSql(${JSON.stringify(operation.where.sql)})`);
+            parts.push(`where: trustedSql(${this.renderStringLiteral(operation.where.sql)})`);
         }
         if (operation.concurrently) {
             parts.push(`concurrently: true`);
@@ -245,23 +250,23 @@ export class MigrationGenerator {
     }
 
     private renderIndexDrop(operation: IndexDrop): string {
-        return `op.index.drop({ name: '${operation.name}', table: '${operation.table}' })`;
+        return `op.index.drop({ name: ${this.renderStringLiteral(operation.name)}, table: ${this.renderStringLiteral(operation.table)} })`;
     }
 
     private renderForeignKeyCreate(operation: ForeignKeyCreate): string {
         const parts: string[] = [
-            `table: '${operation.table}'`,
-            `columns: [${operation.columns.map((c) => `'${c}'`).join(', ')}]`,
-            `references: { table: '${operation.refTable}', columns: [${operation.refColumns.map((c) => `'${c}'`).join(', ')}] }`,
+            `table: ${this.renderStringLiteral(operation.table)}`,
+            `columns: ${this.renderStringArrayLiteral(operation.columns)}`,
+            `references: { table: ${this.renderStringLiteral(operation.refTable)}, columns: ${this.renderStringArrayLiteral(operation.refColumns)} }`,
         ];
         if (operation.name) {
-            parts.push(`name: '${operation.name}'`);
+            parts.push(`name: ${this.renderStringLiteral(operation.name)}`);
         }
         if (operation.onDelete) {
-            parts.push(`onDelete: '${operation.onDelete}'`);
+            parts.push(`onDelete: ${this.renderStringLiteral(operation.onDelete)}`);
         }
         if (operation.onUpdate) {
-            parts.push(`onUpdate: '${operation.onUpdate}'`);
+            parts.push(`onUpdate: ${this.renderStringLiteral(operation.onUpdate)}`);
         }
         if (operation.notValid) {
             parts.push(`notValid: true`);
@@ -270,14 +275,14 @@ export class MigrationGenerator {
     }
 
     private renderForeignKeyDrop(operation: ForeignKeyDrop): string {
-        return `op.foreignKeyDrop({ table: '${operation.table}', name: '${operation.name}' })`;
+        return `op.foreignKeyDrop({ table: ${this.renderStringLiteral(operation.table)}, name: ${this.renderStringLiteral(operation.name)} })`;
     }
 
     private renderColumnChain(col: ColumnSpec): string {
         const parts: string[] = [];
 
         if (col.type) {
-            parts.push(`.${col.type}()`);
+            parts.push(`.${this.renderColumnTypeMethod(col.type)}()`);
         }
         if (col.notNull) {
             parts.push(`.notNull()`);
@@ -286,7 +291,7 @@ export class MigrationGenerator {
             if (this.isNowDefault(col.default)) {
                 parts.push(`.defaultNow()`);
             } else if (isTrustedSqlFragment(col.default)) {
-                parts.push(`.default(trustedSql(${JSON.stringify(col.default.sql)}))`);
+                parts.push(`.default(trustedSql(${this.renderStringLiteral(col.default.sql)}))`);
             }
         } else if (col.default === null) {
             parts.push(`.default(null)`);
@@ -300,16 +305,48 @@ export class MigrationGenerator {
         if (col.references) {
             const refParts: string[] = [];
             if (col.references.onDelete) {
-                refParts.push(`onDelete: '${col.references.onDelete}'`);
+                refParts.push(`onDelete: ${this.renderStringLiteral(col.references.onDelete)}`);
             }
             if (col.references.onUpdate) {
-                refParts.push(`onUpdate: '${col.references.onUpdate}'`);
+                refParts.push(`onUpdate: ${this.renderStringLiteral(col.references.onUpdate)}`);
             }
             const opts = refParts.length > 0 ? `, { ${refParts.join(', ')} }` : '';
-            parts.push(`.references('${col.references.table}', '${col.references.column}'${opts})`);
+            parts.push(
+                `.references(${this.renderStringLiteral(col.references.table)}, ${this.renderStringLiteral(col.references.column)}${opts})`
+            );
         }
 
         return parts.join('');
+    }
+
+    private renderStringLiteral(value: string): string {
+        return JSON.stringify(value);
+    }
+
+    private renderStringArrayLiteral(values: string[]): string {
+        return `[${values.map((value) => this.renderStringLiteral(value)).join(', ')}]`;
+    }
+
+    private renderCommentStringLiteral(value: string): string {
+        return this.renderStringLiteral(value).replaceAll('*/', '*\\/');
+    }
+
+    private renderColumnTypeMethod(type: ColumnSpec['type']): string {
+        switch (type) {
+            case InternalColumnType.SERIAL:
+            case InternalColumnType.INT:
+            case InternalColumnType.BIGINT:
+            case InternalColumnType.TEXT:
+            case InternalColumnType.BOOL:
+            case InternalColumnType.TIMESTAMPTZ:
+            case InternalColumnType.JSONB:
+            case InternalColumnType.UUID:
+                return type;
+            default:
+                throw new Error(
+                    `Unsupported column type in migration source generation: ${this.renderStringLiteral(type)}`
+                );
+        }
     }
 
     private timestamp(): string {
