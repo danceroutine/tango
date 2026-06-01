@@ -202,6 +202,27 @@ describe(ManyToManyRelatedQuerySet, () => {
         expect(params).toEqual(expect.arrayContaining([10, 11, 'docs']));
     });
 
+    it('delegates to a scoped existence query when state is non-trivial', async () => {
+        const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => {
+            if (sql.startsWith('SELECT 1')) {
+                return { rows: [{ exists: 1 }] };
+            }
+            return { rows: [] as Record<string, unknown>[] };
+        });
+        const queryset = new ManyToManyRelatedQuerySet<TagRow>(
+            aQueryExecutor<TagRow>({ meta: targetMeta, query }),
+            buildBridge({ fetchTargetIds: async () => [10, 11] })
+        );
+
+        await expect(queryset.filter({ name: 'docs' }).exists()).resolves.toBe(true);
+        expect(query).toHaveBeenCalledTimes(1);
+        const [sql, params] = query.mock.calls[0]!;
+        expect(sql).toContain('SELECT 1 AS exists FROM tags');
+        expect(sql).toContain('LIMIT 1');
+        expect(sql).not.toContain('SELECT COUNT');
+        expect(params).toEqual([10, 11, 'docs']);
+    });
+
     it('combines successive filter calls into a conjunctive predicate', async () => {
         const run = vi.fn().mockResolvedValue([]);
         const executor = aQueryExecutor<TagRow>({ meta: targetMeta, run });

@@ -627,6 +627,43 @@ describe(QueryCompiler, () => {
         expect(result.sql).toContain('OFFSET 20');
     });
 
+    it('compiles existence probes from scalar query state', () => {
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compileExists<UserModel>({
+            q: { kind: 'atom', where: { email: 'test@example.com' } },
+            excludes: [{ kind: 'atom', where: { name__contains: 'bot' } }],
+            order: [{ by: 'age', dir: 'desc' }],
+            offset: 20,
+            select: ['id'],
+        });
+
+        expect(result.sql).toContain('SELECT 1 AS exists FROM users');
+        expect(result.sql).toContain('users.email = $1');
+        expect(result.sql).toContain('NOT');
+        expect(result.sql).toContain('users.name LIKE $2');
+        expect(result.sql).toContain('LIMIT 1 OFFSET 20');
+        expect(result.sql).not.toContain('ORDER BY');
+        expect(result.sql).not.toContain('users.*');
+        expect(result.params).toEqual(['test@example.com', '%bot%']);
+        expect(result.hydrationPlan).toBeUndefined();
+    });
+
+    it('compiles existence probes without predicates', () => {
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compileExists({});
+
+        expect(result.sql).toBe('SELECT 1 AS exists FROM users LIMIT 1');
+        expect(result.params).toEqual([]);
+    });
+
+    it('omits empty existence predicates', () => {
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compileExists<UserModel>({
+            q: { kind: 'atom', where: {} },
+            excludes: [{ kind: 'atom', where: {} }],
+        });
+
+        expect(result.sql).toBe('SELECT 1 AS exists FROM users LIMIT 1');
+        expect(result.params).toEqual([]);
+    });
+
     describe('SQLite', () => {
         it('uses SQLite placeholders', () => {
             const state = {

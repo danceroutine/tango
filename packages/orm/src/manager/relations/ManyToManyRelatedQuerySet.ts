@@ -134,6 +134,24 @@ export class ManyToManyRelatedQuerySet<TTarget extends Record<string, unknown>> 
         return scopedQs.count();
     }
 
+    override async exists(): Promise<boolean> {
+        if (this.isStateTrivial()) {
+            const cache = this.bridge.getCache();
+            if (cache !== null) {
+                return cache.length > 0;
+            }
+        }
+        const ids = await this.bridge.fetchTargetIds();
+        if (ids.length === 0) {
+            return false;
+        }
+        if (this.isStateTrivial()) {
+            return true;
+        }
+        const scopedQs = new ModelQuerySet<TTarget>(this.executor, this.scopedState(ids));
+        return scopedQs.exists();
+    }
+
     protected override spawn<
         TNextBaseResult extends Record<string, unknown>,
         TNextHydrated extends Record<string, unknown>,

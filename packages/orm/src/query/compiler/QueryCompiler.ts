@@ -154,6 +154,47 @@ export class QueryCompiler {
         };
     }
 
+    compileExists<T, TSourceModel = unknown>(state: QuerySetState<T, TSourceModel>): CompiledQuery {
+        const validatedPlan = sqlSafetyAdapter.validate({
+            kind: SqlPlanKind.SELECT,
+            meta: this.meta,
+            selectFields: state.select?.map(String),
+            filterKeys: this.collectStateFilterKeys(state),
+            orderFields: state.order?.map((order) => String(order.by)),
+            relationNames: [],
+        });
+        const table = validatedPlan.meta.table;
+        const whereParts: string[] = [];
+        const params: unknown[] = [];
+
+        if (state.q) {
+            const result = this.compileQNode(state.q, params.length + 1, validatedPlan.filterKeys);
+            if (result.sql) {
+                whereParts.push(result.sql);
+                params.push(...result.params);
+            }
+        }
+
+        state.excludes?.forEach((exclude) => {
+            const result = this.compileQNode(
+                { kind: InternalQNodeType.NOT, node: exclude },
+                params.length + 1,
+                validatedPlan.filterKeys
+            );
+            if (result.sql) {
+                whereParts.push(result.sql);
+                params.push(...result.params);
+            }
+        });
+
+        const whereSQL = whereParts.length ? ` WHERE ${whereParts.join(' AND ')}` : '';
+        const offsetSQL = state.offset ? ` OFFSET ${state.offset}` : '';
+        return {
+            sql: `SELECT 1 AS exists FROM ${table}${whereSQL} LIMIT 1${offsetSQL}`,
+            params,
+        };
+    }
+
     compilePrefetch(node: CompiledHydrationNode, sourceValues: readonly (string | number)[]): CompiledPrefetchQuery {
         if (node.throughTable && node.throughSourceKey && node.throughTargetKey) {
             return this.compileManyToManyPrefetch(node, sourceValues);

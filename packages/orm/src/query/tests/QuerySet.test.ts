@@ -141,7 +141,9 @@ function createQueryExecutorFixture(
     tableMeta: TableMeta = meta
 ) {
     const run = vi.fn(async (_compiled: { sql: string; params: readonly unknown[] }) => rows);
-    const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => ({ rows: [{ count: rows.length }] }));
+    const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => ({
+        rows: sql.startsWith('SELECT 1') ? (rows.length > 0 ? [{ exists: 1 }] : []) : [{ count: rows.length }],
+    }));
     const queryExecutor = aQueryExecutor<User>({ meta: tableMeta, dialect, query, run });
     return { queryExecutor, run, query };
 }
@@ -1370,7 +1372,7 @@ describe(QuerySet, () => {
         expect(parser.parse).toHaveBeenCalledWith({ id: 1, email: 'first@a.com', active: true });
     });
 
-    it('counts and checks existence using compiled query params', async () => {
+    it('answers scalar count and existence questions using compiled query params', async () => {
         const { queryExecutor, query } = createQueryExecutorFixture([{ id: 1, email: 'a@a.com', active: true }]);
         const qs = new ModelQuerySet<User>(queryExecutor).filter({ active: true });
 
@@ -1381,15 +1383,48 @@ describe(QuerySet, () => {
         expect(exists).toBe(true);
         expect(query).toHaveBeenCalledTimes(2);
         expect(query.mock.calls[0]?.[0]).toContain('SELECT COUNT(*) as count FROM');
+        expect(query.mock.calls[0]?.[1]).toEqual([true]);
+        expect(query.mock.calls[1]?.[0]).toContain('SELECT 1 AS exists FROM users');
+        expect(query.mock.calls[1]?.[0]).toContain('LIMIT 1');
+        expect(query.mock.calls[1]?.[0]).not.toContain('COUNT(*)');
+        expect(query.mock.calls[1]?.[1]).toEqual([true]);
     });
 
-    it('returns false from exists when count is zero', async () => {
+    it('returns false from exists when no row matches', async () => {
         const run = vi.fn(async () => [] as User[]);
-        const query = vi.fn(async () => ({ rows: [] as Array<{ count: number }> }));
+        const query = vi.fn(async () => ({ rows: [] as Array<{ exists: number }> }));
         const queryExecutor = aQueryExecutor<User>({ meta, query, run });
 
         const exists = await new ModelQuerySet<User>(queryExecutor).exists();
         expect(exists).toBe(false);
+    });
+
+    it('returns zero from count when no count row is returned', async () => {
+        const run = vi.fn(async () => [] as User[]);
+        const query = vi.fn(async () => ({ rows: [] as Array<{ count: number }> }));
+        const queryExecutor = aQueryExecutor<User>({ meta, query, run });
+
+        const count = await new ModelQuerySet<User>(queryExecutor).count();
+        expect(count).toBe(0);
+    });
+
+    it('checks existence without compiling eager-loading joins', async () => {
+        const query = vi.fn(async (_sql: string, _params?: readonly unknown[]) => ({ rows: [{ exists: 1 }] }));
+        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, query });
+
+        const exists = await new ModelQuerySet<Record<string, unknown>>(queryExecutor)
+            .selectRelated('team')
+            .prefetchRelated('posts')
+            .filter({ team__name: 'Platform' })
+            .exists();
+
+        expect(exists).toBe(true);
+        const [sql, params] = query.mock.calls[0]!;
+        expect(sql).toContain('SELECT 1 AS exists FROM users');
+        expect(sql).toContain('EXISTS (SELECT 1 FROM teams');
+        expect(sql).not.toContain('LEFT JOIN');
+        expect(sql).not.toContain('__tango_join');
+        expect(params).toEqual(['Platform']);
     });
 
     it('normalizes sqlite bool columns before parser-based schema reads', async () => {
