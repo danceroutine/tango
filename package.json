@@ -12,7 +12,8 @@
     "type": "module",
     "scripts": {
         "prelint": "pnpm format",
-        "lint": "pnpm run lint:ox && pnpm run lint:eslint && pnpm format:check",
+        "lint": "pnpm run lint:ci",
+        "lint:ci": "pnpm run lint:ox && pnpm run lint:eslint && pnpm format:check",
         "lint:ox": "oxlint --format stylish",
         "lint:eslint": "eslint .",
         "format": "prettier --write .",
