@@ -1,14 +1,12 @@
 import { createRequire } from 'node:module';
-import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
 import type { AdapterConfig } from '../../connection/adapters/Adapter';
 import { SqliteClient } from '../../connection/clients/dialects/SqliteClient';
+import type { SqliteDatabaseConstructor } from '../../connection/clients/dialects/SqliteDatabaseLike';
 import type { DBClientProvider, TransactionClientLease } from './DBClientProvider';
-
-type BetterSqliteCtor = new (filename: string, options?: unknown) => BetterSqliteDatabase;
 
 export class SqliteDBClientProvider implements DBClientProvider {
     private readonly filename: string;
-    private readonly Database: BetterSqliteCtor;
+    private readonly Database: SqliteDatabaseConstructor;
     private readonly autocommitClient: SqliteClient;
     private activeLeaseCount = 0;
     private exclusiveTail: Promise<void> = Promise.resolve();
@@ -94,16 +92,16 @@ export class SqliteDBClientProvider implements DBClientProvider {
         };
     }
 
-    private getDatabaseCtor(): BetterSqliteCtor {
+    private getDatabaseCtor(): SqliteDatabaseConstructor {
         const require = createRequire(import.meta.url);
         const moduleValue = require('better-sqlite3') as unknown;
         if (typeof moduleValue === 'function') {
-            return moduleValue as BetterSqliteCtor;
+            return moduleValue as SqliteDatabaseConstructor;
         }
 
         const defaultExport = (moduleValue as { default?: unknown }).default;
         if (typeof defaultExport === 'function') {
-            return defaultExport as BetterSqliteCtor;
+            return defaultExport as SqliteDatabaseConstructor;
         }
 
         throw new TypeError('Failed to load better-sqlite3 constructor.');

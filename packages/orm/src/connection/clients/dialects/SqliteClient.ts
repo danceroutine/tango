@@ -1,5 +1,5 @@
-import type Database from 'better-sqlite3';
 import type { DBClient } from '../DBClient';
+import type { SqliteDatabaseLike } from './SqliteDatabaseLike';
 
 /**
  * Transaction-capable client backed by a synchronous `better-sqlite3` handle.
@@ -9,7 +9,7 @@ export class SqliteClient implements DBClient {
     readonly __tangoBrand: typeof SqliteClient.BRAND = SqliteClient.BRAND;
     private inTransaction = false;
 
-    constructor(private db: Database.Database) {}
+    constructor(private db: SqliteDatabaseLike) {}
 
     /**
      * Narrow an unknown value to `SqliteClient`.

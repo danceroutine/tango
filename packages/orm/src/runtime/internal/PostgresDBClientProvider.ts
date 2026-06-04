@@ -1,33 +1,24 @@
-import pg from 'pg';
 import type { AdapterConfig } from '../../connection/adapters/Adapter';
 import { PostgresClient } from '../../connection/clients/dialects/PostgresClient';
+import { PostgresPoolProvider, type PostgresPoolLike } from '../../connection/clients/dialects/PostgresPoolProvider';
 import type { DBClientProvider, TransactionClientLease } from './DBClientProvider';
 
-const { Pool } = pg;
-
 export class PostgresDBClientProvider implements DBClientProvider {
-    private readonly pool: pg.Pool;
+    private readonly poolProvider = new PostgresPoolProvider();
+    private poolPromise: Promise<PostgresPoolLike> | null = null;
     private activeLeaseCount = 0;
 
-    constructor(config: AdapterConfig) {
-        this.pool = new Pool({
-            connectionString: config.url,
-            host: config.host,
-            port: config.port,
-            database: config.database,
-            user: config.user,
-            password: config.password,
-            max: config.maxConnections || 10,
-        });
-    }
+    constructor(private readonly config: AdapterConfig) {}
 
     async query<T = unknown>(sql: string, params?: readonly unknown[]): Promise<{ rows: T[] }> {
-        const result = await this.pool.query(sql, params as unknown[]);
+        const pool = await this.getPool();
+        const result = await pool.query(sql, params);
         return { rows: result.rows as T[] };
     }
 
     async leaseTransactionClient(): Promise<TransactionClientLease> {
-        const client = await this.pool.connect();
+        const pool = await this.getPool();
+        const client = await pool.connect();
         this.activeLeaseCount += 1;
         let released = false;
 
@@ -50,6 +41,24 @@ export class PostgresDBClientProvider implements DBClientProvider {
             throw new Error('Cannot reset Tango runtime while transaction leases are still active.');
         }
 
-        await this.pool.end();
+        if (!this.poolPromise) {
+            return;
+        }
+
+        const pool = await this.poolPromise;
+        this.poolPromise = null;
+        await pool.end();
+    }
+
+    private async getPool(): Promise<PostgresPoolLike> {
+        if (!this.poolPromise) {
+            this.poolPromise = this.createPool();
+        }
+
+        return this.poolPromise;
+    }
+
+    private async createPool(): Promise<PostgresPoolLike> {
+        return this.poolProvider.createPool(this.config);
     }
 }

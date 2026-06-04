@@ -44,6 +44,7 @@ describe(NuxtScaffoldStrategy, () => {
             const packageJson = renderTemplate(templates, 'package.json', context);
             const nuxtConfig = renderTemplate(templates, 'nuxt.config.ts', context);
             const tsconfig = renderTemplate(templates, 'tsconfig.json', context);
+            const modelSource = renderTemplate(templates, 'lib/models/TodoModel.ts', context);
             const page = renderTemplate(templates, 'app/pages/index.server.vue', context);
             const route = renderTemplate(templates, 'server/tango/health.ts', context);
             const openapiRoute = renderTemplate(templates, 'server/tango/openapi.ts', context);
@@ -52,16 +53,25 @@ describe(NuxtScaffoldStrategy, () => {
             const viewsetSource = renderTemplate(templates, 'viewsets/TodoViewSet.ts', context);
             const readme = renderTemplate(templates, 'README.md', context);
             const migrationsKeep = renderTemplate(templates, 'migrations/.gitkeep', context);
-            const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
+            const packageMetadata = JSON.parse(packageJson) as {
+                scripts: Record<string, string>;
+                dependencies: Record<string, string>;
+                devDependencies: Record<string, string>;
+                pnpm: { onlyBuiltDependencies: string[] };
+            };
+            const scripts = packageMetadata.scripts;
 
             expect(packageJson).toContain('"nuxt"');
-            expect(packageJson).toContain('"better-sqlite3"');
-            expect(packageJson).toContain('"esbuild"');
-            expect(packageJson).toContain('"pg"');
-            expect(packageJson).toContain('"@types/better-sqlite3"');
+            expect(packageMetadata.dependencies).toHaveProperty('better-sqlite3');
+            expect(packageMetadata.dependencies).not.toHaveProperty('pg');
+            expect(packageMetadata.devDependencies).toHaveProperty('@types/better-sqlite3');
+            expect(packageMetadata.devDependencies).not.toHaveProperty('@types/pg');
+            expect(packageMetadata.pnpm.onlyBuiltDependencies).toEqual(['better-sqlite3', 'esbuild']);
             expect(packageJson).toContain('"codegen:relations"');
             expect(scripts['make:migrations']).not.toContain('--name');
             expect(scripts['make:migrations']).not.toContain('npm_config_name');
+            expect(modelSource).toContain('id: t.primaryKey(z.number().int())');
+            expect(modelSource).not.toContain('fields:');
             expect(packageJson).toContain('"start": "NUXT_TELEMETRY_DISABLED=1 nuxt preview"');
             expect(nuxtConfig).toContain("route: '/api/todos/**:tango'");
             expect(tsconfig).toContain('".tango/**/*.d.ts"');
@@ -99,11 +109,17 @@ describe(NuxtScaffoldStrategy, () => {
             const templates = strategy.getTemplates();
             const packageJson = renderTemplate(templates, 'package.json', context);
             const config = renderTemplate(templates, 'tango.config.ts', context);
+            const packageMetadata = JSON.parse(packageJson) as {
+                dependencies: Record<string, string>;
+                devDependencies: Record<string, string>;
+                pnpm: { onlyBuiltDependencies: string[] };
+            };
 
-            expect(packageJson).toContain('"pg"');
-            expect(packageJson).toContain('"better-sqlite3"');
-            expect(packageJson).toContain('"esbuild"');
-            expect(packageJson).toContain('"@types/better-sqlite3"');
+            expect(packageMetadata.dependencies).toHaveProperty('pg');
+            expect(packageMetadata.dependencies).not.toHaveProperty('better-sqlite3');
+            expect(packageMetadata.devDependencies).toHaveProperty('@types/pg');
+            expect(packageMetadata.devDependencies).not.toHaveProperty('@types/better-sqlite3');
+            expect(packageMetadata.pnpm.onlyBuiltDependencies).toEqual(['esbuild']);
             expect(config).toContain("adapter: 'postgres'");
         });
 

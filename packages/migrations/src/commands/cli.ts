@@ -407,7 +407,9 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
                     env: argv.env as ConfigEnvironment | undefined,
                 });
                 const loaded = await loadModels(argv.models);
-                const projectedModels = buildMigrationModelMetadataProjection(loaded.registry);
+                const projectedModels = buildMigrationModelMetadataProjection(loaded.registry, {
+                    dialect: resolved.dialect,
+                });
                 logger.info(
                     `Found ${loaded.models.length} exported model(s); ${projectedModels.length} model(s) after projection: ${projectedModels.map((m) => m.table).join(', ')}`
                 );
