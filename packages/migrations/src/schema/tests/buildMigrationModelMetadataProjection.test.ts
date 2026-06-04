@@ -1,11 +1,50 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Model, ModelRegistry, t } from '@danceroutine/tango-schema';
+import { InternalDialect } from '../../domain/internal/InternalDialect';
 import { buildMigrationModelMetadataProjection } from '../buildMigrationModelMetadataProjection';
 
 describe(buildMigrationModelMetadataProjection, () => {
     beforeEach(() => {
         ModelRegistry.clear();
+    });
+
+    it('preserves integer schema primary keys for SQLite projections', () => {
+        Model({
+            namespace: 'app',
+            name: 'Todo',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                title: z.string(),
+            }),
+        });
+
+        const projection = buildMigrationModelMetadataProjection(ModelRegistry.global(), {
+            dialect: InternalDialect.SQLITE,
+        });
+        const todoProjection = projection.find((entry) => entry.table === 'todos');
+        const idField = todoProjection?.fields.find((field) => field.name === 'id');
+
+        expect(idField).toMatchObject({ name: 'id', type: 'int', primaryKey: true });
+    });
+
+    it('projects Postgres integer schema primary keys as serial columns', () => {
+        Model({
+            namespace: 'app',
+            name: 'Todo',
+            schema: z.object({
+                id: t.primaryKey(z.number().int()),
+                title: z.string(),
+            }),
+        });
+
+        const projection = buildMigrationModelMetadataProjection(ModelRegistry.global(), {
+            dialect: InternalDialect.POSTGRES,
+        });
+        const todoProjection = projection.find((entry) => entry.table === 'todos');
+        const idField = todoProjection?.fields.find((field) => field.name === 'id');
+
+        expect(idField).toMatchObject({ name: 'id', type: 'serial', primaryKey: true });
     });
 
     it('includes index metadata from registered models in the migration projection', () => {

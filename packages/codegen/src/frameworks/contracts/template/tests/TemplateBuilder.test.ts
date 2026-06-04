@@ -32,9 +32,10 @@ describe(TemplateBuilder, () => {
         expect(oneLiner).toContain('npm install ');
         expect(oneLiner).toContain('npm install -D ');
         expect(oneLiner).toContain('@danceroutine/tango-adapters-express@');
-        expect(oneLiner).toContain('better-sqlite3@^12.10.0');
         expect(oneLiner).toContain('pg@^8.20.0');
-        expect(oneLiner).toContain('@types/better-sqlite3@^7.6.12');
+        expect(oneLiner).toContain('@types/pg@^8.20.0');
+        expect(oneLiner).not.toContain('better-sqlite3@^12.10.0');
+        expect(oneLiner).not.toContain('@types/better-sqlite3@^7.6.12');
     });
 
     it('formats Nuxt install instructions with the Nuxt adapter package', () => {
@@ -42,8 +43,9 @@ describe(TemplateBuilder, () => {
 
         expect(oneLiner).toContain('@danceroutine/tango-adapters-nuxt@');
         expect(oneLiner).toContain('better-sqlite3@^12.10.0');
-        expect(oneLiner).toContain('pg@^8.20.0');
         expect(oneLiner).toContain('@types/better-sqlite3@^7.6.12');
+        expect(oneLiner).not.toContain('pg@^8.20.0');
+        expect(oneLiner).not.toContain('@types/pg@^8.20.0');
     });
 
     it('formats npm script forwarding with an explicit separator', () => {

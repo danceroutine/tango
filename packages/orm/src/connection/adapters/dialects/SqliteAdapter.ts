@@ -1,11 +1,9 @@
 import { createRequire } from 'node:module';
-import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
 import type { Adapter, AdapterConfig, SqlPlaceholders } from '../Adapter';
 import type { DBClient } from '../../clients/DBClient';
 import { SqliteClient } from '../../clients/dialects/SqliteClient';
+import type { SqliteDatabaseConstructor } from '../../clients/dialects/SqliteDatabaseLike';
 import { InternalDialect } from '../../../query/domain/internal/InternalDialect';
-
-type BetterSqliteCtor = new (filename: string, options?: unknown) => BetterSqliteDatabase;
 
 /**
  * SQLite adapter that creates a `better-sqlite3` backed `DBClient`.
@@ -59,16 +57,16 @@ export class SqliteAdapter implements Adapter {
         return new SqliteClient(db);
     }
 
-    private getDatabaseCtor(): BetterSqliteCtor {
+    private getDatabaseCtor(): SqliteDatabaseConstructor {
         const require = createRequire(import.meta.url);
         const moduleValue = require('better-sqlite3') as unknown;
         if (typeof moduleValue === 'function') {
-            return moduleValue as BetterSqliteCtor;
+            return moduleValue as SqliteDatabaseConstructor;
         }
 
         const defaultExport = (moduleValue as { default?: unknown }).default;
         if (typeof defaultExport === 'function') {
-            return defaultExport as BetterSqliteCtor;
+            return defaultExport as SqliteDatabaseConstructor;
         }
 
         throw new TypeError('Failed to load better-sqlite3 constructor.');

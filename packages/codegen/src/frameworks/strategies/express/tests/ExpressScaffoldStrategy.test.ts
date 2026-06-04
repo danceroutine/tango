@@ -34,24 +34,34 @@ describe(ExpressScaffoldStrategy, () => {
             const packageJson = renderTemplate(templates, 'package.json', context);
             const config = renderTemplate(templates, 'tango.config.ts', context);
             const tsconfig = renderTemplate(templates, 'tsconfig.json', context);
+            const modelSource = renderTemplate(templates, 'src/models/TodoModel.ts', context);
             const indexSource = renderTemplate(templates, 'src/index.ts', context);
             const openapiSource = renderTemplate(templates, 'src/openapi.ts', context);
             const serializerSource = renderTemplate(templates, 'src/serializers/TodoSerializer.ts', context);
             const viewsetSource = renderTemplate(templates, 'src/viewsets/TodoViewSet.ts', context);
             const readme = renderTemplate(templates, 'README.md', context);
             const migrationsKeep = renderTemplate(templates, 'migrations/.gitkeep', context);
-            const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
+            const packageMetadata = JSON.parse(packageJson) as {
+                scripts: Record<string, string>;
+                dependencies: Record<string, string>;
+                devDependencies: Record<string, string>;
+                pnpm: { onlyBuiltDependencies: string[] };
+            };
+            const scripts = packageMetadata.scripts;
 
-            expect(packageJson).toContain('"better-sqlite3"');
-            expect(packageJson).toContain('"esbuild"');
-            expect(packageJson).toContain('"pg"');
-            expect(packageJson).toContain('"@types/better-sqlite3"');
+            expect(packageMetadata.dependencies).toHaveProperty('better-sqlite3');
+            expect(packageMetadata.dependencies).not.toHaveProperty('pg');
+            expect(packageMetadata.devDependencies).toHaveProperty('@types/better-sqlite3');
+            expect(packageMetadata.devDependencies).not.toHaveProperty('@types/pg');
+            expect(packageMetadata.pnpm.onlyBuiltDependencies).toEqual(['better-sqlite3', 'esbuild']);
             expect(packageJson).toContain('"@danceroutine/tango-openapi"');
             expect(packageJson).toContain('"codegen:relations"');
             expect(scripts['make:migrations']).not.toContain('--name');
             expect(scripts['make:migrations']).not.toContain('npm_config_name');
             expect(config).toContain("adapter: 'sqlite'");
             expect(config).toContain('./.data/express-sqlite.sqlite');
+            expect(modelSource).toContain('id: t.primaryKey(z.number().int())');
+            expect(modelSource).not.toContain('fields:');
             expect((JSON.parse(tsconfig) as { include: string[] }).include).toContain('migrations/**/*.ts');
             expect((JSON.parse(tsconfig) as { include: string[] }).include).toContain('.tango/**/*.d.ts');
             expect(indexSource).toContain("from './tango.js'");
@@ -85,11 +95,17 @@ describe(ExpressScaffoldStrategy, () => {
             const templates = strategy.getTemplates();
             const packageJson = renderTemplate(templates, 'package.json', context);
             const config = renderTemplate(templates, 'tango.config.ts', context);
+            const packageMetadata = JSON.parse(packageJson) as {
+                dependencies: Record<string, string>;
+                devDependencies: Record<string, string>;
+                pnpm: { onlyBuiltDependencies: string[] };
+            };
 
-            expect(packageJson).toContain('"pg"');
-            expect(packageJson).toContain('"better-sqlite3"');
-            expect(packageJson).toContain('"esbuild"');
-            expect(packageJson).toContain('"@types/better-sqlite3"');
+            expect(packageMetadata.dependencies).toHaveProperty('pg');
+            expect(packageMetadata.dependencies).not.toHaveProperty('better-sqlite3');
+            expect(packageMetadata.devDependencies).toHaveProperty('@types/pg');
+            expect(packageMetadata.devDependencies).not.toHaveProperty('@types/better-sqlite3');
+            expect(packageMetadata.pnpm.onlyBuiltDependencies).toEqual(['esbuild']);
             expect(config).toContain("adapter: 'postgres'");
             expect(config).toContain('TANGO_DATABASE_URL');
         });
