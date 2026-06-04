@@ -174,6 +174,49 @@ describe(QuerySet, () => {
         expect(QuerySet.isQuerySet({})).toBe(false);
     });
 
+    it('preserves an explicit zero limit when fetching rows', async () => {
+        const { queryExecutor, run } = createQueryExecutorFixture();
+        const qs = new ModelQuerySet<User>(queryExecutor);
+
+        await qs.limit(0).fetch();
+
+        expect(run).toHaveBeenCalledWith(expect.objectContaining({ sql: expect.stringContaining('LIMIT 0') }));
+    });
+
+    it('preserves an explicit zero offset when fetching rows', async () => {
+        const { queryExecutor, run } = createQueryExecutorFixture();
+        const qs = new ModelQuerySet<User>(queryExecutor);
+
+        await qs.offset(0).fetch();
+
+        expect(run).toHaveBeenCalledWith(expect.objectContaining({ sql: expect.stringContaining('OFFSET 0') }));
+    });
+
+    it('rejects invalid limit and offset values', () => {
+        const { queryExecutor } = createQueryExecutorFixture();
+        const methods = [
+            { name: 'limit', apply: (queryset: ModelQuerySet<User>, value: number) => queryset.limit(value) },
+            { name: 'offset', apply: (queryset: ModelQuerySet<User>, value: number) => queryset.offset(value) },
+        ] as const;
+        const invalidNumericValues = [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1];
+        const nonNumberValues: unknown[] = ['10', null, true, {}, []];
+
+        for (const method of methods) {
+            for (const value of invalidNumericValues) {
+                expect(() => method.apply(new ModelQuerySet<User>(queryExecutor), value), method.name).toThrow(
+                    RangeError
+                );
+            }
+
+            for (const value of nonNumberValues) {
+                expect(
+                    () => method.apply(new ModelQuerySet<User>(queryExecutor), value as number),
+                    method.name
+                ).toThrow(TypeError);
+            }
+        }
+    });
+
     it('clones the current queryset state when all() is called', async () => {
         const { queryExecutor, run } = createQueryExecutorFixture([{ id: 1, email: 'all@a.com', active: true }]);
         const base = new ModelQuerySet<User>(queryExecutor).filter({ active: true }).orderBy('-id');

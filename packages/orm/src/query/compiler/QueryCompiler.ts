@@ -133,8 +133,8 @@ export class QueryCompiler {
                       .join(', ')
                 : `${table}.${validatedPlan.meta.pk} ASC`
         }`;
-        const limitSQL = state.limit ? ` LIMIT ${state.limit}` : '';
-        const offsetSQL = state.offset ? ` OFFSET ${state.offset}` : '';
+        const limitSQL = state.limit !== undefined ? ` LIMIT ${state.limit}` : '';
+        const offsetSQL = state.offset !== undefined ? ` OFFSET ${state.offset}` : '';
         const sql = `SELECT ${select} FROM ${table}${joinCollection.joins.length ? ` ${joinCollection.joins.join(' ')}` : ''}${whereSQL}${orderSQL}${limitSQL}${offsetSQL}`;
 
         const compiledHydrationPlan: CompiledHydrationPlanRoot | undefined =

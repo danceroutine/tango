@@ -617,6 +617,16 @@ describe(QueryCompiler, () => {
         expect(result.sql).toContain('LIMIT 10');
     });
 
+    it('compiles zero limit', () => {
+        const state = {
+            limit: 0,
+        };
+
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
+
+        expect(result.sql).toContain('LIMIT 0');
+    });
+
     it('compiles offset', () => {
         const state = {
             offset: 20,
@@ -625,6 +635,16 @@ describe(QueryCompiler, () => {
         const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('OFFSET 20');
+    });
+
+    it('compiles zero offset', () => {
+        const state = {
+            offset: 0,
+        };
+
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
+
+        expect(result.sql).toContain('OFFSET 0');
     });
 
     it('compiles existence probes from scalar query state', () => {

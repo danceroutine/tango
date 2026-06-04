@@ -163,6 +163,18 @@ export abstract class QuerySet<
         });
     }
 
+    private static validateQueryWindowBound(kind: 'limit' | 'offset', value: unknown): number {
+        if (typeof value !== 'number') {
+            throw new TypeError(`QuerySet.${kind}() expects a number.`);
+        }
+
+        if (!Number.isSafeInteger(value) || value < 0) {
+            throw new RangeError(`QuerySet.${kind}() expects a non-negative safe integer.`);
+        }
+
+        return value;
+    }
+
     private static invertOrderSpec<T extends Record<string, unknown>>(
         order: QuerySetState<T>['order']
     ): NonNullable<QuerySetState<T>['order']> {
@@ -216,14 +228,14 @@ export abstract class QuerySet<
      * Limit the maximum number of rows returned.
      */
     limit(n: number): QuerySet<TModel, TBaseResult, TSourceModel, THydrated> {
-        return this.spawn({ ...this.state, limit: n });
+        return this.spawn({ ...this.state, limit: QuerySet.validateQueryWindowBound('limit', n) });
     }
 
     /**
      * Skip the first `n` rows.
      */
     offset(n: number): QuerySet<TModel, TBaseResult, TSourceModel, THydrated> {
-        return this.spawn({ ...this.state, offset: n });
+        return this.spawn({ ...this.state, offset: QuerySet.validateQueryWindowBound('offset', n) });
     }
 
     /**
