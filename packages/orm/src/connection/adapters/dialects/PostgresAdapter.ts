@@ -1,10 +1,8 @@
-import pg from 'pg';
 import type { Adapter, AdapterConfig, SqlPlaceholders } from '../Adapter';
 import type { DBClient } from '../../clients/DBClient';
 import { PostgresClient } from '../../clients/dialects/PostgresClient';
+import { PostgresPoolProvider } from '../../clients/dialects/PostgresPoolProvider';
 import { InternalDialect } from '../../../query/domain/internal/InternalDialect';
-
-const { Pool } = pg;
 
 /**
  * Postgres adapter that turns adapter config into a transactional `DBClient`.
@@ -14,6 +12,7 @@ export class PostgresAdapter implements Adapter {
     readonly __tangoBrand: typeof PostgresAdapter.BRAND = PostgresAdapter.BRAND;
     readonly name = 'postgres';
     readonly dialect: Adapter['dialect'] = InternalDialect.POSTGRES;
+
     /**
      * Declares capabilities of this database adapter.
      * Used by the migration runner and query compiler to determine which
@@ -40,6 +39,7 @@ export class PostgresAdapter implements Adapter {
             return Array.from({ length: count }, (_value, index) => `$${startOffset + index + 1}`).join(', ');
         },
     };
+    private readonly poolProvider = new PostgresPoolProvider();
 
     /**
      * Narrow an unknown value to `PostgresAdapter`.
@@ -56,16 +56,7 @@ export class PostgresAdapter implements Adapter {
      * Open a Postgres connection pool and return a client-backed DB abstraction.
      */
     async connect(config: AdapterConfig): Promise<DBClient> {
-        const pool = new Pool({
-            connectionString: config.url,
-            host: config.host,
-            port: config.port,
-            database: config.database,
-            user: config.user,
-            password: config.password,
-            max: config.maxConnections || 10,
-        });
-
+        const pool = await this.poolProvider.createPool(config);
         const client = await pool.connect();
         return new PostgresClient(client);
     }

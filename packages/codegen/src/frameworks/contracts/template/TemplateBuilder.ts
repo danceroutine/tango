@@ -35,7 +35,7 @@ export abstract class TemplateBuilder implements BoundTemplate {
         framework: 'express' | 'next' | 'nuxt'
     ): string {
         const deps = TemplateBuilder.getTangoDependencyEntriesFor(dialect, framework);
-        const devDeps = TemplateBuilder.getTangoDevDependencyEntriesFor();
+        const devDeps = TemplateBuilder.getTangoDevDependencyEntriesFor(dialect);
         const depList = Object.entries(deps)
             .map(([pkg, ver]) => `${pkg}@${ver}`)
             .join(' ');
@@ -66,7 +66,6 @@ export abstract class TemplateBuilder implements BoundTemplate {
             case PACKAGE_MANAGER.BUN:
                 return serializedArgs.length > 0 ? `bun run ${scriptName} ${serializedArgs}` : `bun run ${scriptName}`;
             case PACKAGE_MANAGER.PNPM:
-            default:
                 return serializedArgs.length > 0
                     ? `pnpm run ${scriptName} ${serializedArgs}`
                     : `pnpm run ${scriptName}`;
@@ -91,7 +90,7 @@ export abstract class TemplateBuilder implements BoundTemplate {
     }
 
     private static getTangoDependencyEntriesFor(
-        _dialect: 'sqlite' | 'postgres',
+        dialect: 'sqlite' | 'postgres',
         framework: 'express' | 'next' | 'nuxt'
     ): Record<string, string> {
         const v = TemplateBuilder.getTangoVersion();
@@ -110,18 +109,23 @@ export abstract class TemplateBuilder implements BoundTemplate {
                 : framework === 'next'
                   ? { '@danceroutine/tango-adapters-next': v }
                   : { '@danceroutine/tango-adapters-nuxt': v };
-        const dialectDeps: Record<string, string> = {
-            'better-sqlite3': '^12.10.0',
-            pg: '^8.20.0',
-        };
+        const dialectDeps: Record<string, string> =
+            dialect === 'sqlite' ? { 'better-sqlite3': '^12.10.0' } : { pg: '^8.20.0' };
         return { ...core, ...adapter, ...dialectDeps };
     }
 
-    private static getTangoDevDependencyEntriesFor(): Record<string, string> {
+    private static getTangoDevDependencyEntriesFor(dialect: 'sqlite' | 'postgres'): Record<string, string> {
+        const dialectDevDeps: Record<string, string> =
+            dialect === 'sqlite' ? { '@types/better-sqlite3': '^7.6.12' } : { '@types/pg': '^8.20.0' };
+
         return {
             '@danceroutine/tango-cli': TemplateBuilder.getTangoVersion(),
-            '@types/better-sqlite3': '^7.6.12',
+            ...dialectDevDeps,
         };
+    }
+
+    private static getPnpmOnlyBuiltDependenciesFor(dialect: 'sqlite' | 'postgres'): readonly string[] {
+        return dialect === 'sqlite' ? ['better-sqlite3', 'esbuild'] : ['esbuild'];
     }
 
     /** Bind context and return this for chaining. Use before passing to add* methods. */
@@ -147,7 +151,11 @@ export abstract class TemplateBuilder implements BoundTemplate {
         return TemplateBuilder.getTangoDependencyEntriesFor(context.dialect, context.framework);
     }
 
-    protected getTangoDevDependencyEntries(_context: FrameworkScaffoldContext): Record<string, string> {
-        return TemplateBuilder.getTangoDevDependencyEntriesFor();
+    protected getTangoDevDependencyEntries(context: FrameworkScaffoldContext): Record<string, string> {
+        return TemplateBuilder.getTangoDevDependencyEntriesFor(context.dialect);
+    }
+
+    protected getPnpmOnlyBuiltDependencies(context: FrameworkScaffoldContext): readonly string[] {
+        return TemplateBuilder.getPnpmOnlyBuiltDependenciesFor(context.dialect);
     }
 }

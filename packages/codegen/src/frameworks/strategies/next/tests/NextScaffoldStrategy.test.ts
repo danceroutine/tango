@@ -42,6 +42,7 @@ describe(NextScaffoldStrategy, () => {
             const templates = strategy.getTemplates();
             const packageJson = renderTemplate(templates, 'package.json', context);
             const tsconfig = renderTemplate(templates, 'tsconfig.json', context);
+            const modelSource = renderTemplate(templates, 'src/lib/models/TodoModel.ts', context);
             const layout = renderTemplate(templates, 'src/app/layout.tsx', context);
             const route = renderTemplate(templates, 'src/app/api/health/route.ts', context);
             const openapiRoute = renderTemplate(templates, 'src/app/api/openapi/route.ts', context);
@@ -50,15 +51,24 @@ describe(NextScaffoldStrategy, () => {
             const viewsetSource = renderTemplate(templates, 'src/viewsets/TodoViewSet.ts', context);
             const readme = renderTemplate(templates, 'README.md', context);
             const migrationsKeep = renderTemplate(templates, 'migrations/.gitkeep', context);
-            const scripts = JSON.parse(packageJson).scripts as Record<string, string>;
+            const packageMetadata = JSON.parse(packageJson) as {
+                scripts: Record<string, string>;
+                dependencies: Record<string, string>;
+                devDependencies: Record<string, string>;
+                pnpm: { onlyBuiltDependencies: string[] };
+            };
+            const scripts = packageMetadata.scripts;
 
-            expect(packageJson).toContain('"better-sqlite3"');
-            expect(packageJson).toContain('"esbuild"');
-            expect(packageJson).toContain('"pg"');
-            expect(packageJson).toContain('"@types/better-sqlite3"');
+            expect(packageMetadata.dependencies).toHaveProperty('better-sqlite3');
+            expect(packageMetadata.dependencies).not.toHaveProperty('pg');
+            expect(packageMetadata.devDependencies).toHaveProperty('@types/better-sqlite3');
+            expect(packageMetadata.devDependencies).not.toHaveProperty('@types/pg');
+            expect(packageMetadata.pnpm.onlyBuiltDependencies).toEqual(['better-sqlite3', 'esbuild']);
             expect(packageJson).toContain('"codegen:relations"');
             expect(scripts['make:migrations']).not.toContain('--name');
             expect(scripts['make:migrations']).not.toContain('npm_config_name');
+            expect(modelSource).toContain('id: t.primaryKey(z.number().int())');
+            expect(modelSource).not.toContain('fields:');
             expect(tsconfig).toContain('"migrations/**/*.ts"');
             expect(tsconfig).toContain('".tango/**/*.d.ts"');
             expect(layout).toContain('RootLayout');
@@ -94,11 +104,17 @@ describe(NextScaffoldStrategy, () => {
             const templates = strategy.getTemplates();
             const packageJson = renderTemplate(templates, 'package.json', context);
             const config = renderTemplate(templates, 'tango.config.ts', context);
+            const packageMetadata = JSON.parse(packageJson) as {
+                dependencies: Record<string, string>;
+                devDependencies: Record<string, string>;
+                pnpm: { onlyBuiltDependencies: string[] };
+            };
 
-            expect(packageJson).toContain('"pg"');
-            expect(packageJson).toContain('"better-sqlite3"');
-            expect(packageJson).toContain('"esbuild"');
-            expect(packageJson).toContain('"@types/better-sqlite3"');
+            expect(packageMetadata.dependencies).toHaveProperty('pg');
+            expect(packageMetadata.dependencies).not.toHaveProperty('better-sqlite3');
+            expect(packageMetadata.devDependencies).toHaveProperty('@types/pg');
+            expect(packageMetadata.devDependencies).not.toHaveProperty('@types/better-sqlite3');
+            expect(packageMetadata.pnpm.onlyBuiltDependencies).toEqual(['esbuild']);
             expect(config).toContain("adapter: 'postgres'");
         });
 
