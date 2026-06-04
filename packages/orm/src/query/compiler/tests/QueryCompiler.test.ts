@@ -636,7 +636,7 @@ describe(QueryCompiler, () => {
             select: ['id'],
         });
 
-        expect(result.sql).toContain('SELECT 1 AS exists FROM users');
+        expect(result.sql).toContain('SELECT 1 AS tango_exists FROM users');
         expect(result.sql).toContain('users.email = $1');
         expect(result.sql).toContain('NOT');
         expect(result.sql).toContain('users.name LIKE $2');
@@ -650,8 +650,14 @@ describe(QueryCompiler, () => {
     it('compiles existence probes without predicates', () => {
         const result = new QueryCompiler(mockMeta, postgresAdapter).compileExists({});
 
-        expect(result.sql).toBe('SELECT 1 AS exists FROM users LIMIT 1');
+        expect(result.sql).toBe('SELECT 1 AS tango_exists FROM users LIMIT 1');
         expect(result.params).toEqual([]);
+    });
+
+    it('compiles SQLite existence probes with a non-keyword result alias', () => {
+        const result = new QueryCompiler(mockMeta, sqliteAdapter).compileExists({});
+
+        expect(result.sql).toBe('SELECT 1 AS tango_exists FROM users LIMIT 1');
     });
 
     it('omits empty existence predicates', () => {
@@ -660,7 +666,7 @@ describe(QueryCompiler, () => {
             excludes: [{ kind: 'atom', where: {} }],
         });
 
-        expect(result.sql).toBe('SELECT 1 AS exists FROM users LIMIT 1');
+        expect(result.sql).toBe('SELECT 1 AS tango_exists FROM users LIMIT 1');
         expect(result.params).toEqual([]);
     });
 

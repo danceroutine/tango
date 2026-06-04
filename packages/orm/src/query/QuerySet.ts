@@ -535,7 +535,7 @@ export abstract class QuerySet<
     async exists(): Promise<boolean> {
         const compiler = new QueryCompiler(this.executor.meta, this.executor.adapter);
         const compiled = compiler.compileExists(this.withoutHydrationState());
-        const rows = await this.executor.client.query<{ exists: number }>(compiled.sql, compiled.params);
+        const rows = await this.executor.client.query<{ tango_exists: number }>(compiled.sql, compiled.params);
         return rows.rows.length > 0;
     }
 

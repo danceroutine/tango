@@ -190,7 +190,7 @@ export class QueryCompiler {
         const whereSQL = whereParts.length ? ` WHERE ${whereParts.join(' AND ')}` : '';
         const offsetSQL = state.offset ? ` OFFSET ${state.offset}` : '';
         return {
-            sql: `SELECT 1 AS exists FROM ${table}${whereSQL} LIMIT 1${offsetSQL}`,
+            sql: `SELECT 1 AS tango_exists FROM ${table}${whereSQL} LIMIT 1${offsetSQL}`,
             params,
         };
     }

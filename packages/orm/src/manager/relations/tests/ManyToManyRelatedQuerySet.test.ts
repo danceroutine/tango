@@ -205,7 +205,7 @@ describe(ManyToManyRelatedQuerySet, () => {
     it('delegates to a scoped existence query when state is non-trivial', async () => {
         const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => {
             if (sql.startsWith('SELECT 1')) {
-                return { rows: [{ exists: 1 }] };
+                return { rows: [{ tango_exists: 1 }] };
             }
             return { rows: [] as Record<string, unknown>[] };
         });
@@ -217,7 +217,7 @@ describe(ManyToManyRelatedQuerySet, () => {
         await expect(queryset.filter({ name: 'docs' }).exists()).resolves.toBe(true);
         expect(query).toHaveBeenCalledTimes(1);
         const [sql, params] = query.mock.calls[0]!;
-        expect(sql).toContain('SELECT 1 AS exists FROM tags');
+        expect(sql).toContain('SELECT 1 AS tango_exists FROM tags');
         expect(sql).toContain('LIMIT 1');
         expect(sql).not.toContain('SELECT COUNT');
         expect(params).toEqual([10, 11, 'docs']);
