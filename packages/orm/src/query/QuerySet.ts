@@ -533,8 +533,10 @@ export abstract class QuerySet<
      * Return whether at least one row matches the current query state.
      */
     async exists(): Promise<boolean> {
-        const count = await this.count();
-        return count > 0;
+        const compiler = new QueryCompiler(this.executor.meta, this.executor.adapter);
+        const compiled = compiler.compileExists(this.withoutHydrationState());
+        const rows = await this.executor.client.query<{ tango_exists: number }>(compiled.sql, compiled.params);
+        return rows.rows.length > 0;
     }
 
     private shapeFetchedRow<Out>(

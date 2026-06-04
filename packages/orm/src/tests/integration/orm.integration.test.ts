@@ -155,6 +155,9 @@ describe.each(selectedDialects())('ORM integration (%s)', (dialect) => {
 
             const count = await queryset.count();
             expect(count).toBe(3);
+
+            await expect(queryset.filter({ published: true }).exists()).resolves.toBe(true);
+            await expect(queryset.filter({ slug: 'missing' }).exists()).resolves.toBe(false);
         } finally {
             await rm(migrationsDir, { recursive: true, force: true });
         }
