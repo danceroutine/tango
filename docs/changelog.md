@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.10 - 2026-06-04
+
+Improve `QuerySet.exists()` so existence checks can stop after the first matching record.
+
 ## 1.11.9 - 2026-06-04
 
 Scaffolded projects now install database packages for the selected dialect, and SQLite runtimes can start with SQLite-only dependencies.
