@@ -4,7 +4,7 @@
 
 # Tango
 
-[![npm](https://img.shields.io/npm/v/%40danceroutine%2Ftango-cli.svg)](https://www.npmjs.com/package/@danceroutine/tango-cli) [![npm downloads](https://img.shields.io/npm/dw/%40danceroutine%2Ftango-cli.svg)](https://www.npmjs.com/package/@danceroutine/tango-cli) [![CI](https://github.com/danceroutine/tango/actions/workflows/ci.yml/badge.svg)](https://github.com/danceroutine/tango/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/danceroutine/tango)](https://github.com/danceroutine/tango/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/%40danceroutine%2Ftango-cli.svg)](https://www.npmjs.com/package/@danceroutine/tango-cli) [![npm downloads](https://img.shields.io/npm/dw/%40danceroutine%2Ftango-cli.svg)](https://www.npmjs.com/package/@danceroutine/tango-cli) [![CI](https://github.com/danceroutine/tango/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/danceroutine/tango/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/danceroutine/tango)](https://github.com/danceroutine/tango/blob/main/LICENSE)
 
 Tango is a modern TypeScript web framework that brings the elegance and productivity of Django's design philosophy to the Node.js ecosystem. It encourages rapid development and clean, pragmatic design while leveraging TypeScript's powerful type system for maximum safety and developer experience.
 
