@@ -4,6 +4,12 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.12.2 - 2026-06-05
+
+Bump nuxt to 4.4.7.
+
+Bump pg to 8.21.0.
+
 ## 1.12.1 - 2026-06-05
 
 Fix `migrate` and `status` failure handling so a migration error remains the reported failure when closing the database connection afterward also fails. Failed runs now release the connection, and teardown problems are logged separately.
