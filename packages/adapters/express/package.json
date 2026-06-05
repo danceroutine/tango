@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-adapters-express",
-    "version": "1.11.14",
+    "version": "1.11.15",
     "description": "Express adapter for Tango",
     "type": "module",
     "main": "./dist/index.js",
