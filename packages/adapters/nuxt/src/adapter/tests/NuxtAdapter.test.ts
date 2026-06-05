@@ -339,6 +339,9 @@ describe(NuxtAdapter, () => {
 
         const putWithoutId = await handler(createEvent({ method: 'PUT' }));
         expect(putWithoutId.status).toBe(405);
+        expect(await putWithoutId.json()).toEqual({
+            error: { code: 'method_not_allowed', message: 'Method not allowed for this route.' },
+        });
 
         const putWithNestedPath = await handler(createEvent({ method: 'PUT', params: { tango: '789/typo' } }));
         expect(putWithNestedPath.status).toBe(404);

@@ -141,11 +141,18 @@ describe(TangoResponse, () => {
         const methodNotAllowed = TangoResponse.methodNotAllowed(['GET', 'POST']);
         expect(methodNotAllowed.status).toBe(405);
         expect(methodNotAllowed.headers.get('Allow')).toBe('GET, POST');
-        expect(await methodNotAllowed.json()).toEqual({ error: 'Method not allowed.' });
+        expect(methodNotAllowed.headers.get('Content-Type')).toContain('application/problem+json');
+        expect(await methodNotAllowed.json()).toEqual({
+            error: { code: 'method_not_allowed', message: 'Method not allowed.' },
+        });
 
         const methodNotAllowedWithoutAllow = TangoResponse.methodNotAllowed();
         expect(methodNotAllowedWithoutAllow.status).toBe(405);
         expect(methodNotAllowedWithoutAllow.headers.get('Allow')).toBeNull();
+        expect(methodNotAllowedWithoutAllow.headers.get('Content-Type')).toContain('application/problem+json');
+        expect(await methodNotAllowedWithoutAllow.json()).toEqual({
+            error: { code: 'method_not_allowed', message: 'Method not allowed.' },
+        });
     });
 
     it('turns TangoError subclasses into problem responses', async () => {
@@ -214,6 +221,30 @@ describe(TangoResponse, () => {
         const response = (TangoResponse[method] as (arg?: unknown) => TangoResponse)(input);
         expect(response.status).toBe(expectedStatus);
         expect(await response.json()).toEqual({ error: input });
+    });
+
+    it('methodNotAllowed with ProblemDetails returns 405 with the given body', async () => {
+        const input = { code: 'method_not_allowed', message: 'blocked' };
+        const response = TangoResponse.methodNotAllowed(undefined, input);
+        expect(response.status).toBe(405);
+        expect(await response.json()).toEqual({ error: input });
+    });
+
+    it('methodNotAllowed with TangoError uses the error status and envelope', async () => {
+        const response = TangoResponse.methodNotAllowed(['GET'], new TestTangoError('gone'));
+        expect(response.status).toBe(418);
+        expect(response.headers.get('Allow')).toBe('GET');
+        expect(await response.json()).toEqual({
+            error: { code: 'teapot', message: 'gone', details: { foo: ['bar'] } },
+        });
+    });
+
+    it('methodNotAllowed with a custom message returns 405 with the envelope', async () => {
+        const response = TangoResponse.methodNotAllowed(undefined, 'wrong verb');
+        expect(response.status).toBe(405);
+        expect(await response.json()).toEqual({
+            error: { code: 'method_not_allowed', message: 'wrong verb' },
+        });
     });
 
     it.each([
@@ -288,33 +319,38 @@ describe(TangoResponse, () => {
         const form = await formRes.formData();
         expect(form.get('a')).toBe('1');
 
-        const fileInline = TangoResponse.file('abc', { filename: 'a.txt' });
+        const fileBody = new Blob(['abc']);
+        const fileInline = TangoResponse.file(fileBody, { filename: 'a.txt' });
         expect(fileInline.headers.get('Content-Disposition')).toContain('inline');
 
-        const fileWithType = TangoResponse.file('abc', { contentType: 'text/custom' });
+        const fileWithType = TangoResponse.file(fileBody, { contentType: 'text/custom' });
         expect(fileWithType.headers.get('Content-Type')).toBe('text/custom');
 
-        const fileWithHeaderType = TangoResponse.file('abc', { init: { headers: { 'Content-Type': 'x/preferred' } } });
+        const fileWithHeaderType = TangoResponse.file(fileBody, {
+            init: { headers: { 'Content-Type': 'x/preferred' } },
+        });
         expect(fileWithHeaderType.headers.get('Content-Type')).toBe('x/preferred');
 
-        const fileWithHeaderLength = TangoResponse.file('abc', { init: { headers: { 'Content-Length': '99' } } });
+        const fileWithHeaderLength = TangoResponse.file(fileBody, {
+            init: { headers: { 'Content-Length': '99' } },
+        });
         expect(fileWithHeaderLength.headers.get('Content-Length')).toBe('99');
 
         const downloadNamed = TangoResponse.download(new Blob(['abc']), { filename: 'a.txt' });
         expect(downloadNamed.headers.get('Content-Disposition')).toContain('attachment');
 
-        const downloadUnnamed = TangoResponse.download('abc');
+        const downloadUnnamed = TangoResponse.download(fileBody);
         expect(downloadUnnamed.headers.get('Content-Disposition')).toBe('attachment');
 
-        const downloadWithType = TangoResponse.download('abc', { contentType: 'text/custom' });
+        const downloadWithType = TangoResponse.download(fileBody, { contentType: 'text/custom' });
         expect(downloadWithType.headers.get('Content-Type')).toBe('text/custom');
 
-        const downloadWithHeaderType = TangoResponse.download('abc', {
+        const downloadWithHeaderType = TangoResponse.download(fileBody, {
             init: { headers: { 'Content-Type': 'x/preferred' } },
         });
         expect(downloadWithHeaderType.headers.get('Content-Type')).toBe('x/preferred');
 
-        const downloadWithHeaderLength = TangoResponse.download('abc', {
+        const downloadWithHeaderLength = TangoResponse.download(fileBody, {
             init: { headers: { 'Content-Length': '101' } },
         });
         expect(downloadWithHeaderLength.headers.get('Content-Length')).toBe('101');

@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-adapters-nuxt",
-    "version": "1.11.14",
+    "version": "1.12.0",
     "description": "Nuxt Nitro adapter for Tango viewsets",
     "type": "module",
     "main": "./dist/index.js",
@@ -51,7 +51,7 @@
     "devDependencies": {
         "@types/node": "^25.9.1",
         "nuxt": "^4.4.6",
-        "tsdown": "^0.22.1",
+        "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8",
         "vue": "^3.5.35"
