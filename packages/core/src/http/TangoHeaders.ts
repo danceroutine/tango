@@ -277,18 +277,15 @@ export class TangoHeaders extends Headers {
     }
 
     /**
-     * Attempt to guess and set the Content-Type header from a file (string or Blob) and optional filename.
+     * Attempt to guess and set the Content-Type header from response body bytes and an optional filename.
      *
-     * @param file File-like input (string or Blob)
-     * @param filename Optional filename to help guess mime type by extension
+     * @param body Response body bytes (for example a Blob or Uint8Array)
+     * @param filename Optional filename used to guess mime type by extension
      */
-    setContentTypeByFile(file: unknown, filename?: string): void {
-        // do not overwrite explicit content-type
+    setContentTypeForBody(body: unknown, filename?: string): void {
         if (this.has('Content-Type')) return;
 
-        // If file is a string and a filename is provided or can be guessed from file path
-        if (typeof file === 'string' && filename) {
-            // Guess type by extension
+        if (filename) {
             const dotIndex = filename.lastIndexOf('.');
             const ext = dotIndex >= 0 ? filename.slice(dotIndex + 1).toLowerCase() : '';
             const map: Record<string, string> = {
@@ -311,24 +308,27 @@ export class TangoHeaders extends Headers {
             const mime = map[ext];
             if (mime) {
                 this.set('Content-Type', mime);
+                return;
+            }
+        }
+
+        if (isBlob(body)) {
+            if (body.type && body.type !== '') {
+                this.set('Content-Type', body.type);
             } else {
                 this.set('Content-Type', 'application/octet-stream');
             }
             return;
         }
 
-        // If it's a Blob, use its type, or fallback
-        if (isBlob(file)) {
-            if (file.type && file.type !== '') {
-                this.set('Content-Type', file.type);
-            } else {
-                this.set('Content-Type', 'application/octet-stream');
-            }
-            return;
-        }
-
-        // Fallback
         this.set('Content-Type', 'application/octet-stream');
+    }
+
+    /**
+     * @deprecated Use {@link TangoHeaders.setContentTypeForBody} instead.
+     */
+    setContentTypeByFile(body: unknown, filename?: string): void {
+        this.setContentTypeForBody(body, filename);
     }
 
     /**

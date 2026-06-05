@@ -579,10 +579,21 @@ export class TangoResponse implements Response {
     }
 
     /**
-     * Returns a response for serving a file.
+     * Create a response with inline Content-Disposition for file-like body content.
+     *
+     * The first argument is response body bytes, not a filesystem path. To serve bytes
+     * from disk, read the file first and pass the result here.
+     *
+     * @example
+     * ```ts
+     * import { readFile } from 'node:fs/promises';
+     *
+     * const bytes = await readFile('/data/report.pdf');
+     * return TangoResponse.file(bytes, { filename: 'report.pdf' });
+     * ```
      */
     static file(
-        file: Blob | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array> | string,
+        body: Blob | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>,
         opts?: {
             filename?: string;
             contentType?: string;
@@ -591,29 +602,39 @@ export class TangoResponse implements Response {
     ): TangoResponse {
         const headers = new TangoHeaders(opts?.init?.headers ?? {});
         if (opts?.filename) {
-            // Serve as an attachment by default, but not 'download'
             headers.setContentDispositionInline(opts.filename);
         }
         if (opts?.contentType && !headers.has('Content-Type')) {
             headers.set('Content-Type', opts.contentType);
         } else if (!headers.has('Content-Type')) {
-            headers.setContentTypeByFile(file, opts?.filename);
+            headers.setContentTypeForBody(body, opts?.filename);
         }
         if (!headers.has('Content-Length')) {
-            headers.setContentLengthFromBody(file);
+            headers.setContentLengthFromBody(body);
         }
         return new TangoResponse({
             ...opts?.init,
-            body: file as BodyInit,
+            body: body as BodyInit,
             headers,
         });
     }
 
     /**
-     * Returns a response that prompts the user to download the file.
+     * Create a response with attachment Content-Disposition for file-like body content.
+     *
+     * The first argument must be the response body bytes, not a filesystem path. To serve bytes
+     * from disk, read the file first and pass the result here.
+     *
+     * @example
+     * ```ts
+     * import { readFile } from 'node:fs/promises';
+     *
+     * const bytes = await readFile('/data/report.pdf');
+     * return TangoResponse.download(bytes, { filename: 'report.pdf' });
+     * ```
      */
     static download(
-        file: Blob | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array> | string,
+        body: Blob | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>,
         opts?: {
             filename?: string;
             contentType?: string;
@@ -629,14 +650,14 @@ export class TangoResponse implements Response {
         if (opts?.contentType && !headers.has('Content-Type')) {
             headers.set('Content-Type', opts.contentType);
         } else if (!headers.has('Content-Type')) {
-            headers.setContentTypeByFile(file, opts?.filename);
+            headers.setContentTypeForBody(body, opts?.filename);
         }
         if (!headers.has('Content-Length')) {
-            headers.setContentLengthFromBody(file);
+            headers.setContentLengthFromBody(body);
         }
         return new TangoResponse({
             ...opts?.init,
-            body: file as BodyInit,
+            body: body as BodyInit,
             headers,
         });
     }
