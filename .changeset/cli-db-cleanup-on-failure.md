@@ -2,4 +2,4 @@
 "@danceroutine/tango-migrations": patch
 ---
 
-Close migration CLI database clients on `migrate` and `status` failure paths, preserve the primary command error when cleanup also fails, and log close failures instead of masking the original failure.
+Fix `migrate` and `status` failure handling so a migration error remains the reported failure when closing the database connection afterward also fails. Failed runs now release the connection, and teardown problems are logged separately.
