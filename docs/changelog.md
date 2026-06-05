@@ -4,6 +4,12 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.12.1 - 2026-06-05
+
+Fix `migrate` and `status` failure handling so a migration error remains the reported failure when closing the database connection afterward also fails. Failed runs now release the connection, and teardown problems are logged separately.
+
+Fix response cookie intent handling so repeated `setCookie()` calls replace the prior cookie for the same name, domain, and path while `appendCookie()` continues to emit additional `Set-Cookie` lines. Express responses now forward multiple `Set-Cookie` lines without collapsing them into a single header value.
+
 ## 1.12.0 - 2026-06-05
 
 Clarify `TangoResponse.file()` and `TangoResponse.download()` so the first argument is response body bytes, not a filesystem path. Remove `string` from the accepted body type, rename the parameter to `body`, and add `TangoHeaders.setContentTypeForBody()` as the preferred helper. `setContentTypeByFile()` remains as a deprecated proxy.
