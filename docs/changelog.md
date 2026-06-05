@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.13 - 2026-06-05
+
+`tango new` and `tango init` now resolve target directories with platform-native path handling, so scaffolding works correctly on Windows when users pass relative paths or drive-letter paths.
+
 ## 1.11.12 - 2026-06-05
 
 Refactored the QuerySet internal surface in preparation for expanding M2M functionality
