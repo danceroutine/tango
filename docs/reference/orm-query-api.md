@@ -291,6 +291,8 @@ The callback queue belongs to the current transaction frame:
 
 `robust: false` is the default. In that mode, the first callback failure stops later callbacks and rejects `atomic(...)` after the database has already committed. With `robust: true`, Tango logs the callback failure and continues with later callbacks.
 
+When a host adapter runs with `transaction: 'writes'`, the same post-commit durability boundary described in [ORM and QuerySets](/topics/orm-and-querysets) applies: a callback failure after commit can still surface as a request error even though the write is durable.
+
 ### Why Tango uses `tx.onCommit(...)`
 
 Django exposes a package-level `transaction.on_commit(...)` helper because Python code often leans on ambient transaction context. Tango keeps ordinary ORM reads and writes ambient inside `atomic(...)`, but it keeps post-commit registration explicit.
