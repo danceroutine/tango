@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.14 - 2026-06-05
+
+Fix `QuerySet.exists()` so `limit(0)` and `offset` use the same query window as `fetch()` and `count()`, while keeping the `SELECT 1 ... LIMIT 1` existence probe for performance optimization.
+
 ## 1.11.13 - 2026-06-05
 
 `tango new` and `tango init` now resolve target directories with platform-native path handling, so scaffolding works correctly on Windows when users pass relative paths or drive-letter paths.
