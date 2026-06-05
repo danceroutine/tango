@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.12 - 2026-06-05
+
+Refactored the QuerySet internal surface in preparation for expanding M2M functionality
+
 ## 1.11.11 - 2026-06-05
 
 Validate `QuerySet.limit()` and `QuerySet.offset()` bounds before storing query state. Both methods now accept safe non-negative integers, preserve explicit zero values in compiled SQL, and reject invalid JavaScript runtime inputs such as negative numbers, fractions, infinities, and `NaN`.
