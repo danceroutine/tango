@@ -280,6 +280,16 @@ async function connectDbClient(db: string, dialect: Dialect): Promise<CliDbClien
     throw new Error(`Unsupported dialect: ${dialect}`);
 }
 
+async function closeCliDbClientSafely(dbClient: CliDbClient): Promise<void> {
+    try {
+        await dbClient.close();
+    } catch (closeError) {
+        logger.warn(
+            `Unable to close database client: ${closeError instanceof Error ? closeError.message : String(closeError)}`
+        );
+    }
+}
+
 async function ensureSqliteParentDirectory(filename: string): Promise<void> {
     if (filename === ':memory:' || filename === 'file::memory:') {
         return;
@@ -354,11 +364,20 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
 
                 const dbClient = await connectDbClient(resolved.db, resolved.dialect);
 
-                const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
-                await runner.apply(argv.to);
+                let error: unknown;
+                try {
+                    const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
+                    await runner.apply(argv.to);
+                    logger.info('Migrations applied successfully');
+                } catch (e) {
+                    error = e;
+                } finally {
+                    await closeCliDbClientSafely(dbClient);
+                }
 
-                await dbClient.close();
-                logger.info('Migrations applied successfully');
+                if (error) {
+                    throw error;
+                }
             }
         )
         .command(
@@ -532,19 +551,28 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
 
                 const dbClient = await connectDbClient(resolved.db, resolved.dialect);
 
-                const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
-                const statuses = await runner.status();
+                let error: unknown;
+                try {
+                    const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
+                    const statuses = await runner.status();
 
-                if (statuses.length === 0) {
-                    logger.info('No migrations found');
-                } else {
-                    statuses.forEach((statusItem) => {
-                        const marker = statusItem.applied ? '[x]' : '[ ]';
-                        logger.info(`  ${marker} ${statusItem.id}`);
-                    });
+                    if (statuses.length === 0) {
+                        logger.info('No migrations found');
+                    } else {
+                        statuses.forEach((statusItem) => {
+                            const marker = statusItem.applied ? '[x]' : '[ ]';
+                            logger.info(`  ${marker} ${statusItem.id}`);
+                        });
+                    }
+                } catch (e) {
+                    error = e;
+                } finally {
+                    await closeCliDbClientSafely(dbClient);
                 }
 
-                await dbClient.close();
+                if (error) {
+                    throw error;
+                }
             }
         );
 }

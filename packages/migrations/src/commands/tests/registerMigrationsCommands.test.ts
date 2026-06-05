@@ -8,6 +8,18 @@ const createdDirs: string[] = [];
 const LOAD_COUNT_KEY = '__tangoMigrationsLoadCount';
 const SLOW_TEST_TIMEOUT_MS = 15_000;
 
+type CliDbClient = {
+    close: () => Promise<void>;
+};
+
+const migrationRunnerMock = {
+    applyImpl: async (): Promise<void> => {},
+    statusImpl: async (): Promise<{ id: string; applied: boolean }[]> => [],
+    closeImpl: async (): Promise<void> => {},
+};
+
+let capturedClient: CliDbClient | undefined;
+
 type LoadCounterGlobal = typeof globalThis & {
     [LOAD_COUNT_KEY]?: number;
 };
@@ -24,6 +36,23 @@ vi.mock('@danceroutine/tango-core', async () => {
         }),
     };
 });
+
+vi.mock('../../runner/MigrationRunner', () => ({
+    MigrationRunner: class {
+        constructor(client: CliDbClient) {
+            vi.spyOn(client, 'close').mockImplementation(() => migrationRunnerMock.closeImpl());
+            capturedClient = client;
+        }
+
+        async apply(): Promise<void> {
+            return migrationRunnerMock.applyImpl();
+        }
+
+        async status(): Promise<{ id: string; applied: boolean }[]> {
+            return migrationRunnerMock.statusImpl();
+        }
+    },
+}));
 
 async function importRegisterMigrationsCommands() {
     return (await import('../cli')).registerMigrationsCommands;
@@ -96,9 +125,26 @@ async function runMakeMigrations(root: string): Promise<void> {
     }
 }
 
+async function runMigrationsCommand(root: string, args: string[]): Promise<void> {
+    const cwdBefore = process.cwd();
+    process.chdir(root);
+
+    try {
+        const registerMigrationsCommands = await importRegisterMigrationsCommands();
+        const parser = registerMigrationsCommands(yargs(args));
+        await parser.parseAsync();
+    } finally {
+        process.chdir(cwdBefore);
+    }
+}
+
 afterEach(async () => {
     warnings.length = 0;
     delete (globalThis as LoadCounterGlobal)[LOAD_COUNT_KEY];
+    capturedClient = undefined;
+    migrationRunnerMock.applyImpl = async () => {};
+    migrationRunnerMock.statusImpl = async () => [];
+    migrationRunnerMock.closeImpl = async () => {};
     vi.resetModules();
 
     for (const directory of createdDirs.splice(0)) {
@@ -266,4 +312,56 @@ describe(importRegisterMigrationsCommands, () => {
         },
         SLOW_TEST_TIMEOUT_MS
     );
+
+    it('closes the database client when migrate fails', async () => {
+        const root = await makeTempDir('tango-migrations-cli-migrate-close-');
+        await writeConfigFile(root);
+        migrationRunnerMock.applyImpl = async () => {
+            throw new Error('apply failed');
+        };
+
+        await expect(runMigrationsCommand(root, ['migrate', '--dir', './migrations'])).rejects.toThrow('apply failed');
+        expect(capturedClient?.close).toHaveBeenCalledOnce();
+    });
+
+    it('closes the database client when status fails', async () => {
+        const root = await makeTempDir('tango-migrations-cli-status-close-');
+        await writeConfigFile(root);
+        migrationRunnerMock.statusImpl = async () => {
+            throw new Error('status failed');
+        };
+
+        await expect(runMigrationsCommand(root, ['status', '--dir', './migrations'])).rejects.toThrow('status failed');
+        expect(capturedClient?.close).toHaveBeenCalledOnce();
+    });
+
+    it('preserves the migration error when close also fails during migrate', async () => {
+        const root = await makeTempDir('tango-migrations-cli-migrate-primary-error-');
+        await writeConfigFile(root);
+        migrationRunnerMock.applyImpl = async () => {
+            throw new Error('apply failed');
+        };
+        migrationRunnerMock.closeImpl = async () => {
+            throw new Error('close failed');
+        };
+
+        await expect(runMigrationsCommand(root, ['migrate', '--dir', './migrations'])).rejects.toThrow('apply failed');
+        expect(capturedClient?.close).toHaveBeenCalledOnce();
+        expect(warnings).toEqual([expect.stringContaining('Unable to close database client')]);
+    });
+
+    it('preserves the status error when close also fails during status', async () => {
+        const root = await makeTempDir('tango-migrations-cli-status-primary-error-');
+        await writeConfigFile(root);
+        migrationRunnerMock.statusImpl = async () => {
+            throw new Error('status failed');
+        };
+        migrationRunnerMock.closeImpl = async () => {
+            throw new Error('close failed');
+        };
+
+        await expect(runMigrationsCommand(root, ['status', '--dir', './migrations'])).rejects.toThrow('status failed');
+        expect(capturedClient?.close).toHaveBeenCalledOnce();
+        expect(warnings).toEqual([expect.stringContaining('Unable to close database client')]);
+    });
 });
