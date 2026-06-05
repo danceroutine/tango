@@ -250,6 +250,9 @@ describe(NextAdapter, () => {
 
         const putWithoutId = await handlers.PUT(req, { params: Promise.resolve({}) });
         expect(putWithoutId.status).toBe(405);
+        expect(await putWithoutId.json()).toEqual({
+            error: { code: 'method_not_allowed', message: 'Method not allowed for this route.' },
+        });
 
         const retrieveByDirectId = await handlers.GET(req, {
             params: Promise.resolve({ id: '321' }),

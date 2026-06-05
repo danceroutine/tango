@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-openapi",
-    "version": "1.11.14",
+    "version": "1.12.0",
     "description": "OpenAPI generation for Tango resources",
     "type": "module",
     "main": "./dist/index.js",
@@ -55,7 +55,7 @@
         "@danceroutine/tango-core": "workspace:*",
         "@danceroutine/tango-testing": "workspace:*",
         "@types/node": "^25.9.1",
-        "tsdown": "^0.22.1",
+        "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8"
     }

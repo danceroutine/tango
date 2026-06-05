@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-adapters-core",
-    "version": "1.11.14",
+    "version": "1.12.0",
     "description": "Core types and utilities for Tango adapters",
     "type": "module",
     "main": "./dist/index.js",
@@ -51,7 +51,7 @@
     "devDependencies": {
         "@danceroutine/tango-testing": "workspace:*",
         "@types/node": "^25.9.1",
-        "tsdown": "^0.22.1",
+        "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8"
     }

@@ -4,6 +4,14 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.12.0 - 2026-06-05
+
+Clarify `TangoResponse.file()` and `TangoResponse.download()` so the first argument is response body bytes, not a filesystem path. Remove `string` from the accepted body type, rename the parameter to `body`, and add `TangoHeaders.setContentTypeForBody()` as the preferred helper. `setContentTypeByFile()` remains as a deprecated proxy.
+
+## 1.11.15 - 2026-06-05
+
+Standardize `TangoResponse.methodNotAllowed()` and framework adapter 405/404 responses on the Tango error envelope so clients receive `{ error: { code, message } }` with `application/problem+json` instead of legacy `{ error: string }` JSON.
+
 ## 1.11.14 - 2026-06-05
 
 Fix `QuerySet.exists()` so `limit(0)` and `offset` use the same query window as `fetch()` and `count()`, while keeping the `SELECT 1 ... LIMIT 1` existence probe for performance optimization.

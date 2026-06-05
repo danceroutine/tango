@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-resources",
-    "version": "1.11.14",
+    "version": "1.12.0",
     "description": "ModelViewSet, serializers, filters, and pagination for Tango",
     "type": "module",
     "main": "./dist/index.js",
@@ -77,7 +77,7 @@
         "@danceroutine/tango-schema": "workspace:*",
         "@danceroutine/tango-testing": "workspace:*",
         "@types/node": "^25.9.1",
-        "tsdown": "^0.22.1",
+        "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8",
         "zod": "^4.0.0"
