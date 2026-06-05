@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-adapters-next",
-    "version": "1.11.14",
+    "version": "1.11.15",
     "description": "Next.js App Router adapter for Tango viewsets",
     "type": "module",
     "main": "./dist/index.js",
@@ -50,7 +50,7 @@
     "devDependencies": {
         "@types/node": "^25.9.1",
         "next": "^16.2.6",
-        "tsdown": "^0.22.1",
+        "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8"
     }

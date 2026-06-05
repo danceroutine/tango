@@ -146,34 +146,39 @@ describe(TangoHeaders, () => {
     });
 
     it('infers content metadata and preserves trace headers', () => {
+        const bodyBytes = new Uint8Array([120]);
         const headers = new TangoHeaders();
-        headers.setContentTypeByFile('x', 'a.txt');
+        headers.setContentTypeForBody(bodyBytes, 'a.txt');
         expect(headers.get('Content-Type')).toBe('text/plain');
 
         const unknown = new TangoHeaders();
-        unknown.setContentTypeByFile('x', 'a.unknown');
+        unknown.setContentTypeForBody(bodyBytes, 'a.unknown');
         expect(unknown.get('Content-Type')).toBe('application/octet-stream');
 
         const noExtension = new TangoHeaders();
-        noExtension.setContentTypeByFile('x', 'README');
+        noExtension.setContentTypeForBody(bodyBytes, 'README');
         expect(noExtension.get('Content-Type')).toBe('application/octet-stream');
 
         const blob = new Blob(['abc'], { type: 'text/custom' });
         const blobHeaders = new TangoHeaders();
-        blobHeaders.setContentTypeByFile(blob);
+        blobHeaders.setContentTypeForBody(blob);
         expect(blobHeaders.get('Content-Type')).toBe('text/custom');
 
         const emptyBlobHeaders = new TangoHeaders();
-        emptyBlobHeaders.setContentTypeByFile(new Blob(['abc']));
+        emptyBlobHeaders.setContentTypeForBody(new Blob(['abc']));
         expect(emptyBlobHeaders.get('Content-Type')).toBe('application/octet-stream');
 
         const fallbackHeaders = new TangoHeaders();
-        fallbackHeaders.setContentTypeByFile({});
+        fallbackHeaders.setContentTypeForBody({});
         expect(fallbackHeaders.get('Content-Type')).toBe('application/octet-stream');
 
         const keepTypeHeaders = new TangoHeaders({ 'Content-Type': 'keep/me' });
-        keepTypeHeaders.setContentTypeByFile('x', 'a.json');
+        keepTypeHeaders.setContentTypeForBody(bodyBytes, 'a.json');
         expect(keepTypeHeaders.get('Content-Type')).toBe('keep/me');
+
+        const deprecatedHeaders = new TangoHeaders();
+        deprecatedHeaders.setContentTypeByFile(bodyBytes, 'a.txt');
+        expect(deprecatedHeaders.get('Content-Type')).toBe('text/plain');
 
         const lenHeaders = new TangoHeaders();
         lenHeaders.setContentLengthFromBody('hello');

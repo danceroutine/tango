@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-cli",
-    "version": "1.11.14",
+    "version": "1.11.15",
     "description": "Unified Tango command line interface for migrations and code generation",
     "type": "module",
     "main": "./dist/index.js",
@@ -47,7 +47,7 @@
     "devDependencies": {
         "@types/node": "^25.9.1",
         "@types/yargs": "^17.0.33",
-        "tsdown": "^0.22.1",
+        "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8"
     }

@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-adapters-express",
-    "version": "1.11.14",
+    "version": "1.11.15",
     "description": "Express adapter for Tango",
     "type": "module",
     "main": "./dist/index.js",
@@ -52,7 +52,7 @@
         "@types/express": "^5.0.0",
         "@types/node": "^25.9.1",
         "express": "^5.2.1",
-        "tsdown": "^0.22.1",
+        "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8"
     }

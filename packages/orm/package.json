@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-orm",
-    "version": "1.11.14",
+    "version": "1.11.15",
     "description": "Model-first querying, runtime-managed database access, and transactions for Tango",
     "type": "module",
     "main": "./dist/index.js",
@@ -82,7 +82,7 @@
         "@types/pg": "^8.20.0",
         "better-sqlite3": "^12.10.0",
         "pg": "^8.20.0",
-        "tsdown": "^0.22.1",
+        "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8"
     }

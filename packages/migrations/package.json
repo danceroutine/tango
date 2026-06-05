@@ -1,6 +1,6 @@
 {
     "name": "@danceroutine/tango-migrations",
-    "version": "1.11.14",
+    "version": "1.11.15",
     "description": "Auto-migration system with ops DSL for Tango",
     "type": "module",
     "main": "./dist/index.js",
@@ -102,7 +102,7 @@
         "@types/yargs": "^17.0.33",
         "better-sqlite3": "^12.10.0",
         "pg": "^8.20.0",
-        "tsdown": "^0.22.1",
+        "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8",
         "zod": "^4.0.0"
