@@ -182,6 +182,22 @@ describe(QuerySet, () => {
         expect(run).toHaveBeenCalledWith(expect.objectContaining({ sql: expect.stringContaining('LIMIT 0') }));
     });
 
+    it('returns false from exists when limit is zero even if rows match', async () => {
+        const query = vi.fn(async (sql: string) => {
+            expect(sql).toContain('LIMIT 0');
+            expect(sql).not.toContain('COUNT(*)');
+            return { rows: [] as Array<{ tango_exists: number }> };
+        });
+        const queryExecutor = aQueryExecutor<User>({
+            meta,
+            query,
+            run: vi.fn(async () => [{ id: 1, email: 'a@a.com', active: true }]),
+        });
+        const qs = new ModelQuerySet<User>(queryExecutor).filter({ active: true });
+
+        await expect(qs.limit(0).exists()).resolves.toBe(false);
+    });
+
     it('preserves an explicit zero offset when fetching rows', async () => {
         const { queryExecutor, run } = createQueryExecutorFixture();
         const qs = new ModelQuerySet<User>(queryExecutor);

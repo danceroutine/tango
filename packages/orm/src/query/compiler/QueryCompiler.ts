@@ -21,7 +21,11 @@ import { InternalLookupType } from '../domain/internal/InternalLookupType';
 import { InternalSqlValidationPlanKind as SqlPlanKind } from '../../validation/internal/InternalSqlValidationPlanKind';
 import { InternalValidatedFilterDescriptorKind } from '../../validation/internal/InternalValidatedFilterDescriptorKind';
 import { OrmSqlSafetyAdapter } from '../../validation';
-import type { ValidatedFilterDescriptor, ValidatedRelationMeta } from '../../validation/SQLValidationEngine';
+import type {
+    ValidatedFilterDescriptor,
+    ValidatedRelationMeta,
+    ValidatedSelectSqlPlan,
+} from '../../validation/SQLValidationEngine';
 import { QueryPlanner } from '../planning';
 import type { QueryHydrationPlanNode } from '../planning';
 
@@ -126,21 +130,7 @@ export class QueryCompiler {
             ...this.buildRootHiddenSelects(compiledPrefetchNodes, table),
         ].join(', ');
         const whereSQL = whereParts.length ? ` WHERE ${whereParts.join(' AND ')}` : '';
-        const orderSQL = ` ORDER BY ${
-            state.order?.length
-                ? state.order
-                      .map((order) => `${validatedPlan.orderFields[String(order.by)]!} ${order.dir.toUpperCase()}`)
-                      .join(', ')
-                : `${table}.${validatedPlan.meta.pk} ASC`
-        }`;
-        const hasOffset = state.offset !== undefined;
-        const limitSQL =
-            state.limit !== undefined
-                ? ` LIMIT ${state.limit}`
-                : hasOffset && this.adapter.dialect === InternalDialect.SQLITE
-                  ? ' LIMIT -1'
-                  : '';
-        const offsetSQL = state.offset !== undefined ? ` OFFSET ${state.offset}` : '';
+        const { orderSQL, limitSQL, offsetSQL } = this.buildQueryWindowSuffix(state, validatedPlan, table);
         const sql = `SELECT ${select} FROM ${table}${joinCollection.joins.length ? ` ${joinCollection.joins.join(' ')}` : ''}${whereSQL}${orderSQL}${limitSQL}${offsetSQL}`;
 
         const compiledHydrationPlan: CompiledHydrationPlanRoot | undefined =
@@ -194,9 +184,18 @@ export class QueryCompiler {
         });
 
         const whereSQL = whereParts.length ? ` WHERE ${whereParts.join(' AND ')}` : '';
-        const offsetSQL = state.offset ? ` OFFSET ${state.offset}` : '';
+        if (state.limit === undefined && state.offset === undefined) {
+            return {
+                sql: `SELECT 1 AS tango_exists FROM ${table}${whereSQL} LIMIT 1`,
+                params,
+            };
+        }
+
+        const { orderSQL, limitSQL, offsetSQL } = this.buildQueryWindowSuffix(state, validatedPlan, table, {
+            existsProbe: state.offset !== undefined,
+        });
         return {
-            sql: `SELECT 1 AS tango_exists FROM ${table}${whereSQL} LIMIT 1${offsetSQL}`,
+            sql: `SELECT 1 AS tango_exists FROM ${table}${whereSQL}${orderSQL}${limitSQL}${offsetSQL}`,
             params,
         };
     }
@@ -243,6 +242,33 @@ export class QueryCompiler {
             sql: `SELECT ${[...baseSelects, ...joinCollection.selects].join(', ')} FROM ${validatedTarget.table} ${baseAlias}${joinCollection.joins.length ? ` ${joinCollection.joins.join(' ')}` : ''} WHERE ${baseAlias}.${validatedTarget.primaryKey} IN (${placeholders}) ORDER BY ${baseAlias}.${validatedTarget.primaryKey} ASC`,
             params: targetIds,
         };
+    }
+
+    private buildQueryWindowSuffix<T, TSourceModel = unknown>(
+        state: Pick<QuerySetState<T, TSourceModel>, 'order' | 'limit' | 'offset'>,
+        validatedPlan: ValidatedSelectSqlPlan,
+        table: string,
+        options?: { existsProbe?: boolean }
+    ): { orderSQL: string; limitSQL: string; offsetSQL: string } {
+        const orderSQL = ` ORDER BY ${
+            state.order?.length
+                ? state.order
+                      .map((order) => `${validatedPlan.orderFields[String(order.by)]!} ${order.dir.toUpperCase()}`)
+                      .join(', ')
+                : `${table}.${validatedPlan.meta.pk} ASC`
+        }`;
+        const hasOffset = state.offset !== undefined;
+        const limitSQL = options?.existsProbe
+            ? state.limit === 0
+                ? ' LIMIT 0'
+                : ' LIMIT 1'
+            : state.limit !== undefined
+              ? ` LIMIT ${state.limit}`
+              : hasOffset && this.adapter.dialect === InternalDialect.SQLITE
+                ? ' LIMIT -1'
+                : '';
+        const offsetSQL = state.offset !== undefined ? ` OFFSET ${state.offset}` : '';
+        return { orderSQL, limitSQL, offsetSQL };
     }
 
     private compileManyToManyPrefetch(

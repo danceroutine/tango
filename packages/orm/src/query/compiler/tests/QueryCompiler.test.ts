@@ -660,8 +660,8 @@ describe(QueryCompiler, () => {
         expect(result.sql).toContain('users.email = $1');
         expect(result.sql).toContain('NOT');
         expect(result.sql).toContain('users.name LIKE $2');
+        expect(result.sql).toContain('ORDER BY users.age DESC');
         expect(result.sql).toContain('LIMIT 1 OFFSET 20');
-        expect(result.sql).not.toContain('ORDER BY');
         expect(result.sql).not.toContain('users.*');
         expect(result.params).toEqual(['test@example.com', '%bot%']);
         expect(result.hydrationPlan).toBeUndefined();
@@ -671,6 +671,27 @@ describe(QueryCompiler, () => {
         const result = new QueryCompiler(mockMeta, postgresAdapter).compileExists({});
 
         expect(result.sql).toBe('SELECT 1 AS tango_exists FROM users LIMIT 1');
+        expect(result.params).toEqual([]);
+    });
+
+    it('compiles existence probes with zero limit', () => {
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compileExists({ limit: 0 });
+
+        expect(result.sql).toBe('SELECT 1 AS tango_exists FROM users ORDER BY users.id ASC LIMIT 0');
+        expect(result.params).toEqual([]);
+    });
+
+    it('compiles existence probes with zero offset', () => {
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compileExists({ offset: 0 });
+
+        expect(result.sql).toBe('SELECT 1 AS tango_exists FROM users ORDER BY users.id ASC LIMIT 1 OFFSET 0');
+        expect(result.params).toEqual([]);
+    });
+
+    it('compiles existence probes with zero limit and offset', () => {
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compileExists({ limit: 0, offset: 5 });
+
+        expect(result.sql).toBe('SELECT 1 AS tango_exists FROM users ORDER BY users.id ASC LIMIT 0 OFFSET 5');
         expect(result.params).toEqual([]);
     });
 
