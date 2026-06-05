@@ -280,6 +280,16 @@ async function connectDbClient(db: string, dialect: Dialect): Promise<CliDbClien
     throw new Error(`Unsupported dialect: ${dialect}`);
 }
 
+async function closeCliDbClientSafely(dbClient: CliDbClient): Promise<void> {
+    try {
+        await dbClient.close();
+    } catch (closeError) {
+        logger.warn(
+            `Unable to close database client: ${closeError instanceof Error ? closeError.message : String(closeError)}`
+        );
+    }
+}
+
 async function ensureSqliteParentDirectory(filename: string): Promise<void> {
     if (filename === ':memory:' || filename === 'file::memory:') {
         return;
@@ -354,12 +364,19 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
 
                 const dbClient = await connectDbClient(resolved.db, resolved.dialect);
 
+                let error: unknown;
                 try {
                     const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
                     await runner.apply(argv.to);
                     logger.info('Migrations applied successfully');
+                } catch (e) {
+                    error = e;
                 } finally {
-                    await dbClient.close();
+                    await closeCliDbClientSafely(dbClient);
+                }
+
+                if (error) {
+                    throw error;
                 }
             }
         )
@@ -534,6 +551,7 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
 
                 const dbClient = await connectDbClient(resolved.db, resolved.dialect);
 
+                let error: unknown;
                 try {
                     const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
                     const statuses = await runner.status();
@@ -546,8 +564,14 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
                             logger.info(`  ${marker} ${statusItem.id}`);
                         });
                     }
+                } catch (e) {
+                    error = e;
                 } finally {
-                    await dbClient.close();
+                    await closeCliDbClientSafely(dbClient);
+                }
+
+                if (error) {
+                    throw error;
                 }
             }
         );
