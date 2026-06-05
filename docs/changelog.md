@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.11.11 - 2026-06-05
+
+Validate `QuerySet.limit()` and `QuerySet.offset()` bounds before storing query state. Both methods now accept safe non-negative integers, preserve explicit zero values in compiled SQL, and reject invalid JavaScript runtime inputs such as negative numbers, fractions, infinities, and `NaN`.
+
 ## 1.11.10 - 2026-06-04
 
 Improve `QuerySet.exists()` so existence checks can stop after the first matching record.
