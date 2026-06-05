@@ -354,11 +354,13 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
 
                 const dbClient = await connectDbClient(resolved.db, resolved.dialect);
 
-                const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
-                await runner.apply(argv.to);
-
-                await dbClient.close();
-                logger.info('Migrations applied successfully');
+                try {
+                    const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
+                    await runner.apply(argv.to);
+                    logger.info('Migrations applied successfully');
+                } finally {
+                    await dbClient.close();
+                }
             }
         )
         .command(
@@ -532,19 +534,21 @@ export function registerMigrationsCommands(yargsBuilder: Argv): Argv {
 
                 const dbClient = await connectDbClient(resolved.db, resolved.dialect);
 
-                const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
-                const statuses = await runner.status();
+                try {
+                    const runner = new MigrationRunner(dbClient, resolved.dialect, resolved.dir);
+                    const statuses = await runner.status();
 
-                if (statuses.length === 0) {
-                    logger.info('No migrations found');
-                } else {
-                    statuses.forEach((statusItem) => {
-                        const marker = statusItem.applied ? '[x]' : '[ ]';
-                        logger.info(`  ${marker} ${statusItem.id}`);
-                    });
+                    if (statuses.length === 0) {
+                        logger.info('No migrations found');
+                    } else {
+                        statuses.forEach((statusItem) => {
+                            const marker = statusItem.applied ? '[x]' : '[ ]';
+                            logger.info(`  ${marker} ${statusItem.id}`);
+                        });
+                    }
+                } finally {
+                    await dbClient.close();
                 }
-
-                await dbClient.close();
             }
         );
 }
