@@ -141,11 +141,18 @@ describe(TangoResponse, () => {
         const methodNotAllowed = TangoResponse.methodNotAllowed(['GET', 'POST']);
         expect(methodNotAllowed.status).toBe(405);
         expect(methodNotAllowed.headers.get('Allow')).toBe('GET, POST');
-        expect(await methodNotAllowed.json()).toEqual({ error: 'Method not allowed.' });
+        expect(methodNotAllowed.headers.get('Content-Type')).toContain('application/problem+json');
+        expect(await methodNotAllowed.json()).toEqual({
+            error: { code: 'method_not_allowed', message: 'Method not allowed.' },
+        });
 
         const methodNotAllowedWithoutAllow = TangoResponse.methodNotAllowed();
         expect(methodNotAllowedWithoutAllow.status).toBe(405);
         expect(methodNotAllowedWithoutAllow.headers.get('Allow')).toBeNull();
+        expect(methodNotAllowedWithoutAllow.headers.get('Content-Type')).toContain('application/problem+json');
+        expect(await methodNotAllowedWithoutAllow.json()).toEqual({
+            error: { code: 'method_not_allowed', message: 'Method not allowed.' },
+        });
     });
 
     it('turns TangoError subclasses into problem responses', async () => {
@@ -214,6 +221,30 @@ describe(TangoResponse, () => {
         const response = (TangoResponse[method] as (arg?: unknown) => TangoResponse)(input);
         expect(response.status).toBe(expectedStatus);
         expect(await response.json()).toEqual({ error: input });
+    });
+
+    it('methodNotAllowed with ProblemDetails returns 405 with the given body', async () => {
+        const input = { code: 'method_not_allowed', message: 'blocked' };
+        const response = TangoResponse.methodNotAllowed(undefined, input);
+        expect(response.status).toBe(405);
+        expect(await response.json()).toEqual({ error: input });
+    });
+
+    it('methodNotAllowed with TangoError uses the error status and envelope', async () => {
+        const response = TangoResponse.methodNotAllowed(['GET'], new TestTangoError('gone'));
+        expect(response.status).toBe(418);
+        expect(response.headers.get('Allow')).toBe('GET');
+        expect(await response.json()).toEqual({
+            error: { code: 'teapot', message: 'gone', details: { foo: ['bar'] } },
+        });
+    });
+
+    it('methodNotAllowed with a custom message returns 405 with the envelope', async () => {
+        const response = TangoResponse.methodNotAllowed(undefined, 'wrong verb');
+        expect(response.status).toBe(405);
+        expect(await response.json()).toEqual({
+            error: { code: 'method_not_allowed', message: 'wrong verb' },
+        });
     });
 
     it.each([

@@ -424,21 +424,11 @@ export class NuxtAdapter implements FrameworkAdapter<Response, NuxtEventHandler,
     }
 
     private methodNotAllowedResponse(): TangoResponse {
-        return TangoResponse.json(
-            {
-                error: 'Method not allowed for this route.',
-            },
-            { status: 405 }
-        );
+        return TangoResponse.methodNotAllowed(undefined, 'Method not allowed for this route.');
     }
 
     private notFoundResponse(): TangoResponse {
-        return TangoResponse.json(
-            {
-                error: 'Not found.',
-            },
-            { status: 404 }
-        );
+        return TangoResponse.notFound('Not found.');
     }
 
     private resolveActionMatch(viewset: NuxtCrudViewSet, method: HttpMethod, segments: string[]): ActionMatch | null {
