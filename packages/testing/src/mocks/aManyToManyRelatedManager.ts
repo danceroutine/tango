@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import type { QueryExecutor } from '@danceroutine/tango-orm';
 import { ManyToManyRelatedManager } from '@danceroutine/tango-orm';
+import { aQueryExecutor } from './aQueryExecutor';
 
 type ManagerConstructorInputs = ConstructorParameters<typeof ManyToManyRelatedManager>[0];
 
@@ -91,7 +92,7 @@ export function aManyToManyRelatedManager<TTarget extends Record<string, unknown
         targetPrimaryKeyField: overrides.targetPrimaryKeyField ?? 'id',
         throughTableManager,
         targetExecutorProvider: () =>
-            overrides.targetExecutor === undefined ? ({} as QueryExecutor<TTarget>) : overrides.targetExecutor,
+            overrides.targetExecutor === undefined ? aQueryExecutor<TTarget>() : overrides.targetExecutor,
         createTarget,
         runAtomic: runAtomicSpy as ManagerConstructorInputs['runAtomic'],
     });

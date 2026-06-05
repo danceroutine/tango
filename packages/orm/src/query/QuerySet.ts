@@ -9,7 +9,6 @@ import type { OrderToken } from './domain/OrderToken';
 import type { OrderSpec } from './domain/OrderSpec';
 import type { FilterInput } from './domain/FilterInput';
 import type { CompiledQuery } from './domain/CompiledQuery';
-import type { CompiledHydrationNode } from './domain/CompiledQuery';
 import type {
     GeneratedHydratedRelationMap,
     GeneratedPrefetchRelatedPathKeys,
@@ -22,15 +21,16 @@ import type {
     SelectRelatedRelations,
     SingleRelationHydrationCardinality,
 } from './domain/RelationTyping';
-import { InternalRelationHydrationCardinality } from './domain/RelationTyping';
 import { InternalQNodeType } from './domain/internal/InternalQNodeType';
 import { InternalDirection } from './domain/internal/InternalDirection';
-import { InternalDialect } from './domain/internal/InternalDialect';
-import { InternalPrefetchQueryKind } from './domain/internal/InternalPrefetchQueryKind';
 import { QBuilder as Q } from './QBuilder';
 import { QueryCompiler } from './compiler';
 import { isQNodeLike } from './internal/isQNodeLike';
-// TODO revisit this later. QuerySet is getting very heavy between handling query building, prefetching, canonicalization, and hydration, and caching.
+import { QueryHydrator } from './hydration/QueryHydrator';
+import {
+    createQueryRowNormalizerStrategy,
+    type QueryRowNormalizerStrategy,
+} from './hydration/QueryRowNormalizerStrategy';
 /**
  * Query execution seam consumed by `QuerySet`.
  *
@@ -74,10 +74,6 @@ type QueryShapeOutput<TInput, TShape> =
           ? TOutput
           : never;
 
-type TargetColumnMetadata = {
-    targetColumns: Record<string, string>;
-};
-
 type ProjectedResult<
     TModel extends Record<string, unknown>,
     TKeys extends readonly (keyof TModel)[],
@@ -113,11 +109,16 @@ export abstract class QuerySet<
     static readonly BRAND = 'tango.orm.query_set' as const;
     readonly __tangoBrand: typeof QuerySet.BRAND = QuerySet.BRAND;
     private evaluationCache?: Promise<QueryResult<HydratedQueryResult<TBaseResult, THydrated>>>;
+    private readonly hydrator: QueryHydrator<TModel>;
+    private readonly rowNormalizer: QueryRowNormalizerStrategy;
 
     constructor(
         protected executor: QueryExecutor<TModel>,
         protected state: QuerySetState<TModel, TSourceModel> = {}
-    ) {}
+    ) {
+        this.rowNormalizer = createQueryRowNormalizerStrategy(executor.adapter.dialect);
+        this.hydrator = new QueryHydrator(executor, this.rowNormalizer);
+    }
 
     /**
      * Create another queryset of the same runtime family with the supplied
@@ -398,7 +399,9 @@ export abstract class QuerySet<
         const results: Array<HydratedQueryResult<TBaseResult, THydrated> | Out> =
             typeof shape === 'function'
                 ? baseResult.items.map(shape)
-                : this.normalizeHydratedRowsForParserShape(baseResult.items).map((row) => shape.parse(row));
+                : this.rowNormalizer
+                      .normalizeHydratedRowsForParserShape(baseResult.items, this.executor.meta.columns)
+                      .map((row) => shape.parse(row));
 
         return new QueryResult(results);
     }
@@ -565,7 +568,10 @@ export abstract class QuerySet<
             return shape(row);
         }
 
-        const normalizedRow = this.normalizeHydratedRowsForParserShape([row])[0] ?? row;
+        const normalizedRow = this.rowNormalizer.normalizeHydratedRowsForParserShape(
+            [row],
+            this.executor.meta.columns
+        )[0]!;
         return shape.parse(normalizedRow);
     }
 
@@ -583,439 +589,10 @@ export abstract class QuerySet<
         const compiler = new QueryCompiler(this.executor.meta, this.executor.adapter);
         const compiled = compiler.compile(this.state);
         const rows = await this.executor.run(compiled);
-        const normalizedRows = this.normalizeRowsForSchemaParsing(rows);
-        const hydratedRows = await this.hydrateRows(normalizedRows as unknown as Record<string, unknown>[], compiled);
-        this.attachRootRecordAccessors(hydratedRows);
+        const normalizedRows = this.rowNormalizer.normalizeRootRows(rows, this.executor.meta.columns);
+        const hydratedRows = await this.hydrator.materializeRows(normalizedRows, compiled);
         const projectedRows = hydratedRows as Array<HydratedQueryResult<TBaseResult, THydrated>>;
         return new QueryResult(projectedRows);
-    }
-
-    private normalizeRowsForSchemaParsing(rows: readonly TModel[]): TModel[] {
-        if (this.executor.adapter.dialect !== InternalDialect.SQLITE) {
-            return [...rows];
-        }
-
-        const booleanColumns = Object.entries(this.executor.meta.columns)
-            .filter(([, value]) => this.isBooleanColumnType(value))
-            .map(([column]) => column);
-
-        if (booleanColumns.length === 0) {
-            return [...rows];
-        }
-
-        return rows.map((row) => this.normalizeBooleanColumns(row, booleanColumns));
-    }
-
-    private normalizeHydratedRowsForParserShape(
-        rows: readonly HydratedQueryResult<TBaseResult, THydrated>[]
-    ): Array<HydratedQueryResult<TBaseResult, THydrated>> {
-        if (this.executor.adapter.dialect !== InternalDialect.SQLITE) {
-            return [...rows];
-        }
-
-        const booleanColumns = Object.entries(this.executor.meta.columns)
-            .filter(([, value]) => this.isBooleanColumnType(value))
-            .map(([column]) => column);
-
-        if (booleanColumns.length === 0) {
-            return [...rows];
-        }
-
-        return rows.map((row) => this.normalizeBooleanColumns(row, booleanColumns));
-    }
-
-    private async hydrateRows(
-        rows: Record<string, unknown>[],
-        compiled: CompiledQuery
-    ): Promise<Record<string, unknown>[]> {
-        if (!compiled.hydrationPlan) {
-            return rows;
-        }
-
-        // Hydration mutates row objects by attaching related entities and
-        // stripping internal alias columns. Copy once here so the executor's
-        // raw rows remain untouched throughout the recursive hydration pass.
-        const hydratedRows = rows.map((row) => ({ ...row }));
-        // Canonicalize by model key and primary key so one database row maps to
-        // one in-memory object even when multiple hydration paths reach it.
-        this.attachRootRecordAccessors(hydratedRows);
-        const canonicalEntities = new Map<string, Map<string | number, Record<string, unknown>>>();
-        const queuedJoinPrefetchOwners = new Map<CompiledHydrationNode, Set<Record<string, unknown>>>();
-        const compiler = new QueryCompiler(this.executor.meta, this.executor.adapter);
-
-        for (const row of hydratedRows) {
-            this.hydrateJoinNodesForOwner(
-                row,
-                row,
-                compiled.hydrationPlan.joinNodes,
-                canonicalEntities,
-                queuedJoinPrefetchOwners
-            );
-        }
-
-        for (const node of compiled.hydrationPlan.prefetchNodes) {
-            await this.hydratePrefetchNode(node, hydratedRows, canonicalEntities, compiler);
-        }
-
-        for (const [node, owners] of queuedJoinPrefetchOwners.entries()) {
-            await this.hydratePrefetchNode(node, [...owners], canonicalEntities, compiler);
-        }
-
-        for (const row of hydratedRows) {
-            for (const alias of compiled.hydrationPlan.hiddenRootAliases) {
-                delete row[alias];
-            }
-        }
-
-        return hydratedRows;
-    }
-
-    private primeManyToManyOwnerCache(
-        owner: Record<string, unknown>,
-        relationName: string,
-        bucket: readonly Record<string, unknown>[]
-    ): void {
-        const existing = owner[relationName];
-        if (existing && typeof (existing as { primePrefetchCache?: unknown }).primePrefetchCache === 'function') {
-            (existing as { primePrefetchCache: (rows: readonly Record<string, unknown>[]) => void }).primePrefetchCache(
-                bucket
-            );
-            return;
-        }
-        owner[relationName] = bucket.slice();
-    }
-
-    private attachRootRecordAccessors(rows: readonly Record<string, unknown>[]): void {
-        if (!this.executor.attachPersistedRecordAccessors) {
-            return;
-        }
-        const sourceModelKey = this.executor.meta.modelKey;
-        for (const row of rows) {
-            this.executor.attachPersistedRecordAccessors(row, sourceModelKey);
-        }
-    }
-
-    private hydrateJoinNodesForOwner(
-        owner: Record<string, unknown>,
-        rawRow: Record<string, unknown>,
-        nodes: readonly CompiledHydrationNode[],
-        canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>,
-        queuedJoinPrefetchOwners?: Map<CompiledHydrationNode, Set<Record<string, unknown>>>
-    ): void {
-        // Join-backed descendants already live on the current SQL row. This
-        // pass reads the aliased columns, materializes the related entity, and
-        // then recurses into any join-backed children on the same row payload.
-        for (const node of nodes) {
-            if (!node.join) {
-                continue;
-            }
-
-            const target: Record<string, unknown> = {};
-            let hasTargetValue = false;
-
-            for (const [column, alias] of Object.entries(node.join.columns)) {
-                const value = rawRow[alias];
-                delete rawRow[alias];
-                target[column] = this.normalizeColumnValue(node.targetColumns[column], value);
-                if (value !== null && value !== undefined) {
-                    hasTargetValue = true;
-                }
-            }
-
-            if (!hasTargetValue) {
-                owner[node.relationName] = null;
-                continue;
-            }
-
-            const canonical = this.canonicalizeEntity(node, target, canonicalEntities);
-            owner[node.relationName] = canonical;
-            for (const childNode of node.prefetchChildren) {
-                const queuedOwners = queuedJoinPrefetchOwners?.get(childNode);
-                if (queuedOwners) {
-                    queuedOwners.add(canonical);
-                    continue;
-                }
-
-                queuedJoinPrefetchOwners?.set(childNode, new Set([canonical]));
-            }
-            this.hydrateJoinNodesForOwner(
-                canonical,
-                rawRow,
-                node.joinChildren,
-                canonicalEntities,
-                queuedJoinPrefetchOwners
-            );
-        }
-    }
-
-    private async hydratePrefetchNode(
-        node: CompiledHydrationNode,
-        owners: readonly Record<string, unknown>[],
-        canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>,
-        compiler: QueryCompiler
-    ): Promise<void> {
-        if (owners.length === 0) {
-            return;
-        }
-
-        // Prefetch-backed descendants run as follow-up queries keyed by the
-        // owner rows produced so far. Initialize defaults first so missing
-        // children still hydrate to [] or null deterministically.
-        const groupedOwners = this.groupOwnersByAccessor(owners, node.ownerSourceAccessor);
-        const sourceValues = [...groupedOwners.keys()];
-        const isManyToMany = !!node.throughTable;
-        if (!isManyToMany) {
-            for (const owner of owners) {
-                owner[node.relationName] = node.cardinality === InternalRelationHydrationCardinality.MANY ? [] : null;
-            }
-        }
-
-        if (sourceValues.length === 0) {
-            return;
-        }
-
-        const sourceChunks = this.chunkValues(sourceValues, 500);
-        const compiledPrefetch = compiler.compilePrefetch(node, sourceChunks[0]!);
-        if (compiledPrefetch.kind === InternalPrefetchQueryKind.MANY_TO_MANY) {
-            const idsByOwner = new Map<string | number, Array<string | number>>();
-            const uniqueTargetIds = new Set<string | number>();
-
-            for (const chunk of sourceChunks) {
-                const chunkCompiled = compiler.compilePrefetch(node, chunk) as Extract<
-                    typeof compiledPrefetch,
-                    { kind: typeof InternalPrefetchQueryKind.MANY_TO_MANY }
-                >;
-                const throughResult = await this.executor.client.query<Record<string, unknown>>(
-                    chunkCompiled.throughSql,
-                    chunkCompiled.throughParams
-                );
-
-                for (const row of throughResult.rows) {
-                    const ownerId = row[chunkCompiled.ownerAlias];
-                    const targetId = row[chunkCompiled.targetAlias];
-                    if (
-                        (typeof ownerId !== 'string' && typeof ownerId !== 'number') ||
-                        (typeof targetId !== 'string' && typeof targetId !== 'number')
-                    ) {
-                        continue;
-                    }
-                    const bucket = idsByOwner.get(ownerId) ?? [];
-                    bucket.push(targetId);
-                    idsByOwner.set(ownerId, bucket);
-                    uniqueTargetIds.add(targetId);
-                }
-            }
-
-            const targets: Record<string | number, Record<string, unknown>> = {};
-            const targetIds = [...uniqueTargetIds.values()];
-            if (targetIds.length > 0) {
-                for (const targetChunk of this.chunkValues(targetIds, 500)) {
-                    const targetQuery = compiler.compileManyToManyTargets(node, targetChunk);
-                    const targetResult = await this.executor.client.query<Record<string, unknown>>(
-                        targetQuery.sql,
-                        targetQuery.params
-                    );
-
-                    for (const rawTargetRow of targetResult.rows) {
-                        const normalized = this.normalizeTargetRow(
-                            { targetColumns: compiledPrefetch.targetColumns },
-                            rawTargetRow
-                        );
-                        const canonical = this.canonicalizeEntity(node, normalized, canonicalEntities);
-                        this.hydrateJoinNodesForOwner(canonical, normalized, node.joinChildren, canonicalEntities);
-                        const primaryKey = canonical[node.targetPrimaryKey];
-                        if (typeof primaryKey === 'string' || typeof primaryKey === 'number') {
-                            targets[primaryKey] = canonical;
-                        }
-                    }
-                }
-            }
-
-            const canonicalChildren = new Map<string | number, Record<string, unknown>>();
-            const handledOwners = new Set<Record<string, unknown>>();
-            for (const [ownerId, ids] of idsByOwner.entries()) {
-                const bucket = ids
-                    .map((id) => targets[id])
-                    .filter((value): value is Record<string, unknown> => !!value);
-                for (const owner of groupedOwners.get(ownerId) ?? []) {
-                    this.primeManyToManyOwnerCache(owner, node.relationName, bucket);
-                    handledOwners.add(owner);
-                }
-                for (const child of bucket) {
-                    canonicalChildren.set(child[node.targetPrimaryKey] as string | number, child);
-                }
-            }
-            for (const owner of owners) {
-                if (!handledOwners.has(owner)) {
-                    this.primeManyToManyOwnerCache(owner, node.relationName, []);
-                }
-            }
-
-            const childOwners = [...canonicalChildren.values()];
-            for (const childNode of node.prefetchChildren) {
-                await this.hydratePrefetchNode(childNode, childOwners, canonicalEntities, compiler);
-            }
-            return;
-        }
-
-        const canonicalChildren = new Map<string | number, Record<string, unknown>>();
-        for (const chunk of sourceChunks) {
-            const chunkCompiled = compiler.compilePrefetch(node, chunk) as Extract<
-                typeof compiledPrefetch,
-                { kind: typeof InternalPrefetchQueryKind.DIRECT }
-            >;
-            const result = await this.executor.client.query<Record<string, unknown>>(
-                chunkCompiled.sql,
-                chunkCompiled.params
-            );
-
-            for (const rawResultRow of result.rows) {
-                const normalized = this.normalizeTargetRow(chunkCompiled, rawResultRow);
-                const canonical = this.canonicalizeEntity(node, normalized, canonicalEntities);
-                this.hydrateJoinNodesForOwner(canonical, normalized, node.joinChildren, canonicalEntities);
-
-                const key = normalized[chunkCompiled.targetKey];
-                if (typeof key !== 'string' && typeof key !== 'number') {
-                    continue;
-                }
-
-                for (const owner of groupedOwners.get(key) ?? []) {
-                    if (node.cardinality === InternalRelationHydrationCardinality.MANY) {
-                        (owner[node.relationName] as Record<string, unknown>[]).push(canonical);
-                    } else if (owner[node.relationName] === null) {
-                        owner[node.relationName] = canonical;
-                    }
-                }
-
-                const childPrimaryKey = canonical[node.targetPrimaryKey];
-                if (typeof childPrimaryKey === 'string' || typeof childPrimaryKey === 'number') {
-                    canonicalChildren.set(childPrimaryKey, canonical);
-                }
-            }
-        }
-
-        const childOwners = [...canonicalChildren.values()];
-        for (const childNode of node.prefetchChildren) {
-            await this.hydratePrefetchNode(childNode, childOwners, canonicalEntities, compiler);
-        }
-    }
-
-    private chunkValues<T>(values: readonly T[], size: number): T[][] {
-        if (values.length === 0) {
-            return [];
-        }
-        if (values.length <= size) {
-            return [Array.from(values)];
-        }
-        const chunks: T[][] = [];
-        for (let i = 0; i < values.length; i += size) {
-            chunks.push(values.slice(i, i + size) as T[]);
-        }
-        return chunks;
-    }
-
-    private groupOwnersByAccessor(
-        owners: readonly Record<string, unknown>[],
-        accessor: string
-    ): Map<string | number, Record<string, unknown>[]> {
-        const grouped = new Map<string | number, Record<string, unknown>[]>();
-
-        for (const owner of owners) {
-            const key = owner[accessor];
-            if (typeof key !== 'string' && typeof key !== 'number') {
-                continue;
-            }
-            const bucket = grouped.get(key) ?? [];
-            bucket.push(owner);
-            grouped.set(key, bucket);
-        }
-
-        return grouped;
-    }
-
-    private canonicalizeEntity(
-        node: CompiledHydrationNode,
-        row: Record<string, unknown>,
-        canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>
-    ): Record<string, unknown> {
-        // Mixed join/prefetch traversal can encounter the same related row more
-        // than once. Canonicalization ensures all later descendants attach to
-        // one stable object graph instead of competing copies.
-        const primaryKeyValue = row[node.targetPrimaryKey];
-        if (typeof primaryKeyValue !== 'string' && typeof primaryKeyValue !== 'number') {
-            return row;
-        }
-
-        const byModel =
-            canonicalEntities.get(node.targetModelKey) ?? new Map<string | number, Record<string, unknown>>();
-        const existing = byModel.get(primaryKeyValue);
-        if (existing) {
-            Object.assign(existing, row);
-            return existing;
-        }
-
-        byModel.set(primaryKeyValue, row);
-        canonicalEntities.set(node.targetModelKey, byModel);
-        this.executor.attachPersistedRecordAccessors?.(row, node.targetModelKey);
-        return row;
-    }
-
-    private normalizeTargetRow(prefetch: TargetColumnMetadata, row: Record<string, unknown>): Record<string, unknown> {
-        if (this.executor.adapter.dialect !== InternalDialect.SQLITE) {
-            return row;
-        }
-
-        let normalized: Record<string, unknown> | null = null;
-        for (const [column, type] of Object.entries(prefetch.targetColumns)) {
-            if (!this.isBooleanColumnType(type)) {
-                continue;
-            }
-            const next = this.normalizeSqliteBoolean(row[column]);
-            if (next === row[column]) {
-                continue;
-            }
-            normalized ??= { ...row };
-            normalized[column] = next;
-        }
-        return normalized ?? row;
-    }
-
-    private normalizeColumnValue(columnType: string | undefined, value: unknown): unknown {
-        return this.executor.adapter.dialect === InternalDialect.SQLITE && this.isBooleanColumnType(columnType)
-            ? this.normalizeSqliteBoolean(value)
-            : value;
-    }
-
-    private isBooleanColumnType(value: unknown): boolean {
-        return typeof value === 'string' && ['bool', 'boolean'].includes(value.trim().toLowerCase());
-    }
-
-    private normalizeSqliteBoolean(value: unknown): unknown {
-        if (value === 0 || value === '0') {
-            return false;
-        }
-        if (value === 1 || value === '1') {
-            return true;
-        }
-        return value;
-    }
-
-    private normalizeBooleanColumns<TRow extends Record<string, unknown>>(row: TRow, columns: readonly string[]): TRow {
-        let normalized: TRow | null = null;
-
-        for (const column of columns) {
-            const current = (row as Record<string, unknown>)[column];
-            const next = this.normalizeSqliteBoolean(current);
-            if (next === current) {
-                continue;
-            }
-            if (!normalized) {
-                normalized = { ...row };
-            }
-            (normalized as Record<string, unknown>)[column] = next;
-        }
-
-        return normalized ?? row;
     }
 
     private withoutHydrationState(): QuerySetState<TModel, TSourceModel> {
