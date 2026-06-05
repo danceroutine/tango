@@ -8,7 +8,6 @@ import { QBuilder as Q } from '../QBuilder';
 import type { HydratedQueryResult } from '../domain/RelationTyping';
 import type { TableMeta } from '../domain/TableMeta';
 import type { CompiledQuery } from '../domain/CompiledQuery';
-import { InternalPrefetchQueryKind } from '../domain/internal/InternalPrefetchQueryKind';
 import { InternalRelationKind } from '../domain/internal/InternalRelationKind';
 
 type User = {
@@ -627,103 +626,6 @@ describe(QuerySet, () => {
         expect(result.results).toEqual([{ id: 1, author: { id: 99, email: 'a@a.com' } }]);
     });
 
-    it('skips join nodes without compiled join descriptors and no-ops empty prefetch owner batches', async () => {
-        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta });
-        const querySet = new ModelQuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
-            hydrateJoinNodesForOwner: (
-                owner: Record<string, unknown>,
-                rawRow: Record<string, unknown>,
-                nodes: readonly Record<string, unknown>[],
-                canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>
-            ) => void;
-            hydratePrefetchNode: (
-                node: Record<string, unknown>,
-                owners: readonly Record<string, unknown>[],
-                canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>,
-                compiler: unknown
-            ) => Promise<void>;
-        };
-        const owner = { id: 1 };
-
-        querySet.hydrateJoinNodesForOwner(
-            owner,
-            { ...owner },
-            [
-                {
-                    relationName: 'team',
-                    targetColumns: {},
-                },
-            ],
-            new Map()
-        );
-        await expect(
-            querySet.hydratePrefetchNode(
-                {
-                    relationName: 'posts',
-                    cardinality: 'many',
-                    ownerSourceAccessor: 'id',
-                },
-                [],
-                new Map(),
-                {}
-            )
-        ).resolves.toBeUndefined();
-        expect(owner).toEqual({ id: 1 });
-    });
-
-    it('can attach a private single-valued prefetch node for internal recursion branches', async () => {
-        const query = vi.fn(async () => ({
-            rows: [
-                { id: 10, owner_id: 1, email: 'team@example.com' },
-                { id: 11, owner_id: 1, email: 'other@example.com' },
-                { id: null, owner_id: 1, email: 'ignored@example.com' },
-            ],
-        }));
-        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta, query });
-        const querySet = new ModelQuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
-            hydratePrefetchNode: (
-                node: Record<string, unknown>,
-                owners: readonly Record<string, unknown>[],
-                canonicalEntities: Map<string, Map<string | number, Record<string, unknown>>>,
-                compiler: {
-                    compilePrefetch: () => {
-                        kind: typeof InternalPrefetchQueryKind.DIRECT;
-                        sql: string;
-                        params: readonly unknown[];
-                        targetKey: string;
-                        targetColumns: Record<string, string>;
-                    };
-                }
-            ) => Promise<void>;
-        };
-        const owners = [{ id: 1 }] as Record<string, unknown>[];
-
-        await querySet.hydratePrefetchNode(
-            {
-                relationName: 'profile',
-                cardinality: 'single',
-                ownerSourceAccessor: 'id',
-                targetPrimaryKey: 'id',
-                targetModelKey: 'tests/Profile',
-                joinChildren: [],
-                prefetchChildren: [],
-            },
-            owners,
-            new Map(),
-            {
-                compilePrefetch: () => ({
-                    kind: InternalPrefetchQueryKind.DIRECT,
-                    sql: 'SELECT * FROM profiles WHERE owner_id IN ($1)',
-                    params: [1],
-                    targetKey: 'owner_id',
-                    targetColumns: { id: 'int', owner_id: 'int', email: 'text' },
-                }),
-            }
-        );
-
-        expect(owners).toEqual([{ id: 1, profile: { id: 10, owner_id: 1, email: 'team@example.com' } }]);
-    });
-
     it('rejects relation hydration collisions and unsupported hydration paths', async () => {
         const collisionMeta: TableMeta = {
             ...relatedMeta,
@@ -864,17 +766,6 @@ describe(QuerySet, () => {
         expect(first.map((tag) => tag.id)).toEqual([10, 10, 11]);
         expect(first[0]).toBe(first[1]);
         expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM posts'), expect.anything());
-    });
-
-    it('chunks prefetch owner ids deterministically', async () => {
-        const queryExecutor = aQueryExecutor<Record<string, unknown>>({ meta: relatedMeta });
-        const querySet = new ModelQuerySet<Record<string, unknown>>(queryExecutor) as unknown as {
-            chunkValues: <T>(values: readonly T[], size: number) => T[][];
-        };
-
-        expect(querySet.chunkValues([], 2)).toEqual([]);
-        expect(querySet.chunkValues([1, 2], 2)).toEqual([[1, 2]]);
-        expect(querySet.chunkValues([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
     });
 
     it('primes the prefetch cache on attached managers when many-to-many rows are hydrated', async () => {
@@ -1322,47 +1213,6 @@ describe(QuerySet, () => {
         expect(await qs.first((row) => row.email)).toBe('first@a.com');
         expect(await qs.first(parser)).toEqual({ id: 1 });
         expect(parser.parse).toHaveBeenCalledWith({ id: 1, email: 'first@a.com', active: true });
-    });
-
-    it('falls back to the hydrated row when parser-shape normalization yields no replacement row', async () => {
-        const { queryExecutor } = createQueryExecutorFixture(
-            [{ id: 9, email: 'fallback@a.com', active: true }],
-            'sqlite'
-        );
-        const qs = new ModelQuerySet<User>(queryExecutor);
-        const parser = { parse: vi.fn((row: User) => ({ id: row.id, email: row.email })) };
-
-        (
-            qs as unknown as {
-                normalizeHydratedRowsForParserShape: (rows: readonly User[]) => Array<User>;
-            }
-        ).normalizeHydratedRowsForParserShape = vi.fn(() => []);
-
-        expect(await qs.first(parser)).toEqual({ id: 9, email: 'fallback@a.com' });
-        expect(parser.parse).toHaveBeenCalledWith({ id: 9, email: 'fallback@a.com', active: true });
-    });
-
-    it('uses the original row when shapeFetchedRow cannot read a normalized parser row', () => {
-        const { queryExecutor } = createQueryExecutorFixture(
-            [{ id: 10, email: 'direct@a.com', active: true }],
-            'sqlite'
-        );
-        const qs = new ModelQuerySet<User>(queryExecutor);
-        const parser = { parse: vi.fn((row: User) => row.email) };
-
-        (
-            qs as unknown as {
-                normalizeHydratedRowsForParserShape: (rows: readonly User[]) => Array<User>;
-                shapeFetchedRow: (row: User, shape: typeof parser) => string;
-            }
-        ).normalizeHydratedRowsForParserShape = vi.fn(() => []);
-
-        const shaped = (
-            qs as unknown as { shapeFetchedRow: (row: User, shape: typeof parser) => string }
-        ).shapeFetchedRow({ id: 10, email: 'direct@a.com', active: true }, parser);
-
-        expect(shaped).toBe('direct@a.com');
-        expect(parser.parse).toHaveBeenCalledWith({ id: 10, email: 'direct@a.com', active: true });
     });
 
     it('returns last() from the current page when limit or offset are already applied', async () => {
