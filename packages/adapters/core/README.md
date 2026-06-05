@@ -38,7 +38,7 @@ In practice, you usually implement `FrameworkAdapter` in a package of your own a
 The root export includes:
 
 - `FrameworkAdapter`, the main adapter contract
-- `FrameworkAdapterOptions`, the shared options type
+- `FrameworkAdapterOptions`, the shared options type, including optional `transaction: 'writes'` for request-scoped write transactions. See [Opt into request-scoped write transactions](https://tangowebframework.dev/how-to/build-your-api-with-viewsets#opt-into-request-scoped-write-transactions)
 - `FRAMEWORK_ADAPTER_BRAND` and `isFrameworkAdapter`, which support runtime identification of adapter instances
 
 You can import these from the package root or from the `adapter` subpath, if you're used to Django's domain-drill-down style import paths:

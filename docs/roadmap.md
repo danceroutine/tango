@@ -18,9 +18,11 @@ Many-to-many hydration and join-row writes now share the resolved through-table 
 
 ### Transaction ergonomics beyond `atomic(...)`
 
-The core ORM transaction boundary is now `transaction.atomic(async (tx) => ...)`, including nested savepoints and post-commit work through `tx.onCommit(...)`.
+The core ORM transaction boundary is `transaction.atomic(async (tx) => ...)`, including nested savepoints and post-commit work through `tx.onCommit(...)`.
 
-The base transaction contract is in place, so the remaining work is mostly about fit and ergonomics. The main follow-up work is request-scoped wrappers in host adapters, broader multi-database routing, and better SQLite ergonomics beyond the current file-backed transaction boundary.
+Express, Next.js, and Nuxt adapters also ship a writes-only request transaction mode. Setting `transaction: 'writes'` wraps `POST`, `PUT`, `PATCH`, and `DELETE` handlers in one `transaction.atomic(...)` boundary per handler.
+
+The remaining transaction work focuses on broader request transaction policies, multi-database routing for transaction work, request abort and disconnect handling for adapter wrappers, and better SQLite ergonomics beyond the current file-backed transaction boundary.
 
 ### Agentic Development Support
 

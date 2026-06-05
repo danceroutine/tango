@@ -28,7 +28,9 @@ The ORM surface is designed for application code that wants a Django-shaped quer
 
 The current supported ORM contract also includes `transaction.atomic(async (tx) => ...)`, nested savepoints, and post-commit callback registration through `tx.onCommit(...)`.
 
-The remaining unsupported ORM boundary includes related-row projection, request-wide transaction wrappers, and multi-database routing for transaction work.
+Host adapters can also enable request-scoped write transactions through `transaction: 'writes'`, which wraps `POST`, `PUT`, `PATCH`, and `DELETE` handlers in one `transaction.atomic(...)` boundary. See [Opt into request-scoped write transactions](/how-to/build-your-api-with-viewsets#opt-into-request-scoped-write-transactions).
+
+The remaining unsupported ORM boundary includes related-row projection, broader request transaction policies such as wrapping read requests or custom per-route policies beyond the writes-only adapter mode, multi-database routing for transaction work, and request abort or disconnect handling for adapter transaction wrappers.
 
 ### Database dialects
 
@@ -51,6 +53,8 @@ This is the part of the framework that feels closest to Django REST Framework. T
 ### Host-framework adapters
 
 Adapters ship for Express, Next.js App Router, and Nuxt Nitro. Those adapters turn host requests into `RequestContext`, delegate to Tango resources, and convert the resulting `TangoResponse` back into the host framework's response shape.
+
+Those adapters also support optional request-scoped write transactions through `transaction: 'writes'` when you register a viewset or generic handler. See [Opt into request-scoped write transactions](/how-to/build-your-api-with-viewsets#opt-into-request-scoped-write-transactions).
 
 Application code can often keep the same serializers, model hooks, viewsets, and querying patterns while changing the surrounding host framework. The supported examples exercise that portability across Express, Next.js, and Nuxt.
 
@@ -100,7 +104,7 @@ MariaDB is the SQL dialect currently called out on the roadmap, but it is not pa
 
 Several unsupported areas already have explicit follow-up work planned.
 
-At the ORM level, the roadmap includes related-row projection and transaction ergonomics beyond the core `atomic(...)` API such as request-scoped wrappers and broader multi-database routing.
+At the ORM level, the roadmap includes related-row projection and transaction ergonomics beyond the current writes-only adapter mode, such as broader request transaction policies, multi-database routing, and request abort or disconnect handling.
 
 At the platform level, the roadmap also includes MariaDB support, GraphQL support, custom Tango environments beyond `development`, `test`, and `production`, non-linear migration dependency chains for larger teams, agentic development support for AI-assisted workflows, and longer-term exploration of NoSQL support.
 
