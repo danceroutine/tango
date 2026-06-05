@@ -1,6 +1,6 @@
 import { getLogger } from '@danceroutine/tango-core';
 import { readdir, readFile } from 'fs/promises';
-import { resolve, basename, join } from 'path/posix';
+import { basename, join, resolve } from 'node:path';
 import {
     type PackageManager,
     type SupportedFramework,

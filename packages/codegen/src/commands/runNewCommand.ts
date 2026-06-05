@@ -1,5 +1,5 @@
 import { getLogger } from '@danceroutine/tango-core';
-import { basename, resolve } from 'path/posix';
+import { basename, resolve } from 'node:path';
 import {
     type SupportedFramework,
     type PackageManager,
