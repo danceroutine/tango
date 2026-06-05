@@ -706,19 +706,19 @@ export class TangoResponse implements Response {
     }
 
     /**
-     * Add a `Set-Cookie` header that replaces prior application intent.
+     * Add a `Set-Cookie` header that replaces prior helper-managed intent for the same name, domain, and path.
      */
     setCookie(name: string, value: string, options?: Parameters<TangoHeaders['setCookie']>[2]): void {
         this.headers.setCookie(name, value, options);
     }
     /**
-     * Append another `Set-Cookie` header.
+     * Append another `Set-Cookie` header without replacing earlier cookie intent.
      */
     appendCookie(name: string, value: string, options?: Parameters<TangoHeaders['appendCookie']>[2]): void {
         this.headers.appendCookie(name, value, options);
     }
     /**
-     * Expire a cookie by issuing a matching deletion cookie header.
+     * Expire a cookie by replacing prior helper-managed intent for the same name, domain, and path.
      */
     deleteCookie(name: string, options?: Parameters<TangoHeaders['deleteCookie']>[1]): void {
         this.headers.deleteCookie(name, options);
@@ -847,9 +847,20 @@ export class TangoResponse implements Response {
     toWebResponse(): Response {
         const responseForTransfer = !this.bodyUsed && isReadableStream(this.bodySource) ? this.clone() : this;
         const body = TangoResponse.normalizeWebBody(responseForTransfer.bodySource);
+        const headers = new Headers();
+
+        responseForTransfer.headers.forEach((value, key) => {
+            if (key.toLowerCase() !== 'set-cookie') {
+                headers.append(key, value);
+            }
+        });
+
+        for (const cookie of responseForTransfer.headers.getSetCookie()) {
+            headers.append('Set-Cookie', cookie);
+        }
 
         return new Response(body, {
-            headers: new Headers(responseForTransfer.headers),
+            headers,
             status: responseForTransfer.status,
             statusText: responseForTransfer.statusText,
         });
