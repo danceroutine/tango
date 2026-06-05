@@ -617,6 +617,16 @@ describe(QueryCompiler, () => {
         expect(result.sql).toContain('LIMIT 10');
     });
 
+    it('compiles zero limit', () => {
+        const state = {
+            limit: 0,
+        };
+
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
+
+        expect(result.sql).toContain('LIMIT 0');
+    });
+
     it('compiles offset', () => {
         const state = {
             offset: 20,
@@ -625,6 +635,16 @@ describe(QueryCompiler, () => {
         const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
 
         expect(result.sql).toContain('OFFSET 20');
+    });
+
+    it('compiles zero offset', () => {
+        const state = {
+            offset: 0,
+        };
+
+        const result = new QueryCompiler(mockMeta, postgresAdapter).compile(state);
+
+        expect(result.sql).toContain('OFFSET 0');
     });
 
     it('compiles existence probes from scalar query state', () => {
@@ -690,6 +710,27 @@ describe(QueryCompiler, () => {
             const result = new QueryCompiler(mockMeta, sqliteAdapter).compile(state);
             expect(result.sql).toContain('users.id IN (?, ?)');
             expect(result.params).toEqual([1, 2]);
+        });
+
+        it('uses SQLite unlimited limit syntax when offset is set without a limit', () => {
+            const state = {
+                offset: 0,
+            };
+
+            const result = new QueryCompiler(mockMeta, sqliteAdapter).compile(state);
+
+            expect(result.sql).toContain('LIMIT -1 OFFSET 0');
+        });
+
+        it('keeps the requested SQLite limit when limit and offset are set', () => {
+            const state = {
+                limit: 10,
+                offset: 0,
+            };
+
+            const result = new QueryCompiler(mockMeta, sqliteAdapter).compile(state);
+
+            expect(result.sql).toContain('LIMIT 10 OFFSET 0');
         });
 
         it('normalizes sqlite booleans and supports non-array IN values', () => {
