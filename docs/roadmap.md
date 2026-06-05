@@ -16,12 +16,6 @@ The next relation work focuses on related-row projection: fetching related field
 
 Many-to-many hydration and join-row writes now share the resolved through-table metadata path, and persisted records expose a related manager that supports `add(...)`, `remove(...)`, `set(...)`, `clear()`, `create(...)`, and `all()` against the active runtime client. Follow-up work includes reverse-side naming for many-to-many, inverse edges in the resolved graph, and richer symmetry helpers beyond the current join-row link helpers.
 
-### Transaction ergonomics beyond `atomic(...)`
-
-The core ORM transaction boundary is now `transaction.atomic(async (tx) => ...)`, including nested savepoints and post-commit work through `tx.onCommit(...)`.
-
-The base transaction contract is in place, so the remaining work is mostly about fit and ergonomics. The main follow-up work is request-scoped wrappers in host adapters, broader multi-database routing, and better SQLite ergonomics beyond the current file-backed transaction boundary.
-
 ### Agentic Development Support
 
 Tango currently uses agentic skills and subagents for its own development, and wants to package that type of development workflow to enable your own agents to understand how to work with the framework.
