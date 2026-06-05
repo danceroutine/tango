@@ -87,7 +87,9 @@ describe(APIView, () => {
         const payload = await response.json();
 
         expect(response.status).toBe(405);
-        expect(payload).toEqual({ error: 'Method not allowed.' });
+        expect(payload).toEqual({
+            error: { code: 'method_not_allowed', message: 'Method not allowed.' },
+        });
         expect(response.headers.get('allow')).toBe('GET');
     });
 

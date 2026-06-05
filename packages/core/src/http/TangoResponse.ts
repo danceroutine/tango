@@ -214,9 +214,9 @@ export class TangoResponse implements Response {
     /**
      * Create a `405 Method Not Allowed` response and optionally populate `Allow`.
      */
-    static methodNotAllowed(
+    static methodNotAllowed<TDetails extends ErrorDetails = null>(
         allow?: readonly string[],
-        detail: string = 'Method not allowed.',
+        detail?: string | TangoError | ProblemDetails<TDetails>,
         init?: Omit<TangoResponseInit, 'body' | 'status' | 'headers'> & {
             headers?: HeadersInit;
         }
@@ -225,15 +225,27 @@ export class TangoResponse implements Response {
         if (allow && allow.length > 0) {
             headers.set('Allow', allow.join(', '));
         }
-        return TangoResponse.json(
+
+        if (TangoError.isTangoError(detail) || TangoError.isProblemDetails(detail)) {
+            return TangoResponse.error(detail, { ...init, status: 405, headers });
+        }
+
+        if (typeof detail === 'string') {
+            return TangoResponse.error(
+                {
+                    code: 'method_not_allowed',
+                    message: detail,
+                },
+                { ...init, status: 405, headers }
+            );
+        }
+
+        return TangoResponse.error(
             {
-                error: detail,
+                code: 'method_not_allowed',
+                message: 'Method not allowed.',
             },
-            {
-                ...init,
-                status: 405,
-                headers,
-            }
+            { ...init, status: 405, headers }
         );
     }
 
