@@ -82,7 +82,7 @@
         "yargs": "^18.0.0"
     },
     "peerDependencies": {
-        "pg": "^8.20.0",
+        "pg": "^8.21.0",
         "better-sqlite3": "^12.10.0"
     },
     "peerDependenciesMeta": {
@@ -101,7 +101,7 @@
         "@types/pg": "^8.20.0",
         "@types/yargs": "^17.0.33",
         "better-sqlite3": "^12.10.0",
-        "pg": "^8.20.0",
+        "pg": "^8.21.0",
         "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8",
