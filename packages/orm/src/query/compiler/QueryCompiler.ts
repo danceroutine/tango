@@ -133,7 +133,13 @@ export class QueryCompiler {
                       .join(', ')
                 : `${table}.${validatedPlan.meta.pk} ASC`
         }`;
-        const limitSQL = state.limit !== undefined ? ` LIMIT ${state.limit}` : '';
+        const hasOffset = state.offset !== undefined;
+        const limitSQL =
+            state.limit !== undefined
+                ? ` LIMIT ${state.limit}`
+                : hasOffset && this.adapter.dialect === InternalDialect.SQLITE
+                  ? ' LIMIT -1'
+                  : '';
         const offsetSQL = state.offset !== undefined ? ` OFFSET ${state.offset}` : '';
         const sql = `SELECT ${select} FROM ${table}${joinCollection.joins.length ? ` ${joinCollection.joins.join(' ')}` : ''}${whereSQL}${orderSQL}${limitSQL}${offsetSQL}`;
 

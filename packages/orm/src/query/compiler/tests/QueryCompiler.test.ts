@@ -712,6 +712,27 @@ describe(QueryCompiler, () => {
             expect(result.params).toEqual([1, 2]);
         });
 
+        it('uses SQLite unlimited limit syntax when offset is set without a limit', () => {
+            const state = {
+                offset: 0,
+            };
+
+            const result = new QueryCompiler(mockMeta, sqliteAdapter).compile(state);
+
+            expect(result.sql).toContain('LIMIT -1 OFFSET 0');
+        });
+
+        it('keeps the requested SQLite limit when limit and offset are set', () => {
+            const state = {
+                limit: 10,
+                offset: 0,
+            };
+
+            const result = new QueryCompiler(mockMeta, sqliteAdapter).compile(state);
+
+            expect(result.sql).toContain('LIMIT 10 OFFSET 0');
+        });
+
         it('normalizes sqlite booleans and supports non-array IN values', () => {
             const result = new QueryCompiler(mockMeta, sqliteAdapter).compile({
                 q: Q.and<UserModel>({ isActive: true }, { id__in: 9 }),
