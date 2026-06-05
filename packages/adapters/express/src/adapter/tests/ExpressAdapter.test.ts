@@ -107,6 +107,33 @@ describe(ExpressAdapter, () => {
         expect(next).not.toHaveBeenCalled();
     });
 
+    it('forwards set-cookie header lines as one Express header array', async () => {
+        const adapter = new ExpressAdapter();
+        const routeHandler = adapter.adapt(async () => {
+            const response = textResponse('ok');
+            response.setCookie('session', 'old');
+            response.setCookie('session', 'new');
+            response.appendCookie('theme', 'dark');
+            return response;
+        });
+
+        const req = anExpressRequest({
+            originalUrl: '/users',
+            url: '/users',
+        });
+        const res = anExpressResponse();
+        const next = vi.fn() as unknown as NextFunction;
+
+        await routeHandler(req, res, next);
+
+        const setHeader = vi.mocked(res.setHeader);
+        const setCookieCalls = setHeader.mock.calls.filter(([name]) => String(name).toLowerCase() === 'set-cookie');
+
+        expect(setCookieCalls).toEqual([['set-cookie', ['session=new; Path=/', 'theme=dark; Path=/']]]);
+        expect(res.send).toHaveBeenCalledWith('ok');
+        expect(next).not.toHaveBeenCalled();
+    });
+
     it('normalizes Express requests into Tango query params', () => {
         const adapter = new ExpressAdapter();
         const req = anExpressRequest({

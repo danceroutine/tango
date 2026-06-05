@@ -26,6 +26,11 @@ function streamFromText(text: string): ReadableStream<Uint8Array> {
     });
 }
 
+function getSetCookie(headers: Headers): string[] {
+    const withSetCookie = headers as Headers & { getSetCookie?: () => string[] };
+    return withSetCookie.getSetCookie?.() ?? [];
+}
+
 describe(TangoResponse, () => {
     it('identifies tango responses and uses the default response state', () => {
         const response = new TangoResponse();
@@ -72,6 +77,28 @@ describe(TangoResponse, () => {
         expect(response.headers.get('x-request-id')).toBe('a');
         expect(response.headers.get('traceparent')).toBe('b');
         expect(response.headers.get('server-timing')).toBe('c');
+    });
+
+    it('replaces helper-managed cookie intent and preserves cookie lines in web responses', () => {
+        const response = new TangoResponse();
+
+        response.setCookie('session', 'old');
+        response.setCookie('session', 'new');
+        response.appendCookie('theme', 'dark');
+        response.setCookie('session', 'api', { path: '/api' });
+
+        expect(response.headers.getSetCookie()).toEqual([
+            'session=new; Path=/',
+            'theme=dark; Path=/',
+            'session=api; Path=/api',
+        ]);
+
+        const webResponse = response.toWebResponse();
+        expect(getSetCookie(webResponse.headers)).toEqual([
+            'session=new; Path=/',
+            'theme=dark; Path=/',
+            'session=api; Path=/api',
+        ]);
     });
 
     it('serializes JSON, text, HTML, and stream bodies', async () => {

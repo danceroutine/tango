@@ -1,5 +1,30 @@
 import { isArrayBuffer, isBlob, isUint8Array } from '../runtime/index';
 
+type CookieOptions = {
+    domain?: string;
+    expires?: Date;
+    httpOnly?: boolean;
+    maxAge?: number;
+    path?: string;
+    sameSite?: 'Strict' | 'Lax' | 'None';
+    secure?: boolean;
+    priority?: 'Low' | 'Medium' | 'High';
+    partitioned?: boolean;
+};
+
+type DeleteCookieOptions = Omit<CookieOptions, 'expires' | 'maxAge' | 'httpOnly'>;
+
+type CookieIdentity = {
+    name: string;
+    domain: string;
+    path: string;
+};
+
+type CookieEntry = {
+    line: string;
+    identity: CookieIdentity | null;
+};
+
 /**
  * TangoHeaders extends the Web Headers class, adding ergonomic helpers
  * for common HTTP header patterns, convenience features, and a consistent API for
@@ -17,6 +42,12 @@ import { isArrayBuffer, isBlob, isUint8Array } from '../runtime/index';
 export class TangoHeaders extends Headers {
     static readonly BRAND = 'tango.http.headers' as const;
     readonly __tangoBrand: typeof TangoHeaders.BRAND = TangoHeaders.BRAND;
+    private cookieEntries: CookieEntry[] = [];
+
+    constructor(init?: HeadersInit) {
+        super();
+        this.appendHeadersInit(init);
+    }
 
     /**
      * Narrow an unknown value to `TangoHeaders`.
@@ -32,21 +63,7 @@ export class TangoHeaders extends Headers {
     /**
      * Serialize a cookie for the Set-Cookie header line.
      */
-    private static serializeCookie(
-        name: string,
-        value: string,
-        options: {
-            domain?: string;
-            expires?: Date;
-            httpOnly?: boolean;
-            maxAge?: number;
-            path?: string;
-            sameSite?: 'Strict' | 'Lax' | 'None';
-            secure?: boolean;
-            priority?: 'Low' | 'Medium' | 'High';
-            partitioned?: boolean;
-        } = {}
-    ): string {
+    private static serializeCookie(name: string, value: string, options: CookieOptions = {}): string {
         let cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value ?? '');
         if (options.domain) cookie += `; Domain=${options.domain}`;
         if (options.path) cookie += `; Path=${options.path}`;
@@ -59,6 +76,34 @@ export class TangoHeaders extends Headers {
         if (options.priority) cookie += `; Priority=${options.priority}`;
         if (options.partitioned) cookie += '; Partitioned';
         return cookie;
+    }
+
+    private static getCookieIdentity(
+        name: string,
+        options: Pick<CookieOptions, 'domain' | 'path'> = {}
+    ): CookieIdentity {
+        return {
+            name,
+            domain: options.domain?.toLowerCase() ?? '',
+            path: options.path ?? '/',
+        };
+    }
+
+    private static hasCookieIdentity(entry: CookieEntry, identity: CookieIdentity): boolean {
+        return (
+            entry.identity !== null &&
+            entry.identity.name === identity.name &&
+            entry.identity.domain === identity.domain &&
+            entry.identity.path === identity.path
+        );
+    }
+
+    private static isSetCookieName(name: string): boolean {
+        return name.toLowerCase() === 'set-cookie';
+    }
+
+    private static hasHeaderEntries(value: HeadersInit): value is Headers {
+        return typeof (value as { entries?: unknown }).entries === 'function';
     }
 
     private static hasNumberSize(value: unknown): value is { size: number } {
@@ -76,6 +121,36 @@ export class TangoHeaders extends Headers {
         return (
             typeof Buffer !== 'undefined' && typeof maybeBuffer.isBuffer === 'function' && maybeBuffer.isBuffer(value)
         );
+    }
+
+    override append(name: string, value: string): void {
+        if (!TangoHeaders.isSetCookieName(name)) {
+            super.append(name, value);
+            return;
+        }
+
+        this.cookieEntries.push({ line: value, identity: null });
+        this.syncSetCookieHeader();
+    }
+
+    override set(name: string, value: string): void {
+        if (!TangoHeaders.isSetCookieName(name)) {
+            super.set(name, value);
+            return;
+        }
+
+        this.cookieEntries = [{ line: value, identity: null }];
+        this.syncSetCookieHeader();
+    }
+
+    override delete(name: string): void {
+        if (!TangoHeaders.isSetCookieName(name)) {
+            super.delete(name);
+            return;
+        }
+
+        this.cookieEntries = [];
+        super.delete('Set-Cookie');
     }
 
     /**
@@ -107,8 +182,15 @@ export class TangoHeaders extends Headers {
     clone(): TangoHeaders {
         const copy = new TangoHeaders();
         for (const [name, value] of this.entries()) {
-            copy.append(name, value);
+            if (!TangoHeaders.isSetCookieName(name)) {
+                copy.append(name, value);
+            }
         }
+        copy.cookieEntries = this.cookieEntries.map((entry) => ({
+            line: entry.line,
+            identity: entry.identity === null ? null : { ...entry.identity },
+        }));
+        copy.syncSetCookieHeader();
         return copy;
     }
 
@@ -175,64 +257,35 @@ export class TangoHeaders extends Headers {
     }
 
     /**
-     * Set a cookie header (for Set-Cookie).
-     * @param name
-     * @param value
-     * @param options
+     * Set a `Set-Cookie` line, replacing prior helper-managed intent for the same name, domain, and path.
      */
-    setCookie(
-        name: string,
-        value: string,
-        options?: {
-            domain?: string;
-            expires?: Date;
-            httpOnly?: boolean;
-            maxAge?: number;
-            path?: string;
-            sameSite?: 'Strict' | 'Lax' | 'None';
-            secure?: boolean;
-            priority?: 'Low' | 'Medium' | 'High';
-            partitioned?: boolean;
-        }
-    ): void {
-        this.append('Set-Cookie', TangoHeaders.serializeCookie(name, value, options));
+    setCookie(name: string, value: string, options?: CookieOptions): void {
+        const identity = TangoHeaders.getCookieIdentity(name, options);
+        this.replaceCookieIdentity(identity, TangoHeaders.serializeCookie(name, value, options));
     }
 
     /**
-     * Append (additionally) a new cookie.
+     * Append another `Set-Cookie` line without replacing earlier cookie intent.
      */
-    appendCookie(
-        name: string,
-        value: string,
-        options?: {
-            domain?: string;
-            expires?: Date;
-            httpOnly?: boolean;
-            maxAge?: number;
-            path?: string;
-            sameSite?: 'Strict' | 'Lax' | 'None';
-            secure?: boolean;
-            priority?: 'Low' | 'Medium' | 'High';
-            partitioned?: boolean;
-        }
-    ): void {
-        this.append('Set-Cookie', TangoHeaders.serializeCookie(name, value, options));
+    appendCookie(name: string, value: string, options?: CookieOptions): void {
+        this.cookieEntries.push({
+            line: TangoHeaders.serializeCookie(name, value, options),
+            identity: TangoHeaders.getCookieIdentity(name, options),
+        });
+        this.syncSetCookieHeader();
     }
 
     /**
-     * Delete a cookie ("unset" it via expired date).
+     * Return each `Set-Cookie` header line separately.
      */
-    deleteCookie(
-        name: string,
-        options?: {
-            domain?: string;
-            path?: string;
-            sameSite?: 'Strict' | 'Lax' | 'None';
-            secure?: boolean;
-            priority?: 'Low' | 'Medium' | 'High';
-            partitioned?: boolean;
-        }
-    ): void {
+    override getSetCookie(): string[] {
+        return this.cookieEntries.map((entry) => entry.line);
+    }
+
+    /**
+     * Expire a cookie, replacing prior helper-managed intent for the same name, domain, and path.
+     */
+    deleteCookie(name: string, options?: DeleteCookieOptions): void {
         this.setCookie(name, '', {
             ...options,
             expires: new Date(0),
@@ -473,5 +526,54 @@ export class TangoHeaders extends Headers {
      */
     getResponseTime(): string | null {
         return this.get('X-Response-Time');
+    }
+
+    private appendHeadersInit(init: HeadersInit | undefined): void {
+        if (!init) return;
+
+        if (TangoHeaders.isTangoHeaders(init)) {
+            for (const [name, value] of init.entries()) {
+                if (!TangoHeaders.isSetCookieName(name)) {
+                    super.append(name, value);
+                }
+            }
+            this.cookieEntries = init.cookieEntries.map((entry) => ({
+                line: entry.line,
+                identity: entry.identity === null ? null : { ...entry.identity },
+            }));
+            this.syncSetCookieHeader();
+            return;
+        }
+
+        if (Array.isArray(init)) {
+            for (const [name, value] of init) {
+                this.append(name, value);
+            }
+            return;
+        }
+
+        if (TangoHeaders.hasHeaderEntries(init)) {
+            for (const [name, value] of init.entries()) {
+                this.append(name, value);
+            }
+            return;
+        }
+
+        for (const [name, value] of Object.entries(init)) {
+            this.append(name, value);
+        }
+    }
+
+    private replaceCookieIdentity(identity: CookieIdentity, line: string): void {
+        this.cookieEntries = this.cookieEntries.filter((entry) => !TangoHeaders.hasCookieIdentity(entry, identity));
+        this.cookieEntries.push({ line, identity });
+        this.syncSetCookieHeader();
+    }
+
+    private syncSetCookieHeader(): void {
+        super.delete('Set-Cookie');
+        for (const entry of this.cookieEntries) {
+            super.append('Set-Cookie', entry.line);
+        }
     }
 }

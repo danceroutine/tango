@@ -256,8 +256,14 @@ export class ExpressAdapter implements FrameworkAdapter<Response, RequestHandler
                 res.status(response.status);
 
                 response.headers.forEach((value, key) => {
+                    if (key.toLowerCase() === 'set-cookie') return;
                     res.setHeader(key, value);
                 });
+
+                const setCookie = tangoResponse.headers.getSetCookie();
+                if (setCookie.length > 0) {
+                    res.setHeader('set-cookie', setCookie);
+                }
 
                 if (response.body === null) {
                     res.end();

@@ -78,6 +78,73 @@ describe(TangoHeaders, () => {
         expect(headers.get('Content-Type')).toBe('application/json');
     });
 
+    it('replaces helper-managed cookie intent by name, domain, and path', () => {
+        const headers = new TangoHeaders();
+
+        headers.setCookie('session', 'old');
+        headers.setCookie('session', 'new');
+        headers.setCookie('session', 'api', { path: '/api' });
+        headers.setCookie('session', 'domain', { domain: 'example.com' });
+        headers.appendCookie('session', 'extra');
+        headers.deleteCookie('session');
+
+        const setCookie = headers.getSetCookie();
+        expect(setCookie).not.toContain('session=old; Path=/');
+        expect(setCookie).not.toContain('session=new; Path=/');
+        expect(setCookie).toContain('session=api; Path=/api');
+        expect(setCookie).toContain('session=domain; Domain=example.com; Path=/');
+        expect(setCookie.filter((cookie) => cookie.startsWith('session=extra;'))).toHaveLength(0);
+        expect(setCookie).toContain('session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0');
+    });
+
+    it('preserves appended and cloned cookie lines', () => {
+        const headers = new TangoHeaders();
+        headers.appendCookie('session', 'one');
+        headers.appendCookie('session', 'two');
+        headers.append('Set-Cookie', 'raw=1; Path=/');
+
+        const copy = headers.clone();
+        copy.setCookie('session', 'three');
+
+        expect(headers.getSetCookie()).toEqual(['session=one; Path=/', 'session=two; Path=/', 'raw=1; Path=/']);
+        expect(copy.getSetCookie()).toEqual(['raw=1; Path=/', 'session=three; Path=/']);
+    });
+
+    it('preserves set-cookie lines from header init values and raw mutations', () => {
+        const source = new TangoHeaders();
+        source.setHeader('X-Test', 'source');
+        source.setCookie('session', 'source');
+        source.append('Set-Cookie', 'raw=1; Path=/');
+
+        const fromTangoHeaders = new TangoHeaders(source);
+        expect(fromTangoHeaders.get('X-Test')).toBe('source');
+        expect(fromTangoHeaders.getSetCookie()).toEqual(['session=source; Path=/', 'raw=1; Path=/']);
+
+        const native = new Headers();
+        native.set('X-Test', 'native');
+        native.append('Set-Cookie', 'native=1; Path=/');
+        const fromNativeHeaders = new TangoHeaders(native);
+        expect(fromNativeHeaders.get('X-Test')).toBe('native');
+        expect(fromNativeHeaders.getSetCookie()).toEqual(['native=1; Path=/']);
+
+        const fromArray = new TangoHeaders([
+            ['X-Test', 'array'],
+            ['Set-Cookie', 'array=1; Path=/'],
+        ]);
+        expect(fromArray.get('X-Test')).toBe('array');
+        expect(fromArray.getSetCookie()).toEqual(['array=1; Path=/']);
+
+        const fromObject = new TangoHeaders({ 'Set-Cookie': 'object=1; Path=/' });
+        expect(fromObject.getSetCookie()).toEqual(['object=1; Path=/']);
+
+        fromArray.set('Set-Cookie', 'reset=1; Path=/');
+        expect(fromArray.getSetCookie()).toEqual(['reset=1; Path=/']);
+
+        fromArray.delete('Set-Cookie');
+        expect(fromArray.getSetCookie()).toEqual([]);
+        expect(fromArray.has('Set-Cookie')).toBe(false);
+    });
+
     it('infers content metadata and preserves trace headers', () => {
         const bodyBytes = new Uint8Array([120]);
         const headers = new TangoHeaders();
