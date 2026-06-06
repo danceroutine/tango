@@ -4,6 +4,10 @@ maintainerNote: This page is generated from stable release changesets during Tan
 
 # Changelog
 
+## 1.12.3 - 2026-06-06
+
+Existing `QuerySet` filter, exclude, relation hydration, and prefetch SQL outputs remain unchanged while predicate, hydration-plan, and prefetch rendering move into internal compiler components.
+
 ## 1.12.2 - 2026-06-05
 
 Bump nuxt to 4.4.7.
