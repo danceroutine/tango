@@ -97,7 +97,7 @@
         "@danceroutine/tango-testing": "workspace:*",
         "@danceroutine/tango-orm": "workspace:*",
         "@types/better-sqlite3": "^7.6.12",
-        "@types/node": "^25.9.1",
+        "@types/node": "^25.9.3",
         "@types/pg": "^8.20.0",
         "@types/yargs": "^17.0.33",
         "better-sqlite3": "^12.10.0",
