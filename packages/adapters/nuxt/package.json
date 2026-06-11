@@ -46,11 +46,11 @@
         "h3": "^1.15.11"
     },
     "peerDependencies": {
-        "nuxt": "^4.4.7"
+        "nuxt": "^4.4.8"
     },
     "devDependencies": {
         "@types/node": "^25.9.1",
-        "nuxt": "^4.4.7",
+        "nuxt": "^4.4.8",
         "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8",
