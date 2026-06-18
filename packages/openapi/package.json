@@ -55,7 +55,7 @@
         "@danceroutine/tango-core": "workspace:*",
         "@danceroutine/tango-testing": "workspace:*",
         "@types/node": "^25.9.1",
-        "tsdown": "^0.22.2",
+        "tsdown": "^0.22.3",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8"
     }

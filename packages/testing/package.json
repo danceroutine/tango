@@ -81,7 +81,7 @@
     "devDependencies": {
         "@types/express": "^5.0.0",
         "@types/node": "^25.9.1",
-        "tsdown": "^0.22.2",
+        "tsdown": "^0.22.3",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8",
         "zod": "^4.0.0"
