@@ -83,7 +83,7 @@
     },
     "peerDependencies": {
         "pg": "^8.21.0",
-        "better-sqlite3": "^12.10.0"
+        "better-sqlite3": "^12.11.1"
     },
     "peerDependenciesMeta": {
         "pg": {
@@ -100,7 +100,7 @@
         "@types/node": "^25.9.1",
         "@types/pg": "^8.20.0",
         "@types/yargs": "^17.0.33",
-        "better-sqlite3": "^12.10.0",
+        "better-sqlite3": "^12.11.1",
         "pg": "^8.21.0",
         "tsdown": "^0.22.2",
         "typescript": "^6.0.3",
