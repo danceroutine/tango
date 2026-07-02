@@ -34,7 +34,7 @@
         "zod": "^4.0.0"
     },
     "devDependencies": {
-        "@types/node": "^25.9.1",
+        "@types/node": "^26.1.0",
         "tsx": "^4.22.4",
         "typescript": "^6.0.3",
         "vue-tsc": "^3.3.3"
